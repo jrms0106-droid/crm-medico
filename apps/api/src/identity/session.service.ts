@@ -8,10 +8,19 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Session, User } from '../generated/prisma/client.js';
 import { randomToken, sha256Hex } from './crypto.js';
 
+/** Dados da requisição que vão para a auditoria. */
+export interface RequestMeta {
+  requestId: string;
+  ip?: string | undefined;
+}
+
 export interface AuthContext {
   session: Session;
   user: User;
   state: SessionState;
+  /** Unidades às quais o usuário está vinculado. */
+  unitIds: string[];
+  request: RequestMeta;
 }
 
 const MINUTE = 60_000;
@@ -63,11 +72,11 @@ export class SessionService {
    * Encontra a sessão do token e confere validade (revogada, expirada, inativa, usuário desativado).
    * Renova o "último uso". Lança 401 em qualquer problema.
    */
-  async resolve(token: string): Promise<AuthContext> {
+  async resolve(token: string, request: RequestMeta): Promise<AuthContext> {
     const now = this.clock.now();
     const session = await this.prisma.session.findUnique({
       where: { tokenHash: sha256Hex(token) },
-      include: { user: true },
+      include: { user: { include: { unitMemberships: { select: { unitId: true } } } } },
     });
     const expired = () =>
       new AppError(401, ErrorCode.SESSION_EXPIRED, 'Sua sessão terminou. Entre novamente.');
@@ -83,8 +92,14 @@ export class SessionService {
       where: { id: session.id },
       data: { lastSeenAt: now },
     });
-    const { user } = session;
-    return { session: updated, user, state: this.stateOf(user, updated) };
+    const { unitMemberships, ...user } = session.user;
+    return {
+      session: updated,
+      user,
+      state: this.stateOf(user, updated),
+      unitIds: unitMemberships.map((m) => m.unitId),
+      request,
+    };
   }
 
   async revoke(sessionId: string): Promise<void> {

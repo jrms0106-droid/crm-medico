@@ -1,5 +1,7 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { AuditController } from './audit/audit.controller.js';
+import { AuditService } from './audit/audit.service.js';
 import { AuthorizationService } from './authz/authorization.service.js';
 import { Clock, SystemClock } from './common/clock.js';
 import { APP_CONFIG } from './config.tokens.js';
@@ -11,6 +13,11 @@ import { AuthController } from './identity/auth.controller.js';
 import { AuthGuard } from './identity/auth.guard.js';
 import { AuthService } from './identity/auth.service.js';
 import { SessionService } from './identity/session.service.js';
+import { UserAdminService } from './identity/user-admin.service.js';
+import { OrgService } from './org/org.service.js';
+import { ProfessionalsController } from './org/professionals.controller.js';
+import { SpecialtiesController } from './org/specialties.controller.js';
+import { UnitsController } from './org/units.controller.js';
 
 export interface AppOverrides {
   clock?: Clock;
@@ -21,14 +28,25 @@ export class AppModule {
   static forRoot(config: AppConfig, overrides: AppOverrides = {}): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, AuthController, AdminUsersController],
+      controllers: [
+        HealthController,
+        AuthController,
+        AdminUsersController,
+        UnitsController,
+        SpecialtiesController,
+        ProfessionalsController,
+        AuditController,
+      ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
         { provide: Clock, useValue: overrides.clock ?? new SystemClock() },
         { provide: PrismaService, useFactory: () => new PrismaService(config.DATABASE_URL) },
         SessionService,
         AuthService,
+        AuditService,
         AuthorizationService,
+        UserAdminService,
+        OrgService,
         { provide: APP_GUARD, useClass: AuthGuard },
       ],
     };

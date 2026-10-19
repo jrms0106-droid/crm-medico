@@ -27,7 +27,7 @@ MFA é obrigatório para os papéis configurados em `MFA_REQUIRED_ROLES` (padrã
 - Desativar um usuário ou redefinir o acesso dele revoga **na hora** todas as sessões.
 - Toda requisição que altera dados (POST, PUT, PATCH, DELETE) com sessão exige o cabeçalho `x-csrf-token` igual ao da sessão (403 `CSRF_FAILED`). Cookie `SameSite=Strict` e `HttpOnly`.
 - Código TOTP de 6 dígitos, janela de 30 s, tolerância de ±1 janela, e cada código só vale uma vez.
-- Reautenticação (senha + código TOTP se o usuário tem MFA) vale 5 minutos e será exigida por ações críticas (assinar, exportar, acesso emergencial, alterar permissões).
+- Reautenticação (senha + código TOTP se o usuário tem MFA) vale 5 minutos e é exigida por ações críticas. Desde a Etapa 2, já vale para criar contas, mudar papéis ou unidades, redefinir acesso, desativar e reativar (ver [organizacao-e-permissoes.md](organizacao-e-permissoes.md)). Assinar, exportar e acesso emergencial entram nas próximas etapas.
 - Recuperação de acesso: um administrador gera uma **senha temporária** (mostrada uma única vez), que obriga a troca no próximo login, e apaga o MFA para novo cadastro. Recuperação por e-mail fica para quando houver serviço de e-mail contratado.
 
 ## Endpoints (`/api/v1`)
@@ -42,7 +42,7 @@ MFA é obrigatório para os papéis configurados em `MFA_REQUIRED_ROLES` (padrã
 | `POST /auth/mfa/verify`              | `pending_mfa` com MFA cadastrado              | `{ code }`                         | 200 `SessionInfo`; 400                    |
 | `POST /auth/password`                | `password_change_required` ou `active`        | `{ currentPassword, newPassword }` | 200 `SessionInfo`                         |
 | `POST /auth/reauth`                  | `active`                                      | `{ password, code? }`              | 204                                       |
-| `POST /admin/users/:id/reset-access` | `active`, papel admin                         | —                                  | 200 `{ temporaryPassword }`               |
+| `POST /admin/users/:id/reset-access` | `active`, papel admin, reautenticação recente | —                                  | 200 `{ temporaryPassword }`               |
 
 `SessionInfo` = `{ user: { id, name, email, roles }, state, mfaEnabled, csrfToken, expiresAt }`.
 

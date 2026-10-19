@@ -11,17 +11,19 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity"]
+  schemas  = ["org", "identity", "audit"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
 model Organization {
-  id        String   @id @default(uuid(7)) @db.Uuid
-  name      String   @db.VarChar(200)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-  units     Unit[]
-  users     User[]
+  id            String         @id @default(uuid(7)) @db.Uuid
+  name          String         @db.VarChar(200)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  units         Unit[]
+  users         User[]
+  specialties   Specialty[]
+  professionals Professional[]
 
   @@map("organizations")
   @@schema("org")
@@ -29,14 +31,15 @@ model Organization {
 
 /// Unidade de atendimento. Todo dado operacional carrega o id da unidade.
 model Unit {
-  id             String       @id @default(uuid(7)) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  name           String       @db.VarChar(200)
-  timezone       String       @default("America/Sao_Paulo") @db.VarChar(64)
-  active         Boolean      @default(true)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id             String           @id @default(uuid(7)) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name           String           @db.VarChar(200)
+  timezone       String           @default("America/Sao_Paulo") @db.VarChar(64)
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  memberships    UnitMembership[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -54,26 +57,28 @@ enum Role {
 
 /// Pessoa que acessa o sistema. Senha guardada só como hash Argon2id.
 model User {
-  id                 String       @id @default(uuid(7)) @db.Uuid
-  organizationId     String       @map("organization_id") @db.Uuid
-  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  name               String       @db.VarChar(200)
+  id                 String           @id @default(uuid(7)) @db.Uuid
+  organizationId     String           @map("organization_id") @db.Uuid
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name               String           @db.VarChar(200)
   /// Sempre em minúsculas.
-  email              String       @unique @db.VarChar(254)
-  passwordHash       String       @map("password_hash") @db.VarChar(255)
+  email              String           @unique @db.VarChar(254)
+  passwordHash       String           @map("password_hash") @db.VarChar(255)
   roles              Role[]
-  active             Boolean      @default(true)
-  mustChangePassword Boolean      @default(false) @map("must_change_password")
+  active             Boolean          @default(true)
+  mustChangePassword Boolean          @default(false) @map("must_change_password")
   /// Segredo TOTP criptografado com AES-256-GCM (nunca em texto puro).
-  mfaSecretEnc       String?      @map("mfa_secret_enc") @db.VarChar(255)
-  mfaEnabled         Boolean      @default(false) @map("mfa_enabled")
+  mfaSecretEnc       String?          @map("mfa_secret_enc") @db.VarChar(255)
+  mfaEnabled         Boolean          @default(false) @map("mfa_enabled")
   /// Último passo de 30 s aceito; impede reutilizar o mesmo código.
-  mfaLastStep        BigInt?      @map("mfa_last_step")
-  failedLoginCount   Int          @default(0) @map("failed_login_count")
-  lockedUntil        DateTime?    @map("locked_until") @db.Timestamptz(3)
-  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  mfaLastStep        BigInt?          @map("mfa_last_step")
+  failedLoginCount   Int              @default(0) @map("failed_login_count")
+  lockedUntil        DateTime?        @map("locked_until") @db.Timestamptz(3)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
   sessions           Session[]
+  unitMemberships    UnitMembership[]
+  professional       Professional?
 
   @@index([organizationId])
   @@map("users")
@@ -82,21 +87,122 @@ model User {
 
 /// Sessão de login. Guarda apenas o hash do token; o token fica só no cookie do navegador.
 model Session {
-  id            String    @id @default(uuid(7)) @db.Uuid
-  userId        String    @map("user_id") @db.Uuid
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash     String    @unique @map("token_hash") @db.Char(64)
-  csrfToken     String    @map("csrf_token") @db.VarChar(64)
-  mfaVerified   Boolean   @default(false) @map("mfa_verified")
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  lastSeenAt    DateTime  @map("last_seen_at") @db.Timestamptz(3)
-  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(3)
-  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(3)
-  reauthAt      DateTime? @map("reauth_at") @db.Timestamptz(3)
-  ip            String?   @db.VarChar(64)
-  userAgent     String?   @map("user_agent") @db.VarChar(400)
+  id          String    @id @default(uuid(7)) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique @map("token_hash") @db.Char(64)
+  csrfToken   String    @map("csrf_token") @db.VarChar(64)
+  mfaVerified Boolean   @default(false) @map("mfa_verified")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt  DateTime  @map("last_seen_at") @db.Timestamptz(3)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(3)
+  reauthAt    DateTime? @map("reauth_at") @db.Timestamptz(3)
+  ip          String?   @db.VarChar(64)
+  userAgent   String?   @map("user_agent") @db.VarChar(400)
 
   @@index([userId])
   @@map("sessions")
   @@schema("identity")
+}
+
+/// Vínculo de um usuário com uma unidade. Recursos operacionais da unidade exigem este vínculo.
+model UnitMembership {
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unitId    String   @map("unit_id") @db.Uuid
+  unit      Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([userId, unitId])
+  @@index([unitId])
+  @@map("unit_memberships")
+  @@schema("org")
+}
+
+/// Especialidade médica do catálogo da organização.
+model Specialty {
+  id             String                  @id @default(uuid(7)) @db.Uuid
+  organizationId String                  @map("organization_id") @db.Uuid
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name           String                  @db.VarChar(120)
+  active         Boolean                 @default(true)
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  professionals  ProfessionalSpecialty[]
+
+  @@unique([organizationId, name])
+  @@map("specialties")
+  @@schema("org")
+}
+
+/// Ficha profissional de um usuário médico: CRM/UF e especialidades com RQE.
+model Professional {
+  id             String                  @id @default(uuid(7)) @db.Uuid
+  organizationId String                  @map("organization_id") @db.Uuid
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  userId         String                  @unique @map("user_id") @db.Uuid
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  /// Só dígitos.
+  crmNumber      String                  @map("crm_number") @db.VarChar(10)
+  /// Sigla da UF em maiúsculas.
+  crmState       String                  @map("crm_state") @db.Char(2)
+  active         Boolean                 @default(true)
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  specialties    ProfessionalSpecialty[]
+
+  @@unique([organizationId, crmState, crmNumber])
+  @@map("professionals")
+  @@schema("org")
+}
+
+model ProfessionalSpecialty {
+  professionalId String       @map("professional_id") @db.Uuid
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  specialtyId    String       @map("specialty_id") @db.Uuid
+  specialty      Specialty    @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  /// Registro de Qualificação de Especialista, quando houver. Só dígitos.
+  rqe            String?      @db.VarChar(10)
+
+  @@id([professionalId, specialtyId])
+  @@index([specialtyId])
+  @@map("professional_specialties")
+  @@schema("org")
+}
+
+enum AuditOutcome {
+  allowed
+  denied
+  not_found
+
+  @@schema("audit")
+}
+
+/// Trilha de auditoria somente-acréscimo (um gatilho recusa UPDATE e DELETE).
+/// Referencia tudo por id, sem chaves estrangeiras, para sobreviver a qualquer outro dado.
+/// Nunca guarda conteúdo clínico.
+model AuditEvent {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  /// Ordem de gravação, estritamente crescente (base do encadeamento por hash na Etapa 7).
+  seq            BigInt       @unique @default(autoincrement())
+  occurredAt     DateTime     @map("occurred_at") @db.Timestamptz(3)
+  organizationId String?      @map("organization_id") @db.Uuid
+  actorUserId    String?      @map("actor_user_id") @db.Uuid
+  sessionId      String?      @map("session_id") @db.Uuid
+  requestId      String?      @map("request_id") @db.VarChar(64)
+  ip             String?      @db.VarChar(64)
+  action         String       @db.VarChar(32)
+  resourceType   String       @map("resource_type") @db.VarChar(64)
+  resourceId     String?      @map("resource_id") @db.VarChar(64)
+  unitId         String?      @map("unit_id") @db.Uuid
+  patientId      String?      @map("patient_id") @db.Uuid
+  outcome        AuditOutcome
+  reason         String       @db.VarChar(100)
+  emergency      Boolean      @default(false)
+
+  @@index([organizationId, occurredAt])
+  @@index([actorUserId, occurredAt])
+  @@map("events")
+  @@schema("audit")
 }
