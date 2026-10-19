@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { defineConfig, devices } from '@playwright/test';
+import { TEST_KEYS } from './e2e/fixtures.js';
 
 /**
  * Testes ponta a ponta no navegador (Etapa 7). Sobem a API e o aplicativo web já compilados
@@ -8,13 +9,6 @@ import { defineConfig, devices } from '@playwright/test';
 const API_PORT = 3100;
 const WEB_PORT = 4173;
 const dbUrl = process.env['E2E_DATABASE_URL'] ?? process.env['DATABASE_URL_TEST'] ?? '';
-// Chaves públicas de teste (as mesmas do .env.example); nunca usar fora de testes.
-const testKeys = {
-  MFA_ENCRYPTION_KEY:
-    process.env['MFA_ENCRYPTION_KEY'] ?? 'ZGV2LXNvbWVudGUtbmFvLXVzYXItZW0tcHJvZHVjYW8=',
-  PII_ENCRYPTION_KEY:
-    process.env['PII_ENCRYPTION_KEY'] ?? 'cGlpLWRldi1zb21lbnRlLW5hby11c2FyLWVtLXByb2Q=',
-};
 
 export default defineConfig({
   testDir: 'e2e',
@@ -48,7 +42,7 @@ export default defineConfig({
       port: API_PORT,
       reuseExistingServer: false,
       env: {
-        ...testKeys,
+        ...TEST_KEYS,
         DATABASE_URL: dbUrl,
         API_PORT: String(API_PORT),
         WEB_ORIGIN: `http://localhost:${WEB_PORT}`,

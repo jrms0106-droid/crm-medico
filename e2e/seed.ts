@@ -7,14 +7,14 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../apps/api/src/generated/prisma/client.js';
 import { SecretBox } from '../apps/api/src/identity/crypto.js';
 import { hashPassword } from '../apps/api/src/identity/password.js';
-import { E2E_PASSWORD, E2E_TOTP_SECRET, USERS } from './fixtures.js';
+import { E2E_PASSWORD, E2E_TOTP_SECRET, TEST_KEYS, USERS } from './fixtures.js';
 
 const url = process.env['E2E_DATABASE_URL'] ?? process.env['DATABASE_URL_TEST'];
 if (!url || !/_test\b|_e2e\b/.test(url)) {
   throw new Error('Os testes ponta a ponta só rodam num banco de teste (nome terminado em _test).');
 }
-const mfaKey = process.env['MFA_ENCRYPTION_KEY'];
-if (!mfaKey) throw new Error('MFA_ENCRYPTION_KEY é obrigatória.');
+// A mesma chave que playwright.config.ts entrega à API.
+const mfaKey = TEST_KEYS.MFA_ENCRYPTION_KEY;
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 await db.$executeRawUnsafe(
