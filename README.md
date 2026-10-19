@@ -9,7 +9,8 @@ Sistema de gestão de clínica multiespecialidades com prontuário eletrônico, 
 - Monorepo TypeScript com API (NestJS), aplicativo web instalável (React + Vite, PWA) e pacotes compartilhados.
 - Banco PostgreSQL com migrações versionadas (Prisma) e dados fictícios de exemplo.
 - Formato único de erros da API, cabeçalhos de segurança e identificador por requisição.
-- Motor de autorização com negação por padrão (as regras de cada perfil chegam na Etapa 2).
+- Motor de autorização com negação por padrão e matriz de permissões por perfil (médico, secretária, administrador), com auditoria de toda decisão de acesso ([regras](docs/api/organizacao-e-permissoes.md)).
+- Cadastro de unidades, especialidades, fichas profissionais (CRM/UF e RQE) e contas de usuário pelo administrador (por enquanto só pela API; as telas chegam na Etapa 7).
 - Login com senha (Argon2id), sessão no servidor, bloqueio por tentativas, verificação em duas etapas (TOTP) obrigatória para médicos e administradores, troca de senha e recuperação de acesso pelo administrador ([regras](docs/api/identidade.md)).
 - Verificações automáticas a cada alteração: tipos, lint, formatação, testes, vulnerabilidades e segredos.
 
@@ -45,6 +46,7 @@ npm run dev                   # API em http://localhost:3000 e app em http://loc
 Usuários fictícios criados pelo seed (senha `senha-de-desenvolvimento`, só para desenvolvimento):
 `admin@clinica-ficticia.test`, `medico@clinica-ficticia.test` e `secretaria@clinica-ficticia.test`.
 No primeiro login, médico e administrador cadastram a verificação em duas etapas num aplicativo autenticador.
+O seed também cria a "Unidade Centro", quatro especialidades e a ficha profissional do médico (CRM 000001/SP, fictício).
 
 ## Verificações
 

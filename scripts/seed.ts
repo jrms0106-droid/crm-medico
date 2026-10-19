@@ -22,7 +22,7 @@ const DEV_PASSWORD = 'senha-de-desenvolvimento';
 const existing = await prisma.organization.findFirst({ where: { name: ORG_NAME } });
 const org = existing ?? (await prisma.organization.create({ data: { name: ORG_NAME } }));
 
-await prisma.unit.upsert({
+const unit = await prisma.unit.upsert({
   where: { organizationId_name: { organizationId: org.id, name: 'Unidade Centro' } },
   update: {},
   create: { organizationId: org.id, name: 'Unidade Centro' },
@@ -39,15 +39,56 @@ const users: { name: string; email: string; roles: Role[] }[] = [
 ];
 
 const passwordHash = await hashPassword(DEV_PASSWORD);
+const created: Record<string, string> = {};
 for (const u of users) {
-  await prisma.user.upsert({
+  const user = await prisma.user.upsert({
     where: { email: u.email },
     update: {},
     create: { ...u, organizationId: org.id, passwordHash },
   });
+  await prisma.unitMembership.upsert({
+    where: { userId_unitId: { userId: user.id, unitId: unit.id } },
+    update: {},
+    create: { userId: user.id, unitId: unit.id },
+  });
+  created[u.email] = user.id;
 }
 
-console.log(`Dados fictícios prontos: "${org.name}", 1 unidade e ${users.length} usuários.`);
+const specialtyNames = ['Cardiologia', 'Clínica Médica', 'Dermatologia', 'Pediatria'];
+const specialties = [];
+for (const name of specialtyNames) {
+  specialties.push(
+    await prisma.specialty.upsert({
+      where: { organizationId_name: { organizationId: org.id, name } },
+      update: {},
+      create: { organizationId: org.id, name },
+    }),
+  );
+}
+
+// CRM e RQE inventados, só para desenvolvimento.
+const doctorId = created['medico@clinica-ficticia.test'] ?? '';
+await prisma.professional.upsert({
+  where: { userId: doctorId },
+  update: {},
+  create: {
+    organizationId: org.id,
+    userId: doctorId,
+    crmNumber: '000001',
+    crmState: 'SP',
+    specialties: {
+      create: [
+        { specialtyId: specialties[0]?.id ?? '', rqe: '000001' },
+        { specialtyId: specialties[1]?.id ?? '' },
+      ],
+    },
+  },
+});
+
+console.log(
+  `Dados fictícios prontos: "${org.name}", 1 unidade, ${users.length} usuários, ` +
+    `${specialtyNames.length} especialidades e 1 ficha profissional (CRM 000001/SP, fictício).`,
+);
 console.log(`Senha de todos (só desenvolvimento): ${DEV_PASSWORD}`);
 for (const u of users) console.log(`  ${u.email}  (${u.roles.join(', ')})`);
 await prisma.$disconnect();

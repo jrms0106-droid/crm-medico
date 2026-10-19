@@ -41,7 +41,10 @@ export class AuthGuard implements CanActivate {
       throw new AppError(401, ErrorCode.UNAUTHENTICATED, 'É preciso entrar no sistema.');
     }
 
-    const auth = await this.sessions.resolve(token);
+    const auth = await this.sessions.resolve(token, {
+      requestId: String(req.res?.locals['requestId'] ?? ''),
+      ip: req.ip,
+    });
 
     if (!SAFE_METHODS.has(req.method)) {
       const header = req.header('x-csrf-token') ?? '';
