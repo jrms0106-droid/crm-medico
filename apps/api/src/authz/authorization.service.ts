@@ -3,9 +3,11 @@ import {
   type AccessContext,
   type AccessRequest,
   type Action,
+  type Decision,
   RULES,
   type ResourceType,
   type Role,
+  type Sensitivity,
   decide,
 } from '@crm/policy';
 import { ErrorCode } from '@crm/shared';
@@ -24,6 +26,9 @@ export interface ResourceRef {
   patientId?: string | undefined;
   /** Usuário dono do recurso (ex.: o médico da agenda), para regras que dependem disso. */
   ownerUserId?: string | undefined;
+  /** Autor do registro clínico ou do atendimento. */
+  authorUserId?: string | undefined;
+  sensitivity?: Sensitivity | undefined;
 }
 
 /**
@@ -43,6 +48,31 @@ export class AuthorizationService {
     resource: ResourceRef,
     context: AccessContext = {},
   ): Promise<void> {
+    const decision = this.check(ctx, action, resource, context);
+    await this.audit.record(ctx, {
+      action,
+      resourceType: resource.type,
+      resourceId: resource.id,
+      unitId: resource.unitId,
+      patientId: resource.patientId,
+      outcome: decision.allowed ? 'allowed' : 'denied',
+      reason: decision.reason,
+    });
+    if (!decision.allowed) {
+      throw new AppError(403, ErrorCode.FORBIDDEN, 'Você não tem permissão para esta operação.');
+    }
+  }
+
+  /**
+   * Só calcula a decisão, sem auditar e sem lançar erro. Serve para dizer à tela o que o usuário
+   * pode fazer; todo acesso real a dados passa por `authorize`.
+   */
+  check(
+    ctx: AuthContext,
+    action: Action,
+    resource: ResourceRef,
+    context: AccessContext = {},
+  ): Decision {
     const request: AccessRequest = {
       subject: {
         userId: ctx.user.id,
@@ -57,22 +87,12 @@ export class AuthorizationService {
         unitId: resource.unitId,
         patientId: resource.patientId,
         ownerUserId: resource.ownerUserId,
+        authorUserId: resource.authorUserId,
+        sensitivity: resource.sensitivity,
       },
       context,
     };
-    const decision = decide(request, RULES);
-    await this.audit.record(ctx, {
-      action,
-      resourceType: resource.type,
-      resourceId: resource.id,
-      unitId: resource.unitId,
-      patientId: resource.patientId,
-      outcome: decision.allowed ? 'allowed' : 'denied',
-      reason: decision.reason,
-    });
-    if (!decision.allowed) {
-      throw new AppError(403, ErrorCode.FORBIDDEN, 'Você não tem permissão para esta operação.');
-    }
+    return decide(request, RULES);
   }
 
   /**

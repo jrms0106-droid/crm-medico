@@ -66,10 +66,31 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
     unitScope: 'all_roles',
     grants: { secretary: MANAGE },
   },
+  // Os recursos clínicos abaixo dependem também do vínculo assistencial (careRelationshipAccess).
+  encounter: {
+    dataClass: 'clinical',
+    unitScope: 'none',
+    grants: { doctor: MANAGE },
+  },
+  clinical_summary: {
+    dataClass: 'clinical',
+    unitScope: 'none',
+    grants: { doctor: ['view'] },
+  },
   clinical_record: {
     dataClass: 'clinical',
     unitScope: 'none',
     grants: { doctor: ['view', 'create', 'edit', 'correct', 'sign'] },
+  },
+  emergency_access: {
+    dataClass: 'clinical',
+    unitScope: 'none',
+    grants: { doctor: ['create'] },
+  },
+  emergency_review: {
+    dataClass: 'audit',
+    unitScope: 'none',
+    grants: { admin: ['view', 'edit'] },
   },
   audit_event: {
     dataClass: 'audit',
@@ -82,11 +103,40 @@ export function dataClassOf(type: ResourceType): DataClass {
   return RESOURCE_CATALOG[type].dataClass;
 }
 
+type ClinicalType = 'encounter' | 'clinical_summary' | 'clinical_record' | 'emergency_access';
+type CareGrants = Partial<Record<ClinicalType, readonly Action[]>>;
+
+const RECORD_WORK: readonly Action[] = ['view', 'create', 'edit', 'correct', 'sign'];
+
 /**
- * Estados do vínculo que liberam acesso clínico nesta etapa. A tabela completa por estado
- * (seção 5.2 da arquitetura) substitui esta lista na Etapa 5, após validação médica.
+ * O que cada estado do vínculo libera (docs/api/atendimento-e-vinculo.md). Proposta técnica,
+ * pendente de validação médica.
  */
-const CARE_STATES_WITH_CLINICAL_ACCESS: readonly CareRelationshipState[] = ['started', 'follow_up'];
+export const CARE_MATRIX: Readonly<Record<CareRelationshipState, CareGrants>> = {
+  scheduled: { clinical_summary: ['view'], encounter: ['create'] },
+  confirmed: { clinical_summary: ['view'], encounter: ['create'] },
+  started: {
+    clinical_summary: ['view'],
+    clinical_record: RECORD_WORK,
+    encounter: ['view', 'edit'],
+  },
+  follow_up: { clinical_summary: ['view'], clinical_record: RECORD_WORK, encounter: ['view'] },
+  closed: {
+    clinical_summary: ['view'],
+    clinical_record: ['view', 'edit', 'correct', 'sign'],
+    encounter: ['view'],
+  },
+  expired: {},
+};
+
+/** Acesso emergencial: só leitura. */
+const EMERGENCY_GRANTS: CareGrants = { clinical_summary: ['view'], clinical_record: ['view'] };
+
+/** Pedir acesso emergencial não depende de vínculo. */
+const ANY_STATE_GRANTS: CareGrants = { emergency_access: ['create'] };
+
+/** Ações que só o autor faz sobre o próprio registro ou atendimento. */
+const AUTHOR_ONLY: readonly Action[] = ['edit', 'correct', 'sign'];
 
 const deny = (reason: string) => ({ allowed: false, reason });
 
@@ -100,13 +150,39 @@ export const clinicalRequiresDoctor: Rule = ({ subject, resource }) => {
   return subject.roles.includes('doctor') ? undefined : deny('clinical_requires_doctor');
 };
 
-/** Mesmo o médico só acessa dado clínico com vínculo assistencial em andamento. */
-export const clinicalRequiresCareRelationship: Rule = ({ resource, context }) => {
+/**
+ * Mesmo o médico só acessa dado clínico conforme o vínculo assistencial com o paciente.
+ * Só nega; quem concede é a matriz de papéis.
+ */
+export const careRelationshipAccess: Rule = ({ subject, action, resource, context }) => {
   if (dataClassOf(resource.type) !== 'clinical') return undefined;
+  const type = resource.type as ClinicalType;
+  if (type === 'encounter' && resource.ownerUserId && resource.ownerUserId !== subject.userId) {
+    return deny('not_own_schedule');
+  }
+  const isAuthor = resource.authorUserId === subject.userId;
+  if (AUTHOR_ONLY.includes(action) && resource.authorUserId !== undefined && !isAuthor) {
+    return deny('not_author');
+  }
+  // Obrigação documental: o autor sempre vê e adenda os próprios registros.
+  if (type === 'clinical_record' && isAuthor && (action === 'view' || action === 'correct')) {
+    return undefined;
+  }
   const state = context?.careRelationship;
-  return state && CARE_STATES_WITH_CLINICAL_ACCESS.includes(state)
-    ? undefined
-    : deny('no_care_relationship');
+  const emergency = context?.emergencyAccess === true;
+  const allowed = [
+    ...(state ? (CARE_MATRIX[state][type] ?? []) : []),
+    ...(emergency ? (EMERGENCY_GRANTS[type] ?? []) : []),
+    ...(ANY_STATE_GRANTS[type] ?? []),
+  ];
+  if (!allowed.includes(action)) {
+    return deny(state || emergency ? 'care_state_disallows' : 'no_care_relationship');
+  }
+  const sensitive = resource.sensitivity === 'elevated' || resource.sensitivity === 'restricted';
+  if (type === 'clinical_record' && sensitive && !isAuthor && !context?.justified && !emergency) {
+    return deny('justification_required');
+  }
+  return undefined;
 };
 
 /**
@@ -131,6 +207,25 @@ export const roleGrants: Rule = ({ subject, action, resource }: AccessRequest) =
   return role ? { allowed: true, reason: `role_${role}` } : undefined;
 };
 
+/**
+ * Quando só o acesso emergencial libera a leitura, a auditoria registra esse motivo, e não o
+ * papel, para que a revisão encontre todo uso da quebra de vidro.
+ */
+export const emergencyAccessReason: Rule = ({ subject, action, resource, context }) => {
+  if (dataClassOf(resource.type) !== 'clinical' || context?.emergencyAccess !== true) {
+    return undefined;
+  }
+  if (!subject.roles.includes('doctor')) return undefined;
+  const type = resource.type as ClinicalType;
+  const byState = context.careRelationship
+    ? (CARE_MATRIX[context.careRelationship][type] ?? [])
+    : [];
+  if (byState.includes(action) || !(EMERGENCY_GRANTS[type] ?? []).includes(action)) {
+    return undefined;
+  }
+  return { allowed: true, reason: 'emergency_access' };
+};
+
 /** O médico vê as consultas da própria agenda, e só elas. */
 export const doctorViewsOwnAppointments: Rule = ({ subject, action, resource }) => {
   if (resource.type !== 'appointment' || action !== 'view') return undefined;
@@ -144,8 +239,9 @@ export const doctorViewsOwnAppointments: Rule = ({ subject, action, resource }) 
 export const RULES: readonly Rule[] = [
   sameOrganization,
   clinicalRequiresDoctor,
-  clinicalRequiresCareRelationship,
+  careRelationshipAccess,
   unitScope,
+  emergencyAccessReason,
   roleGrants,
   doctorViewsOwnAppointments,
 ];

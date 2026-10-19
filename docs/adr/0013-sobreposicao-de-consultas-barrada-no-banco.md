@@ -12,6 +12,7 @@
   - Dividir a agenda em horários fixos com índice único: não comporta durações diferentes nem mudança da duração padrão.
   - Biblioteca de datas (Luxon, date-fns-tz): o `Intl` do Node já resolve a conversão de fuso que precisamos.
 - **Consequências:**
+  - Complemento (Etapa 5): a marcação também trava a agenda (`pg_advisory_xact_lock`) antes de conferir. No CI, quatro inserções simultâneas sobrepostas chegaram a travar entre si na restrição (resposta 500 em vez de 409); com a trava, as marcações da mesma agenda passam uma de cada vez, e a restrição continua como última barreira.
   - A extensão `btree_gist` precisa estar disponível no PostgreSQL da hospedagem (é extensão padrão do PostgreSQL).
   - Toda mudança de estado da consulta passa por `updateMany` condicionado ao estado de origem, para que duas pessoas não façam transições conflitantes.
 - **Riscos:** Encaixes não têm proteção de sobreposição por desenho; o limite de encaixes por período, se a clínica quiser, fica para depois.

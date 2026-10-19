@@ -654,7 +654,10 @@ export class SchedulingService {
       throw rule('Esse horário está bloqueado na agenda.', ErrorCode.SLOT_BLOCKED);
     }
 
-    // Serializa as marcações do mesmo paciente, para a checagem abaixo valer sob concorrência.
+    // Serializa as marcações da mesma agenda e do mesmo paciente (sempre nesta ordem), para as
+    // checagens abaixo valerem sob concorrência. Sem a trava da agenda, inserções simultâneas
+    // sobrepostas podem travar entre si na restrição do banco (deadlock) em vez de serem recusadas.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${schedule.id}::text, 0))`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${b.patientId}::text, 0))`;
     const active = {
       status: { in: [...ACTIVE_STATUSES] },

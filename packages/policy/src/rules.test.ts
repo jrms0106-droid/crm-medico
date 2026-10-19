@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decide } from './engine.js';
-import { RULES } from './rules.js';
+import { RULES, dataClassOf } from './rules.js';
 import {
   ACTIONS,
   type AccessRequest,
@@ -26,7 +26,11 @@ const EXPECTED: Record<ResourceType, Record<Role, string>> = {
   patient_registration: { doctor: 'vce', secretary: 'vce', admin: '' },
   schedule: { doctor: 'v', secretary: 'vce', admin: 'vce' },
   appointment: { doctor: '', secretary: 'vce', admin: '' },
+  encounter: { doctor: 've', secretary: '', admin: '' },
+  clinical_summary: { doctor: 'v', secretary: '', admin: '' },
   clinical_record: { doctor: 'vcers', secretary: '', admin: '' },
+  emergency_access: { doctor: 'c', secretary: '', admin: '' },
+  emergency_review: { doctor: '', secretary: '', admin: 've' },
   audit_event: { doctor: '', secretary: '', admin: 'v' },
 };
 
@@ -61,7 +65,7 @@ function request(
       type,
       organizationId: opts.organizationId ?? ORG,
       unitId: 'unitId' in opts ? opts.unitId : UNIT,
-      patientId: type === 'clinical_record' ? 'p1' : undefined,
+      patientId: dataClassOf(type) === 'clinical' ? 'p1' : undefined,
     },
     context: { careRelationship: opts.care ?? 'started' },
   };
@@ -107,20 +111,15 @@ describe('regras de atributo', () => {
     });
   });
 
-  it('médico sem vínculo assistencial em andamento não acessa prontuário', () => {
-    for (const care of ['scheduled', 'confirmed', 'closed', 'expired'] as const) {
-      expect(decide(request(['doctor'], 'view', 'clinical_record', { care }), RULES)).toEqual({
-        allowed: false,
-        reason: 'no_care_relationship',
-      });
+  it('médico sem vínculo assistencial não acessa nada clínico, só pede acesso emergencial', () => {
+    for (const type of ['clinical_summary', 'clinical_record', 'encounter'] as const) {
+      for (const action of ACTIONS) {
+        const req = { ...request(['doctor'], action, type), context: {} };
+        expect(decide(req, RULES)).toEqual({ allowed: false, reason: 'no_care_relationship' });
+      }
     }
-    const noContext = { ...request(['doctor'], 'view', 'clinical_record'), context: {} };
-    expect(decide(noContext, RULES).reason).toBe('no_care_relationship');
-  });
-
-  it('médico com vínculo em acompanhamento ativo acessa prontuário', () => {
-    const req = request(['doctor'], 'view', 'clinical_record', { care: 'follow_up' });
-    expect(decide(req, RULES).allowed).toBe(true);
+    const ask = { ...request(['doctor'], 'create', 'emergency_access'), context: {} };
+    expect(decide(ask, RULES).allowed).toBe(true);
   });
 
   it('usuário de outra unidade é negado em recurso operacional da unidade alheia', () => {
@@ -174,6 +173,159 @@ describe('regras de atributo', () => {
       for (const action of ACTIONS) {
         expect(decide(request([], action, type), RULES).allowed).toBe(false);
       }
+    }
+  });
+});
+
+/**
+ * Um caso por estado do vínculo (docs/api/atendimento-e-vinculo.md), sobre registros de outro
+ * autor com sensibilidade normal. Letras como na matriz acima.
+ */
+const BY_STATE: Record<
+  CareRelationshipState,
+  Record<'summary' | 'record' | 'encounter', string>
+> = {
+  scheduled: { summary: 'v', record: '', encounter: 'c' },
+  confirmed: { summary: 'v', record: '', encounter: 'c' },
+  started: { summary: 'v', record: 'vc', encounter: 'v' },
+  follow_up: { summary: 'v', record: 'vc', encounter: 'v' },
+  closed: { summary: 'v', record: 'v', encounter: 'v' },
+  expired: { summary: '', record: '', encounter: '' },
+};
+
+function clinical(
+  action: Action,
+  type: 'clinical_summary' | 'clinical_record' | 'encounter',
+  context: AccessRequest['context'],
+  resource: Partial<AccessRequest['resource']> = {},
+): AccessRequest {
+  return {
+    subject: { userId: 'u1', organizationId: ORG, roles: ['doctor'], unitIds: [UNIT] },
+    action,
+    resource: { type, organizationId: ORG, patientId: 'p1', ...resource },
+    context,
+  };
+}
+
+describe('o que o médico vê e faz em cada estado do vínculo', () => {
+  const states = Object.keys(BY_STATE) as CareRelationshipState[];
+  for (const state of states) {
+    it(`estado ${state}`, () => {
+      const expected = BY_STATE[state];
+      for (const action of ['view', 'create'] as const) {
+        const ctx = { careRelationship: state };
+        const summary = decide(clinical(action, 'clinical_summary', ctx), RULES).allowed;
+        expect(summary, `resumo ${action}`).toBe(expected.summary.includes(LETTER[action]));
+        const other = { authorUserId: 'u2', sensitivity: 'normal' as const };
+        const record = decide(clinical(action, 'clinical_record', ctx, other), RULES).allowed;
+        expect(record, `registro ${action}`).toBe(expected.record.includes(LETTER[action]));
+        const encounter = decide(clinical(action, 'encounter', ctx), RULES).allowed;
+        expect(encounter, `atendimento ${action}`).toBe(
+          expected.encounter.includes(LETTER[action]),
+        );
+      }
+    });
+  }
+
+  it('agendamento não libera o histórico completo', () => {
+    for (const state of ['scheduled', 'confirmed'] as const) {
+      expect(
+        decide(clinical('view', 'clinical_record', { careRelationship: state }), RULES),
+      ).toEqual({ allowed: false, reason: 'care_state_disallows' });
+    }
+  });
+
+  it('vínculo expirado: só os registros de sua autoria, para ver e adendar', () => {
+    const ctx = { careRelationship: 'expired' as const };
+    const own = { authorUserId: 'u1' };
+    expect(decide(clinical('view', 'clinical_record', ctx, own), RULES).allowed).toBe(true);
+    expect(decide(clinical('correct', 'clinical_record', ctx, own), RULES).allowed).toBe(true);
+    expect(decide(clinical('edit', 'clinical_record', ctx, own), RULES).allowed).toBe(false);
+    expect(decide(clinical('sign', 'clinical_record', ctx, own), RULES).allowed).toBe(false);
+    const other = { authorUserId: 'u2' };
+    expect(decide(clinical('view', 'clinical_record', ctx, other), RULES).allowed).toBe(false);
+  });
+
+  it('encerrado: termina e assina os próprios, mas não cria registros novos', () => {
+    const ctx = { careRelationship: 'closed' as const };
+    expect(decide(clinical('create', 'clinical_record', ctx), RULES).allowed).toBe(false);
+    const own = { authorUserId: 'u1' };
+    for (const action of ['edit', 'sign', 'correct'] as const) {
+      expect(decide(clinical(action, 'clinical_record', ctx, own), RULES).allowed).toBe(true);
+    }
+  });
+
+  it('editar, adendar e assinar só os próprios registros', () => {
+    const ctx = { careRelationship: 'started' as const };
+    for (const action of ['edit', 'correct', 'sign'] as const) {
+      const req = clinical(action, 'clinical_record', ctx, { authorUserId: 'u2' });
+      expect(decide(req, RULES)).toEqual({ allowed: false, reason: 'not_author' });
+    }
+  });
+
+  it('registro sensível de outro autor exige justificativa, mesmo com vínculo em andamento', () => {
+    for (const sensitivity of ['elevated', 'restricted'] as const) {
+      const resource = { authorUserId: 'u2', sensitivity };
+      const bare = clinical('view', 'clinical_record', { careRelationship: 'started' }, resource);
+      expect(decide(bare, RULES)).toEqual({ allowed: false, reason: 'justification_required' });
+      const justified = clinical(
+        'view',
+        'clinical_record',
+        { careRelationship: 'started', justified: true },
+        resource,
+      );
+      expect(decide(justified, RULES).allowed).toBe(true);
+      const mine = clinical(
+        'view',
+        'clinical_record',
+        { careRelationship: 'started' },
+        {
+          authorUserId: 'u1',
+          sensitivity,
+        },
+      );
+      expect(decide(mine, RULES).allowed).toBe(true);
+    }
+  });
+
+  it('só o médico dono da agenda inicia o atendimento', () => {
+    const ctx = { careRelationship: 'confirmed' as const };
+    const own = clinical('create', 'encounter', ctx, { ownerUserId: 'u1' });
+    expect(decide(own, RULES).allowed).toBe(true);
+    const other = clinical('create', 'encounter', ctx, { ownerUserId: 'u2' });
+    expect(decide(other, RULES)).toEqual({ allowed: false, reason: 'not_own_schedule' });
+  });
+
+  it('acesso emergencial libera só leitura, registrada com motivo próprio', () => {
+    const ctx = { emergencyAccess: true };
+    expect(decide(clinical('view', 'clinical_record', ctx, { authorUserId: 'u2' }), RULES)).toEqual(
+      { allowed: true, reason: 'emergency_access' },
+    );
+    const sensitive = { authorUserId: 'u2', sensitivity: 'restricted' as const };
+    expect(decide(clinical('view', 'clinical_record', ctx, sensitive), RULES).allowed).toBe(true);
+    expect(decide(clinical('view', 'clinical_summary', ctx), RULES).reason).toBe(
+      'emergency_access',
+    );
+    for (const action of ['create', 'edit', 'sign', 'export', 'share'] as const) {
+      expect(decide(clinical(action, 'clinical_record', ctx), RULES).allowed).toBe(false);
+    }
+    // Com vínculo que já libera a leitura, o motivo continua sendo o papel.
+    const both = { emergencyAccess: true, careRelationship: 'started' as const };
+    expect(decide(clinical('view', 'clinical_record', both), RULES).reason).toBe('role_doctor');
+  });
+
+  it('secretária e administrador continuam sem acesso clínico, inclusive emergencial', () => {
+    for (const roles of [['secretary'], ['admin']] as Role[][]) {
+      const req = clinical('view', 'clinical_record', {
+        careRelationship: 'started',
+        emergencyAccess: true,
+      });
+      req.subject.roles = roles;
+      expect(decide(req, RULES)).toEqual({ allowed: false, reason: 'clinical_requires_doctor' });
+      const ask = clinical('create', 'clinical_record', {});
+      ask.resource.type = 'emergency_access';
+      ask.subject.roles = roles;
+      expect(decide(ask, RULES).allowed).toBe(false);
     }
   });
 });

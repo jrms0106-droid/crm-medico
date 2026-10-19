@@ -11,7 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity", "audit", "patients", "scheduling"]
+  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
@@ -223,38 +223,40 @@ enum CommChannel {
 
 /// Cadastro do paciente (dado pessoal, nunca clínico). Ver docs/api/pacientes.md.
 model Patient {
-  id                   String           @id @default(uuid(7)) @db.Uuid
-  organizationId       String           @map("organization_id") @db.Uuid
-  organization         Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  fullName             String           @map("full_name") @db.VarChar(200)
-  socialName           String?          @map("social_name") @db.VarChar(200)
+  id                   String            @id @default(uuid(7)) @db.Uuid
+  organizationId       String            @map("organization_id") @db.Uuid
+  organization         Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fullName             String            @map("full_name") @db.VarChar(200)
+  socialName           String?           @map("social_name") @db.VarChar(200)
   /// Nome completo e social sem acentos, em minúsculas, para a busca.
-  nameSearch           String           @map("name_search") @db.VarChar(410)
+  nameSearch           String            @map("name_search") @db.VarChar(410)
   /// CPF criptografado (AES-256-GCM). Nunca em texto puro.
-  cpfEnc               String?          @map("cpf_enc") @db.VarChar(255)
+  cpfEnc               String?           @map("cpf_enc") @db.VarChar(255)
   /// HMAC-SHA256 do CPF: impede repetição e permite busca exata.
-  cpfHash              String?          @map("cpf_hash") @db.Char(64)
-  birthDate            DateTime         @map("birth_date") @db.Date
-  email                String?          @db.VarChar(254)
-  addressZip           String?          @map("address_zip") @db.Char(8)
-  addressStreet        String?          @map("address_street") @db.VarChar(200)
-  addressNumber        String?          @map("address_number") @db.VarChar(20)
-  addressComplement    String?          @map("address_complement") @db.VarChar(100)
-  addressDistrict      String?          @map("address_district") @db.VarChar(100)
-  addressCity          String?          @map("address_city") @db.VarChar(100)
-  addressState         String?          @map("address_state") @db.Char(2)
-  commChannels         CommChannel[]    @default([]) @map("comm_channels")
-  appointmentReminders Boolean          @default(false) @map("appointment_reminders")
-  marketingOptIn       Boolean          @default(false) @map("marketing_opt_in")
-  active               Boolean          @default(true)
-  version              Int              @default(1)
-  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  cpfHash              String?           @map("cpf_hash") @db.Char(64)
+  birthDate            DateTime          @map("birth_date") @db.Date
+  email                String?           @db.VarChar(254)
+  addressZip           String?           @map("address_zip") @db.Char(8)
+  addressStreet        String?           @map("address_street") @db.VarChar(200)
+  addressNumber        String?           @map("address_number") @db.VarChar(20)
+  addressComplement    String?           @map("address_complement") @db.VarChar(100)
+  addressDistrict      String?           @map("address_district") @db.VarChar(100)
+  addressCity          String?           @map("address_city") @db.VarChar(100)
+  addressState         String?           @map("address_state") @db.Char(2)
+  commChannels         CommChannel[]     @default([]) @map("comm_channels")
+  appointmentReminders Boolean           @default(false) @map("appointment_reminders")
+  marketingOptIn       Boolean           @default(false) @map("marketing_opt_in")
+  active               Boolean           @default(true)
+  version              Int               @default(1)
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   phones               PatientPhone[]
   contacts             PatientContact[]
   versions             PatientVersion[]
   appointments         Appointment[]
   waitlist             WaitlistEntry[]
+  encounters           Encounter[]
+  emergencyAccesses    EmergencyAccess[]
 
   @@unique([organizationId, cpfHash])
   @@index([organizationId, birthDate])
@@ -415,6 +417,7 @@ model Appointment {
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
   events            AppointmentEvent[]
+  encounter         Encounter?
 
   @@index([scheduleId, startsAt])
   @@index([patientId, startsAt])
@@ -466,4 +469,61 @@ model WaitlistEntry {
   @@index([unitId, status, createdAt])
   @@map("waitlist_entries")
   @@schema("scheduling")
+}
+
+enum EncounterStatus {
+  started
+  closed
+
+  @@schema("care")
+}
+
+/// Atendimento: do início pelo médico, com o paciente na recepção, até o encerramento.
+/// O banco impede dois atendimentos abertos do mesmo médico com o mesmo paciente (EXCLUDE).
+model Encounter {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  unitId         String          @map("unit_id") @db.Uuid
+  appointmentId  String          @unique @map("appointment_id") @db.Uuid
+  appointment    Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  patientId      String          @map("patient_id") @db.Uuid
+  patient        Patient         @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  doctorUserId   String          @map("doctor_user_id") @db.Uuid
+  status         EncounterStatus @default(started)
+  startedAt      DateTime        @map("started_at") @db.Timestamptz(3)
+  closedAt       DateTime?       @map("closed_at") @db.Timestamptz(3)
+  followUpUntil  DateTime?       @map("follow_up_until") @db.Timestamptz(3)
+
+  @@index([doctorUserId, patientId])
+  @@index([organizationId])
+  @@map("encounters")
+  @@schema("care")
+}
+
+enum EmergencyReviewOutcome {
+  appropriate
+  inappropriate
+
+  @@schema("care")
+}
+
+/// Acesso emergencial ("quebra de vidro"). Nunca apagado; a revisão é gravada uma única vez.
+model EmergencyAccess {
+  id               String                  @id @default(uuid(7)) @db.Uuid
+  organizationId   String                  @map("organization_id") @db.Uuid
+  patientId        String                  @map("patient_id") @db.Uuid
+  patient          Patient                 @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  userId           String                  @map("user_id") @db.Uuid
+  justification    String                  @db.VarChar(1000)
+  startsAt         DateTime                @map("starts_at") @db.Timestamptz(3)
+  expiresAt        DateTime                @map("expires_at") @db.Timestamptz(3)
+  reviewOutcome    EmergencyReviewOutcome? @map("review_outcome")
+  reviewNotes      String?                 @map("review_notes") @db.VarChar(1000)
+  reviewedAt       DateTime?               @map("reviewed_at") @db.Timestamptz(3)
+  reviewedByUserId String?                 @map("reviewed_by_user_id") @db.Uuid
+
+  @@index([userId, patientId, expiresAt])
+  @@index([organizationId, reviewedAt])
+  @@map("emergency_accesses")
+  @@schema("care")
 }

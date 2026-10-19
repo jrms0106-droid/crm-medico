@@ -6,3 +6,4 @@ export * from './org.js';
 export * from './patients.js';
 export * from './text.js';
 export * from './scheduling.js';
+export * from './care.js';

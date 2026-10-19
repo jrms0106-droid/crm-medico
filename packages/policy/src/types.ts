@@ -33,12 +33,16 @@ export const RESOURCE_TYPES = [
   'patient_registration',
   'schedule',
   'appointment',
+  'encounter',
+  'clinical_summary',
   'clinical_record',
+  'emergency_access',
+  'emergency_review',
   'audit_event',
 ] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
-/** Estados do vínculo assistencial (seção 5.2 da arquitetura). As regras completas chegam na Etapa 5. */
+/** Estados do vínculo assistencial (docs/api/atendimento-e-vinculo.md). */
 export type CareRelationshipState =
   'scheduled' | 'confirmed' | 'started' | 'follow_up' | 'closed' | 'expired';
 
@@ -56,11 +60,21 @@ export interface Resource {
   patientId?: string | undefined;
   /** Usuário dono do recurso, quando a regra depende disso (ex.: o médico da agenda). */
   ownerUserId?: string | undefined;
+  /** Autor do registro clínico ou do atendimento. */
+  authorUserId?: string | undefined;
+  sensitivity?: Sensitivity | undefined;
 }
+
+/** Sensibilidade de um registro clínico. */
+export type Sensitivity = 'normal' | 'elevated' | 'restricted';
 
 export interface AccessContext {
   /** Estado do vínculo assistencial entre o usuário e o paciente do recurso, se houver. */
   careRelationship?: CareRelationshipState | undefined;
+  /** Há acesso emergencial vigente do usuário para o paciente. */
+  emergencyAccess?: boolean | undefined;
+  /** O usuário registrou justificativa para este acesso (registros sensíveis de outros autores). */
+  justified?: boolean | undefined;
 }
 
 export interface AccessRequest {
