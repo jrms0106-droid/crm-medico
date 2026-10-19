@@ -22,7 +22,7 @@ export default tseslint.config(
     rules: reactHooks.configs.recommended.rules,
   },
   {
-    files: ['scripts/**'],
+    files: ['scripts/**', 'e2e/seed.ts'],
     rules: { 'no-console': 'off' },
   },
 );

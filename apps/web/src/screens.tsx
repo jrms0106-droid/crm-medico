@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { type HealthResponse, ROLE_LABELS, type SessionInfo, passwordProblem } from '@crm/shared';
+import { type SessionInfo, passwordProblem } from '@crm/shared';
 import QRCode from 'qrcode';
 import { api } from './api';
 import { Card, ErrorMessage, Field } from './components';
@@ -186,35 +186,6 @@ export function ChangePasswordScreen({
           Salvar nova senha
         </button>
       </form>
-    </Card>
-  );
-}
-
-export function HomeScreen({ session, onLogout }: { session: SessionInfo; onLogout: () => void }) {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  useEffect(() => {
-    api.health().then(setHealth, () => setHealth(null));
-  }, []);
-
-  return (
-    <Card
-      title={`Olá, ${session.user.name}`}
-      subtitle={session.user.roles.map((r) => ROLE_LABELS[r]).join(', ')}
-    >
-      <ul className="checks" aria-live="polite">
-        <li className={health?.status === 'ok' ? 'ok' : 'warn'}>
-          Servidor:{' '}
-          {health ? (health.status === 'ok' ? 'funcionando' : 'com problemas') : 'verificando…'}
-        </li>
-        <li className={session.mfaEnabled ? 'ok' : 'warn'}>
-          Verificação em duas etapas: {session.mfaEnabled ? 'ativa' : 'não ativada'}
-        </li>
-        <li className="warn">Uso clínico: ainda não aprovado</li>
-      </ul>
-      <p className="muted small">Pacientes, agenda e prontuário chegam nas próximas etapas.</p>
-      <button type="button" onClick={onLogout}>
-        Sair
-      </button>
     </Card>
   );
 }

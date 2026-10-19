@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { SessionInfo } from '@crm/shared';
-import { ApiError, api } from './api';
+import { ApiError, api, setUnauthorizedHandler } from './api';
 import { Card, DevBanner } from './components';
-import {
-  ChangePasswordScreen,
-  HomeScreen,
-  LoginScreen,
-  MfaSetupScreen,
-  MfaVerifyScreen,
-} from './screens';
+import { ChangePasswordScreen, LoginScreen, MfaSetupScreen, MfaVerifyScreen } from './screens';
+import { Shell } from './shell';
 
 type View =
   | { kind: 'loading' }
@@ -27,6 +22,8 @@ export function App() {
   }, []);
 
   useEffect(refresh, [refresh]);
+  // Sessão expirada no meio do uso: volta ao login.
+  useEffect(() => setUnauthorizedHandler(() => setView({ kind: 'anonymous' })), []);
 
   const onSession = (session: SessionInfo) => setView({ kind: 'session', session });
   const logout = () => {
@@ -71,6 +68,6 @@ function SessionView({
     case 'password_change_required':
       return <ChangePasswordScreen session={session} onSession={onSession} />;
     case 'active':
-      return <HomeScreen session={session} onLogout={onLogout} />;
+      return <Shell session={session} onLogout={onLogout} />;
   }
 }
