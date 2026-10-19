@@ -29,6 +29,7 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
-    proxy: { '/api': 'http://localhost:3000' },
+    // Em testes ponta a ponta, a API roda em outra porta (playwright.config.ts).
+    proxy: { '/api': process.env['API_URL'] ?? 'http://localhost:3000' },
   },
 });
