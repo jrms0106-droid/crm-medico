@@ -19,6 +19,8 @@ import { UserAdminService } from './identity/user-admin.service.js';
 import { OrgService } from './org/org.service.js';
 import { PatientsController } from './patients/patients.controller.js';
 import { PatientsService } from './patients/patients.service.js';
+import { RecordsController } from './records/records.controller.js';
+import { RecordsService } from './records/records.service.js';
 import {
   AppointmentsController,
   SchedulesController,
@@ -53,6 +55,7 @@ export class AppModule {
         AppointmentsController,
         WaitlistController,
         CareController,
+        RecordsController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
@@ -67,6 +70,7 @@ export class AppModule {
         PatientsService,
         SchedulingService,
         CareService,
+        RecordsService,
         { provide: APP_GUARD, useClass: AuthGuard },
       ],
     };
