@@ -35,12 +35,14 @@ Ações: visualizar (`view`), criar (`create`), editar (`edit`), corrigir (`corr
 | `professional` (ficha profissional)      | administrativo | visualizar                                                 | visualizar                | visualizar, criar, editar | não                    |
 | `unit_professionals` (equipe da unidade) | administrativo | visualizar                                                 | visualizar                | visualizar                | sim, todos os papéis   |
 | `patient_registration` (cadastro)        | pessoal        | visualizar, criar, editar                                  | visualizar, criar, editar | —                         | não                    |
-| `schedule` (agenda)                      | administrativo | visualizar                                                 | visualizar, criar, editar | —                         | sim, todos os papéis   |
+| `schedule` (configuração da agenda)      | administrativo | visualizar                                                 | visualizar, criar, editar | visualizar, criar, editar | sim, todos os papéis   |
+| `appointment` (consultas e espera)       | pessoal        | visualizar, só da própria agenda                           | visualizar, criar, editar | —                         | sim, todos os papéis   |
 | `clinical_record` (prontuário)           | clínico        | visualizar, criar, editar, corrigir, assinar (com vínculo) | —                         | —                         | não (é da organização) |
 | `audit_event` (auditoria)                | auditoria      | —                                                          | —                         | visualizar                | não                    |
 
 - **Exportar e compartilhar** não estão liberados para ninguém no MVP. Entram com a reautenticação e a auditoria reforçada, depois da validação jurídica.
-- **Cadastro, agenda e prontuário** entram na matriz agora para que as Etapas 3, 4 e 6 já nasçam com a regra testada. As rotas desses recursos ainda não existem.
+- **Agenda (Etapa 4):** a configuração (`schedule`) é separada das consultas (`appointment`), porque o administrador configura agendas, mas não vê pacientes. Ver [agenda.md](agenda.md).
+- **Cadastro, agenda e prontuário** entraram na matriz antes para que as Etapas 3, 4 e 6 já nasçam com a regra testada. As rotas desses recursos ainda não existem.
 - **Vínculo assistencial:** nesta etapa, o médico só tem acesso clínico com um vínculo nos estados "atendimento iniciado" ou "acompanhamento ativo". A tabela completa por estado (seção 5.2 de [03-arquitetura.md](../planejamento/03-arquitetura.md)) chega na Etapa 5 e **precisa de validação médica**.
 - O prontuário é do paciente na organização, não da unidade, por isso não tem escopo de unidade (seção 9 da arquitetura).
 

@@ -58,7 +58,13 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
   schedule: {
     dataClass: 'administrative',
     unitScope: 'all_roles',
-    grants: { doctor: ['view'], secretary: MANAGE },
+    grants: { doctor: ['view'], secretary: MANAGE, admin: MANAGE },
+  },
+  // O médico vê só as consultas da própria agenda (regra doctorViewsOwnAppointments).
+  appointment: {
+    dataClass: 'personal',
+    unitScope: 'all_roles',
+    grants: { secretary: MANAGE },
   },
   clinical_record: {
     dataClass: 'clinical',
@@ -125,6 +131,15 @@ export const roleGrants: Rule = ({ subject, action, resource }: AccessRequest) =
   return role ? { allowed: true, reason: `role_${role}` } : undefined;
 };
 
+/** O médico vê as consultas da própria agenda, e só elas. */
+export const doctorViewsOwnAppointments: Rule = ({ subject, action, resource }) => {
+  if (resource.type !== 'appointment' || action !== 'view') return undefined;
+  if (!subject.roles.includes('doctor')) return undefined;
+  return resource.ownerUserId === subject.userId
+    ? { allowed: true, reason: 'own_schedule' }
+    : undefined;
+};
+
 /** Regras em vigor. As negações vêm primeiro para que o motivo registrado seja o mais específico. */
 export const RULES: readonly Rule[] = [
   sameOrganization,
@@ -132,4 +147,5 @@ export const RULES: readonly Rule[] = [
   clinicalRequiresCareRelationship,
   unitScope,
   roleGrants,
+  doctorViewsOwnAppointments,
 ];
