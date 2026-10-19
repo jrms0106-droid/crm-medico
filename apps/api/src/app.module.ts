@@ -15,6 +15,8 @@ import { AuthService } from './identity/auth.service.js';
 import { SessionService } from './identity/session.service.js';
 import { UserAdminService } from './identity/user-admin.service.js';
 import { OrgService } from './org/org.service.js';
+import { PatientsController } from './patients/patients.controller.js';
+import { PatientsService } from './patients/patients.service.js';
 import { ProfessionalsController } from './org/professionals.controller.js';
 import { SpecialtiesController } from './org/specialties.controller.js';
 import { UnitsController } from './org/units.controller.js';
@@ -36,6 +38,7 @@ export class AppModule {
         SpecialtiesController,
         ProfessionalsController,
         AuditController,
+        PatientsController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
@@ -47,6 +50,7 @@ export class AppModule {
         AuthorizationService,
         UserAdminService,
         OrgService,
+        PatientsService,
         { provide: APP_GUARD, useClass: AuthGuard },
       ],
     };

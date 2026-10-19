@@ -11,7 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity", "audit"]
+  schemas  = ["org", "identity", "audit", "patients"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
@@ -24,6 +24,7 @@ model Organization {
   users         User[]
   specialties   Specialty[]
   professionals Professional[]
+  patients      Patient[]
 
   @@map("organizations")
   @@schema("org")
@@ -205,4 +206,109 @@ model AuditEvent {
   @@index([actorUserId, occurredAt])
   @@map("events")
   @@schema("audit")
+}
+
+enum CommChannel {
+  whatsapp
+  sms
+  email
+  phone
+
+  @@schema("patients")
+}
+
+/// Cadastro do paciente (dado pessoal, nunca clínico). Ver docs/api/pacientes.md.
+model Patient {
+  id                   String           @id @default(uuid(7)) @db.Uuid
+  organizationId       String           @map("organization_id") @db.Uuid
+  organization         Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  fullName             String           @map("full_name") @db.VarChar(200)
+  socialName           String?          @map("social_name") @db.VarChar(200)
+  /// Nome completo e social sem acentos, em minúsculas, para a busca.
+  nameSearch           String           @map("name_search") @db.VarChar(410)
+  /// CPF criptografado (AES-256-GCM). Nunca em texto puro.
+  cpfEnc               String?          @map("cpf_enc") @db.VarChar(255)
+  /// HMAC-SHA256 do CPF: impede repetição e permite busca exata.
+  cpfHash              String?          @map("cpf_hash") @db.Char(64)
+  birthDate            DateTime         @map("birth_date") @db.Date
+  email                String?          @db.VarChar(254)
+  addressZip           String?          @map("address_zip") @db.Char(8)
+  addressStreet        String?          @map("address_street") @db.VarChar(200)
+  addressNumber        String?          @map("address_number") @db.VarChar(20)
+  addressComplement    String?          @map("address_complement") @db.VarChar(100)
+  addressDistrict      String?          @map("address_district") @db.VarChar(100)
+  addressCity          String?          @map("address_city") @db.VarChar(100)
+  addressState         String?          @map("address_state") @db.Char(2)
+  commChannels         CommChannel[]    @default([]) @map("comm_channels")
+  appointmentReminders Boolean          @default(false) @map("appointment_reminders")
+  marketingOptIn       Boolean          @default(false) @map("marketing_opt_in")
+  active               Boolean          @default(true)
+  version              Int              @default(1)
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  phones               PatientPhone[]
+  contacts             PatientContact[]
+  versions             PatientVersion[]
+
+  @@unique([organizationId, cpfHash])
+  @@index([organizationId, birthDate])
+  @@index([organizationId, nameSearch])
+  @@map("patients")
+  @@schema("patients")
+}
+
+model PatientPhone {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  patientId String  @map("patient_id") @db.Uuid
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  /// DDD + número, só dígitos.
+  number    String  @db.VarChar(11)
+  whatsapp  Boolean @default(false)
+  position  Int
+
+  @@unique([patientId, position])
+  @@index([number])
+  @@map("phones")
+  @@schema("patients")
+}
+
+enum PatientContactKind {
+  guardian
+  emergency
+
+  @@schema("patients")
+}
+
+/// Responsável legal ou contato de emergência.
+model PatientContact {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  patientId    String             @map("patient_id") @db.Uuid
+  patient      Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  kind         PatientContactKind
+  name         String             @db.VarChar(200)
+  relationship String             @db.VarChar(60)
+  phone        String?            @db.VarChar(11)
+  email        String?            @db.VarChar(254)
+  position     Int
+
+  @@unique([patientId, kind, position])
+  @@map("contacts")
+  @@schema("patients")
+}
+
+/// Versões do cadastro, somente-acréscimo (um gatilho recusa UPDATE e DELETE).
+model PatientVersion {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  patientId       String   @map("patient_id") @db.Uuid
+  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  version         Int
+  changedAt       DateTime @map("changed_at") @db.Timestamptz(3)
+  changedByUserId String   @map("changed_by_user_id") @db.Uuid
+  changedFields   String[] @map("changed_fields")
+  /// Fotografia do cadastro após a alteração, sem o CPF.
+  snapshot        Json
+
+  @@unique([patientId, version])
+  @@map("versions")
+  @@schema("patients")
 }

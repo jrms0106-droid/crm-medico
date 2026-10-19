@@ -26,6 +26,10 @@ export const ErrorCode = {
   WEAK_PASSWORD: 'WEAK_PASSWORD',
   CSRF_FAILED: 'CSRF_FAILED',
   REAUTH_REQUIRED: 'REAUTH_REQUIRED',
+  // Pacientes (docs/api/pacientes.md)
+  CPF_ALREADY_REGISTERED: 'CPF_ALREADY_REGISTERED',
+  POSSIBLE_DUPLICATE: 'POSSIBLE_DUPLICATE',
+  VERSION_CONFLICT: 'VERSION_CONFLICT',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

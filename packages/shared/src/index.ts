@@ -3,3 +3,5 @@ export * from './cpf.js';
 export * from './errors.js';
 export * from './health.js';
 export * from './org.js';
+export * from './patients.js';
+export * from './text.js';

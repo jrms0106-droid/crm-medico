@@ -11,6 +11,7 @@ import { totpAt } from '../src/identity/totp.js';
 
 /** Chave pública de teste (mesma do .env.example). Nunca usar fora de testes. */
 const TEST_MFA_KEY = 'ZGV2LXNvbWVudGUtbmFvLXVzYXItZW0tcHJvZHVjYW8=';
+const TEST_PII_KEY = 'cGlpLWRldi1zb21lbnRlLW5hby11c2FyLWVtLXByb2Q=';
 
 /** Relógio controlado pelos testes. */
 export class TestClock extends Clock {
@@ -36,6 +37,7 @@ export async function startTestApp(env: Record<string, string> = {}): Promise<Te
   const url = process.env['DATABASE_URL_TEST'];
   const config = loadConfig({
     MFA_ENCRYPTION_KEY: TEST_MFA_KEY,
+    PII_ENCRYPTION_KEY: TEST_PII_KEY,
     LOGIN_RATE_LIMIT_PER_MINUTE: '1000',
     ...process.env,
     DATABASE_URL: url,
@@ -61,7 +63,7 @@ export async function startTestApp(env: Record<string, string> = {}): Promise<Te
 /** Apaga os dados entre testes (ordem respeita as chaves estrangeiras). */
 export async function resetData(db: PrismaClient): Promise<void> {
   await db.$executeRawUnsafe(
-    `TRUNCATE audit.events, org.professional_specialties, org.professionals, org.specialties,
+    `TRUNCATE patients.versions, patients.contacts, patients.phones, patients.patients, audit.events, org.professional_specialties, org.professionals, org.specialties,
       org.unit_memberships, identity.sessions, identity.users, org.units, org.organizations CASCADE`,
   );
 }
