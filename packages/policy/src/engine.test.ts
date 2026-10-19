@@ -3,14 +3,19 @@ import { DEFAULT_DENY, decide } from './engine.js';
 import type { AccessRequest, Rule } from './types.js';
 
 const request: AccessRequest = {
-  subject: { userId: 'u1', roles: ['admin'], unitIds: ['unit-a'] },
+  subject: { userId: 'u1', organizationId: 'org-1', roles: ['admin'], unitIds: ['unit-a'] },
   action: 'view',
-  resource: { type: 'clinical_record', dataClass: 'clinical', unitId: 'unit-a', patientId: 'p1' },
+  resource: {
+    type: 'clinical_record',
+    organizationId: 'org-1',
+    unitId: 'unit-a',
+    patientId: 'p1',
+  },
 };
 
 const allowAll: Rule = () => ({ allowed: true, reason: 'test_allow' });
 const denyClinical: Rule = (r) =>
-  r.resource.dataClass === 'clinical'
+  r.resource.type === 'clinical_record'
     ? { allowed: false, reason: 'test_deny_clinical' }
     : undefined;
 const noOpinion: Rule = () => undefined;

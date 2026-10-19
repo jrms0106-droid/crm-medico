@@ -61,7 +61,8 @@ export async function startTestApp(env: Record<string, string> = {}): Promise<Te
 /** Apaga os dados entre testes (ordem respeita as chaves estrangeiras). */
 export async function resetData(db: PrismaClient): Promise<void> {
   await db.$executeRawUnsafe(
-    'TRUNCATE identity.sessions, identity.users, org.units, org.organizations CASCADE',
+    `TRUNCATE audit.events, org.professional_specialties, org.professionals, org.specialties,
+      org.unit_memberships, identity.sessions, identity.users, org.units, org.organizations CASCADE`,
   );
 }
 
@@ -76,10 +77,15 @@ export interface TestUser {
 
 let counter = 0;
 
+export async function createUnit(db: PrismaClient, organizationId: string, name?: string) {
+  counter += 1;
+  return db.unit.create({ data: { organizationId, name: name ?? `Unidade Fictícia ${counter}` } });
+}
+
 export async function createUser(
   db: PrismaClient,
   roles: RoleName[],
-  extra: { organizationId?: string; mustChangePassword?: boolean } = {},
+  extra: { organizationId?: string; mustChangePassword?: boolean; unitIds?: string[] } = {},
 ): Promise<TestUser> {
   counter += 1;
   const organizationId =
@@ -94,6 +100,7 @@ export async function createUser(
       passwordHash: await hashPassword(STRONG_PASSWORD),
       roles,
       mustChangePassword: extra.mustChangePassword ?? false,
+      unitMemberships: { create: (extra.unitIds ?? []).map((unitId) => ({ unitId })) },
     },
   });
   return { id: user.id, email, password: STRONG_PASSWORD, organizationId };
@@ -105,6 +112,8 @@ export type Agent = ReturnType<typeof request.agent>;
 export class Client {
   readonly agent: Agent;
   csrf = '';
+  /** Segredo TOTP cadastrado no login completo, se houver. */
+  mfaSecret: string | undefined;
 
   constructor(app: INestApplication) {
     this.agent = request.agent(app.getHttpServer());
@@ -117,6 +126,21 @@ export class Client {
   post(path: string, body?: object) {
     const req = this.agent.post(`/api/v1${path}`).set('x-csrf-token', this.csrf);
     return body ? req.send(body) : req;
+  }
+
+  patch(path: string, body: object) {
+    return this.agent.patch(`/api/v1${path}`).set('x-csrf-token', this.csrf).send(body);
+  }
+
+  /**
+   * Reautentica para ações críticas. Avança o relógio uma janela TOTP, porque o código do
+   * login não pode ser reutilizado.
+   */
+  async reauth(user: TestUser, clock: TestClock): Promise<void> {
+    clock.advance(30_000);
+    const code = this.mfaSecret ? totpAt(this.mfaSecret, clock.now()) : undefined;
+    const res = await this.post('/auth/reauth', { password: user.password, code });
+    if (res.status !== 204) throw new Error(`Falha na reautenticação: ${res.status}`);
   }
 
   async login(email: string, password: string) {
@@ -133,6 +157,7 @@ export class Client {
     const secret: string = setup.body.secret;
     const activated = await this.post('/auth/mfa/activate', { code: totpAt(secret, clock.now()) });
     if (activated.status !== 200) throw new Error(`Falha ao ativar MFA: ${activated.status}`);
+    this.mfaSecret = secret;
     return secret;
   }
 }

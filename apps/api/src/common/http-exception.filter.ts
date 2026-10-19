@@ -48,6 +48,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    if (isUniqueViolation(exception)) {
+      const body: ErrorResponse = {
+        error: {
+          code: ErrorCode.CONFLICT,
+          message: 'Já existe um registro com esses dados.',
+          requestId,
+          details: [],
+        },
+      };
+      res.status(409).json(body);
+      return;
+    }
+
     const status =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const mapped = CODE_BY_STATUS[status] ?? INTERNAL;
@@ -64,4 +77,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     };
     res.status(status).json(body);
   }
+}
+
+/** Violação de unicidade do banco (código P2002 do Prisma), tratada como conflito. */
+function isUniqueViolation(exception: unknown): boolean {
+  return (
+    typeof exception === 'object' &&
+    exception !== null &&
+    (exception as { code?: unknown }).code === 'P2002'
+  );
 }

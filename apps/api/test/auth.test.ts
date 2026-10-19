@@ -162,6 +162,7 @@ describe('expiração e revogação de sessão', () => {
     const sec = await createUser(t.db, ['secretary'], { organizationId: admin.organizationId });
     const adminClient = new Client(t.app);
     await adminClient.loginFully(admin, t.clock);
+    await adminClient.reauth(admin, t.clock);
     const secClient = new Client(t.app);
     await secClient.login(sec.email, sec.password);
 
@@ -284,6 +285,9 @@ describe('recuperação de acesso pelo administrador', () => {
     const oldDoctorClient = new Client(t.app);
     await oldDoctorClient.loginFully(doctor, t.clock);
 
+    const withoutReauth = await adminClient.post(`/admin/users/${doctor.id}/reset-access`);
+    expect(errorCode(withoutReauth.body)).toBe('REAUTH_REQUIRED');
+    await adminClient.reauth(admin, t.clock);
     const reset = await adminClient.post(`/admin/users/${doctor.id}/reset-access`);
     expect(reset.status).toBe(200);
     const temporaryPassword: string = reset.body.temporaryPassword;
@@ -327,6 +331,7 @@ describe('recuperação de acesso pelo administrador', () => {
     const outsider = await createUser(t.db, ['secretary']);
     const client = new Client(t.app);
     await client.loginFully(admin, t.clock);
+    await client.reauth(admin, t.clock);
     expect((await client.post(`/admin/users/${outsider.id}/reset-access`)).status).toBe(404);
   });
 
@@ -343,6 +348,7 @@ describe('recuperação de acesso pelo administrador', () => {
     const admin = await createUser(t.db, ['admin']);
     const client = new Client(t.app);
     await client.loginFully(admin, t.clock);
+    await client.reauth(admin, t.clock);
     expect((await client.post(`/admin/users/${admin.id}/reset-access`)).status).toBe(422);
   });
 });
