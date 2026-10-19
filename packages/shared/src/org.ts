@@ -147,11 +147,17 @@ export const AUDIT_OUTCOMES = ['allowed', 'denied', 'not_found'] as const;
 export const auditQuerySchema = z.strictObject({
   outcome: z.enum(AUDIT_OUTCOMES).optional(),
   actorUserId: id.optional(),
+  patientId: id.optional(),
+  resourceType: z.string().trim().min(1).max(64).optional(),
+  action: z.string().trim().min(1).max(32).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   before: z.iso.datetime().optional(),
+  after: z.iso.datetime().optional(),
 });
 export interface AuditEventDto {
   id: string;
+  /** Posição na cadeia de auditoria da organização (docs/api/auditoria.md). */
+  chainSeq: number;
   occurredAt: string;
   actorUserId: string | null;
   requestId: string | null;
@@ -163,4 +169,13 @@ export interface AuditEventDto {
   patientId: string | null;
   outcome: (typeof AUDIT_OUTCOMES)[number];
   reason: string;
+}
+
+export const AUDIT_CHAIN_ISSUES = ['gap', 'link', 'content'] as const;
+export interface AuditChainReportDto {
+  valid: boolean;
+  checked: number;
+  headSeq: number | null;
+  headHash: string | null;
+  problems: { chainSeq: number; eventId: string; issue: (typeof AUDIT_CHAIN_ISSUES)[number] }[];
 }

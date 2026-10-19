@@ -7,7 +7,7 @@ Regras definidas antes da implementação (seção 30 do Prompt Mestre). Etapa 2
 - **Unidade** (`org.units`): já existia. Agora os usuários são ligados a uma ou mais unidades por **vínculo de unidade** (`org.unit_memberships`).
 - **Especialidade** (`org.specialties`): catálogo da organização (nome único, ativa/inativa).
 - **Profissional** (`org.professionals`): ficha profissional de um usuário com papel de médico. Guarda o número do CRM e a UF, que juntos são únicos na organização. Cada especialidade da ficha pode ter um RQE (`org.professional_specialties`).
-- **Evento de auditoria** (`audit.events`): toda decisão de acesso, permitida ou negada, e toda busca por identificador que não existe no alcance do usuário. A tabela só aceita inclusão: um gatilho no banco recusa `UPDATE` e `DELETE`. O encadeamento por hash e o painel ficam para a Etapa 7.
+- **Evento de auditoria** (`audit.events`): toda decisão de acesso, permitida ou negada, e toda busca por identificador que não existe no alcance do usuário. A tabela só aceita inclusão: um gatilho no banco recusa `UPDATE` e `DELETE`. Os eventos são encadeados por hash, e a cadeia pode ser verificada ([auditoria.md](auditoria.md)).
 
 ## Como a decisão é tomada
 
@@ -105,4 +105,4 @@ Se a gravação do evento falhar, a operação não acontece (500), para que nen
 
 ## Fora desta etapa
 
-Painel de auditoria e encadeamento por hash (Etapa 7); estados completos do vínculo assistencial e acesso emergencial (Etapa 5); telas de administração (Etapa 7); exportação e compartilhamento.
+Telas do painel de auditoria (Etapa 7); estados completos do vínculo assistencial e acesso emergencial (Etapa 5); telas de administração (Etapa 7); exportação e compartilhamento.

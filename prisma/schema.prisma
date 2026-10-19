@@ -205,7 +205,14 @@ model AuditEvent {
   outcome        AuditOutcome
   reason         String       @db.VarChar(100)
   emergency      Boolean      @default(false)
+  /// Posição na cadeia da organização, preenchida pelo gatilho `audit.chain_event`.
+  chainSeq       BigInt       @default(dbgenerated("0")) @map("chain_seq")
+  /// Resumo do evento anterior da cadeia (vazio no primeiro).
+  prevHash       String?      @map("prev_hash") @db.Char(64)
+  /// SHA-256 do evento, calculado pelo banco (docs/api/auditoria.md).
+  hash           String       @default(dbgenerated("''::bpchar")) @db.Char(64)
 
+  @@index([organizationId, chainSeq])
   @@index([organizationId, occurredAt])
   @@index([actorUserId, occurredAt])
   @@map("events")
