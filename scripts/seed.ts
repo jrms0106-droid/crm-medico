@@ -69,7 +69,7 @@ for (const name of specialtyNames) {
 
 // CRM e RQE inventados, só para desenvolvimento.
 const doctorId = created['medico@clinica-ficticia.test'] ?? '';
-await prisma.professional.upsert({
+const professional = await prisma.professional.upsert({
   where: { userId: doctorId },
   update: {},
   create: {
@@ -125,10 +125,25 @@ for (const p of patients) {
   });
 }
 
+// Agenda do médico na unidade: segunda a sexta, 08:00–12:00 e 14:00–18:00, consultas de 30 minutos.
+const schedule = await prisma.schedule.upsert({
+  where: { unitId_professionalId: { unitId: unit.id, professionalId: professional.id } },
+  update: {},
+  create: { organizationId: org.id, unitId: unit.id, professionalId: professional.id },
+});
+if ((await prisma.scheduleRule.count({ where: { scheduleId: schedule.id } })) === 0) {
+  await prisma.scheduleRule.createMany({
+    data: [1, 2, 3, 4, 5].flatMap((weekday) => [
+      { scheduleId: schedule.id, weekday, startMinute: 8 * 60, endMinute: 12 * 60 },
+      { scheduleId: schedule.id, weekday, startMinute: 14 * 60, endMinute: 18 * 60 },
+    ]),
+  });
+}
+
 console.log(
   `Dados fictícios prontos: "${org.name}", 1 unidade, ${users.length} usuários, ` +
-    `${specialtyNames.length} especialidades, 1 ficha profissional (CRM 000001/SP, fictício) ` +
-    `e ${patients.length} pacientes.`,
+    `${specialtyNames.length} especialidades, 1 ficha profissional (CRM 000001/SP, fictício), ` +
+    `${patients.length} pacientes e a agenda do médico (seg. a sex.).`,
 );
 console.log(`Senha de todos (só desenvolvimento): ${DEV_PASSWORD}`);
 for (const u of users) console.log(`  ${u.email}  (${u.roles.join(', ')})`);

@@ -19,6 +19,9 @@ export class TestClock extends Clock {
   now(): Date {
     return new Date(this.current);
   }
+  set(date: Date | string): void {
+    this.current = new Date(date);
+  }
   advance(ms: number): void {
     this.current = new Date(this.current.getTime() + ms);
   }
@@ -63,7 +66,8 @@ export async function startTestApp(env: Record<string, string> = {}): Promise<Te
 /** Apaga os dados entre testes (ordem respeita as chaves estrangeiras). */
 export async function resetData(db: PrismaClient): Promise<void> {
   await db.$executeRawUnsafe(
-    `TRUNCATE patients.versions, patients.contacts, patients.phones, patients.patients, audit.events, org.professional_specialties, org.professionals, org.specialties,
+    `TRUNCATE scheduling.appointment_events, scheduling.waitlist_entries, scheduling.appointments, scheduling.schedule_blocks, scheduling.schedule_rules, scheduling.schedules,
+      patients.versions, patients.contacts, patients.phones, patients.patients, audit.events, org.professional_specialties, org.professionals, org.specialties,
       org.unit_memberships, identity.sessions, identity.users, org.units, org.organizations CASCADE`,
   );
 }

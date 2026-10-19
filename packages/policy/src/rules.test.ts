@@ -24,7 +24,8 @@ const EXPECTED: Record<ResourceType, Record<Role, string>> = {
   professional: { doctor: 'v', secretary: 'v', admin: 'vce' },
   unit_professionals: { doctor: 'v', secretary: 'v', admin: 'v' },
   patient_registration: { doctor: 'vce', secretary: 'vce', admin: '' },
-  schedule: { doctor: 'v', secretary: 'vce', admin: '' },
+  schedule: { doctor: 'v', secretary: 'vce', admin: 'vce' },
+  appointment: { doctor: '', secretary: 'vce', admin: '' },
   clinical_record: { doctor: 'vcers', secretary: '', admin: '' },
   audit_event: { doctor: '', secretary: '', admin: 'v' },
 };
@@ -129,6 +130,21 @@ describe('regras de atributo', () => {
     }
     const schedule = request(['secretary'], 'create', 'schedule', { unitIds: ['unit-b'] });
     expect(decide(schedule, RULES)).toEqual({ allowed: false, reason: 'other_unit' });
+  });
+
+  it('médico vê só as consultas da própria agenda, e não as altera', () => {
+    const own = request(['doctor'], 'view', 'appointment');
+    own.resource.ownerUserId = 'u1';
+    expect(decide(own, RULES)).toEqual({ allowed: true, reason: 'own_schedule' });
+    const other = request(['doctor'], 'view', 'appointment');
+    other.resource.ownerUserId = 'u2';
+    expect(decide(other, RULES).allowed).toBe(false);
+    const edit = request(['doctor'], 'edit', 'appointment');
+    edit.resource.ownerUserId = 'u1';
+    expect(decide(edit, RULES).allowed).toBe(false);
+    const elsewhere = request(['doctor'], 'view', 'appointment', { unitIds: ['unit-b'] });
+    elsewhere.resource.ownerUserId = 'u1';
+    expect(decide(elsewhere, RULES).reason).toBe('other_unit');
   });
 
   it('recurso operacional pedido sem unidade é negado', () => {

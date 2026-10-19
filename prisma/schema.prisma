@@ -11,7 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity", "audit", "patients"]
+  schemas  = ["org", "identity", "audit", "patients", "scheduling"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
@@ -41,6 +41,8 @@ model Unit {
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
   memberships    UnitMembership[]
+  schedules      Schedule[]
+  waitlist       WaitlistEntry[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -152,6 +154,8 @@ model Professional {
   createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
   specialties    ProfessionalSpecialty[]
+  schedules      Schedule[]
+  waitlist       WaitlistEntry[]
 
   @@unique([organizationId, crmState, crmNumber])
   @@map("professionals")
@@ -249,6 +253,8 @@ model Patient {
   phones               PatientPhone[]
   contacts             PatientContact[]
   versions             PatientVersion[]
+  appointments         Appointment[]
+  waitlist             WaitlistEntry[]
 
   @@unique([organizationId, cpfHash])
   @@index([organizationId, birthDate])
@@ -311,4 +317,153 @@ model PatientVersion {
   @@unique([patientId, version])
   @@map("versions")
   @@schema("patients")
+}
+
+/// Agenda de um profissional numa unidade. Ver docs/api/agenda.md.
+model Schedule {
+  id             String          @id @default(uuid(7)) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  unitId         String          @map("unit_id") @db.Uuid
+  unit           Unit            @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  professionalId String          @map("professional_id") @db.Uuid
+  professional   Professional    @relation(fields: [professionalId], references: [id], onDelete: Restrict)
+  slotMinutes    Int             @default(30) @map("slot_minutes")
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  rules          ScheduleRule[]
+  blocks         ScheduleBlock[]
+  appointments   Appointment[]
+
+  @@unique([unitId, professionalId])
+  @@index([organizationId])
+  @@map("schedules")
+  @@schema("scheduling")
+}
+
+/// Faixa de atendimento semanal, em minutos desde a meia-noite na hora local da unidade.
+model ScheduleRule {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  scheduleId  String   @map("schedule_id") @db.Uuid
+  schedule    Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  /// 0 = domingo ... 6 = sábado.
+  weekday     Int      @db.SmallInt
+  startMinute Int      @map("start_minute") @db.SmallInt
+  endMinute   Int      @map("end_minute") @db.SmallInt
+
+  @@index([scheduleId, weekday])
+  @@map("schedule_rules")
+  @@schema("scheduling")
+}
+
+model ScheduleBlock {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  scheduleId      String    @map("schedule_id") @db.Uuid
+  schedule        Schedule  @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  startsAt        DateTime  @map("starts_at") @db.Timestamptz(3)
+  endsAt          DateTime  @map("ends_at") @db.Timestamptz(3)
+  reason          String    @db.VarChar(200)
+  createdByUserId String    @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  removedAt       DateTime? @map("removed_at") @db.Timestamptz(3)
+  removedByUserId String?   @map("removed_by_user_id") @db.Uuid
+
+  @@index([scheduleId, startsAt])
+  @@map("schedule_blocks")
+  @@schema("scheduling")
+}
+
+enum AppointmentKind {
+  regular
+  return
+  fit_in
+
+  @@schema("scheduling")
+}
+
+enum AppointmentStatus {
+  scheduled
+  confirmed
+  arrived
+  cancelled
+  no_show
+  rescheduled
+
+  @@schema("scheduling")
+}
+
+/// Consulta marcada. Sobreposição na mesma agenda é barrada no banco (EXCLUDE USING gist).
+model Appointment {
+  id                String             @id @default(uuid(7)) @db.Uuid
+  organizationId    String             @map("organization_id") @db.Uuid
+  unitId            String             @map("unit_id") @db.Uuid
+  scheduleId        String             @map("schedule_id") @db.Uuid
+  schedule          Schedule           @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  patientId         String             @map("patient_id") @db.Uuid
+  patient           Patient            @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  startsAt          DateTime           @map("starts_at") @db.Timestamptz(3)
+  endsAt            DateTime           @map("ends_at") @db.Timestamptz(3)
+  kind              AppointmentKind    @default(regular)
+  status            AppointmentStatus  @default(scheduled)
+  notes             String?            @db.VarChar(200)
+  returnOfId        String?            @map("return_of_id") @db.Uuid
+  rescheduledFromId String?            @unique @map("rescheduled_from_id") @db.Uuid
+  rescheduledToId   String?            @unique @map("rescheduled_to_id") @db.Uuid
+  cancelReason      String?            @map("cancel_reason") @db.VarChar(200)
+  cancelRequestedBy String?            @map("cancel_requested_by") @db.VarChar(20)
+  createdByUserId   String             @map("created_by_user_id") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  events            AppointmentEvent[]
+
+  @@index([scheduleId, startsAt])
+  @@index([patientId, startsAt])
+  @@map("appointments")
+  @@schema("scheduling")
+}
+
+/// Histórico da consulta, somente-acréscimo.
+model AppointmentEvent {
+  id            String      @id @default(uuid(7)) @db.Uuid
+  seq           BigInt      @unique @default(autoincrement())
+  appointmentId String      @map("appointment_id") @db.Uuid
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  type          String      @db.VarChar(40)
+  at            DateTime    @db.Timestamptz(3)
+  byUserId      String      @map("by_user_id") @db.Uuid
+  details       Json?
+
+  @@index([appointmentId])
+  @@map("appointment_events")
+  @@schema("scheduling")
+}
+
+enum WaitlistStatus {
+  waiting
+  scheduled
+  removed
+
+  @@schema("scheduling")
+}
+
+model WaitlistEntry {
+  id              String         @id @default(uuid(7)) @db.Uuid
+  organizationId  String         @map("organization_id") @db.Uuid
+  unitId          String         @map("unit_id") @db.Uuid
+  unit            Unit           @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  patientId       String         @map("patient_id") @db.Uuid
+  patient         Patient        @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  professionalId  String?        @map("professional_id") @db.Uuid
+  professional    Professional?  @relation(fields: [professionalId], references: [id], onDelete: Restrict)
+  preference      String?        @db.VarChar(200)
+  status          WaitlistStatus @default(waiting)
+  appointmentId   String?        @unique @map("appointment_id") @db.Uuid
+  removedReason   String?        @map("removed_reason") @db.VarChar(200)
+  createdByUserId String         @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([unitId, status, createdAt])
+  @@map("waitlist_entries")
+  @@schema("scheduling")
 }

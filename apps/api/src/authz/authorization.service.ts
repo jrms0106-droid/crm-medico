@@ -22,6 +22,8 @@ export interface ResourceRef {
   organizationId?: string | undefined;
   unitId?: string | undefined;
   patientId?: string | undefined;
+  /** Usuário dono do recurso (ex.: o médico da agenda), para regras que dependem disso. */
+  ownerUserId?: string | undefined;
 }
 
 /**
@@ -54,6 +56,7 @@ export class AuthorizationService {
         organizationId: resource.organizationId ?? ctx.user.organizationId,
         unitId: resource.unitId,
         patientId: resource.patientId,
+        ownerUserId: resource.ownerUserId,
       },
       context,
     };

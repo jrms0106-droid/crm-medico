@@ -32,6 +32,7 @@ export const RESOURCE_TYPES = [
   'unit_professionals',
   'patient_registration',
   'schedule',
+  'appointment',
   'clinical_record',
   'audit_event',
 ] as const;
@@ -53,6 +54,8 @@ export interface Resource {
   organizationId: string;
   unitId?: string | undefined;
   patientId?: string | undefined;
+  /** Usuário dono do recurso, quando a regra depende disso (ex.: o médico da agenda). */
+  ownerUserId?: string | undefined;
 }
 
 export interface AccessContext {

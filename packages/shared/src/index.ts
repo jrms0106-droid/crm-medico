@@ -5,3 +5,4 @@ export * from './health.js';
 export * from './org.js';
 export * from './patients.js';
 export * from './text.js';
+export * from './scheduling.js';
