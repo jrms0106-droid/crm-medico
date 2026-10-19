@@ -12,6 +12,8 @@ describe('loadConfig', () => {
     expect(config.NODE_ENV).toBe('development');
     expect(config.MFA_REQUIRED_ROLES).toEqual(['doctor', 'admin']);
     expect(config.COOKIE_SECURE).toBe(false);
+    expect(config.CARE_COURTESY_DAYS).toBe(30);
+    expect(config.EMERGENCY_ACCESS_HOURS).toBe(4);
   });
 
   it('em produção exige cookie seguro e chave de MFA válida', () => {

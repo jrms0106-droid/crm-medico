@@ -14,6 +14,7 @@ Sistema de gestão de clínica multiespecialidades com prontuário eletrônico, 
 - Login com senha (Argon2id), sessão no servidor, bloqueio por tentativas, verificação em duas etapas (TOTP) obrigatória para médicos e administradores, troca de senha e recuperação de acesso pelo administrador ([regras](docs/api/identidade.md)).
 - Cadastro de pacientes com nome social, CPF validado e criptografado, responsáveis, contatos de emergência e preferências de comunicação; busca sem acento por nome, CPF ou telefone; alerta de duplicidade; histórico de versões ([regras](docs/api/pacientes.md)).
 - Agenda por profissional e unidade: horários de atendimento, bloqueios, disponibilidade, encaixe, retorno, confirmação, presença, falta, cancelamento com motivo, reagendamento com histórico e lista de espera. O banco impede duas consultas no mesmo horário, mesmo com pedidos simultâneos ([regras](docs/api/agenda.md)).
+- Atendimento e vínculo assistencial: o que o médico vê do paciente depende do estado do vínculo (agendado, confirmado, atendimento iniciado, acompanhamento ativo, encerrado, expirado), com acesso emergencial temporário, justificado e revisado pelo administrador ([regras](docs/api/atendimento-e-vinculo.md)). A tabela de estados é uma proposta que precisa de validação médica.
 - Verificações automáticas a cada alteração: tipos, lint, formatação, testes, vulnerabilidades e segredos.
 
 O plano completo está em [docs/planejamento/04-plano-do-mvp.md](docs/planejamento/04-plano-do-mvp.md).

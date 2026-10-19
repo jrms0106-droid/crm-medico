@@ -16,7 +16,7 @@ O motor `@crm/policy` recebe quem pede (usuário, papéis, organização, unidad
 1. **Negação explícita vence**, nesta ordem:
    - recurso de outra organização: `other_organization`
    - dado clínico pedido por quem não é médico: `clinical_requires_doctor` (o administrador **nunca** tem acesso clínico pelo papel de administrador)
-   - dado clínico sem vínculo assistencial em andamento: `no_care_relationship`
+   - dado clínico sem vínculo assistencial: `no_care_relationship`; com vínculo que não libera a ação: `care_state_disallows`; registro de outro autor: `not_author` (editar, adendar, assinar); registro sensível de outro autor sem justificativa: `justification_required`
    - recurso operacional de uma unidade à qual o usuário não pertence: `other_unit`
 2. Depois, a **matriz de papéis** abaixo concede a ação.
 3. Sem concessão, a resposta é **negar** (`default_deny`). Um erro dentro de uma regra também nega (`rule_error`).
@@ -27,23 +27,27 @@ Um usuário com dois papéis (por exemplo, administrador e médico) soma as conc
 
 Ações: visualizar (`view`), criar (`create`), editar (`edit`), corrigir (`correct`), assinar (`sign`), exportar (`export`), compartilhar (`share`).
 
-| Recurso                                  | Classe         | Médico                                                     | Secretária                | Administrador             | Escopo de unidade      |
-| ---------------------------------------- | -------------- | ---------------------------------------------------------- | ------------------------- | ------------------------- | ---------------------- |
-| `unit` (unidade)                         | administrativo | visualizar                                                 | visualizar                | visualizar, criar, editar | sim, exceto admin      |
-| `user_account` (contas e acessos)        | administrativo | —                                                          | —                         | visualizar, criar, editar | não                    |
-| `specialty` (especialidade)              | administrativo | visualizar                                                 | visualizar                | visualizar, criar, editar | não                    |
-| `professional` (ficha profissional)      | administrativo | visualizar                                                 | visualizar                | visualizar, criar, editar | não                    |
-| `unit_professionals` (equipe da unidade) | administrativo | visualizar                                                 | visualizar                | visualizar                | sim, todos os papéis   |
-| `patient_registration` (cadastro)        | pessoal        | visualizar, criar, editar                                  | visualizar, criar, editar | —                         | não                    |
-| `schedule` (configuração da agenda)      | administrativo | visualizar                                                 | visualizar, criar, editar | visualizar, criar, editar | sim, todos os papéis   |
-| `appointment` (consultas e espera)       | pessoal        | visualizar, só da própria agenda                           | visualizar, criar, editar | —                         | sim, todos os papéis   |
-| `clinical_record` (prontuário)           | clínico        | visualizar, criar, editar, corrigir, assinar (com vínculo) | —                         | —                         | não (é da organização) |
-| `audit_event` (auditoria)                | auditoria      | —                                                          | —                         | visualizar                | não                    |
+| Recurso                                            | Classe         | Médico                                                            | Secretária                | Administrador             | Escopo de unidade      |
+| -------------------------------------------------- | -------------- | ----------------------------------------------------------------- | ------------------------- | ------------------------- | ---------------------- |
+| `unit` (unidade)                                   | administrativo | visualizar                                                        | visualizar                | visualizar, criar, editar | sim, exceto admin      |
+| `user_account` (contas e acessos)                  | administrativo | —                                                                 | —                         | visualizar, criar, editar | não                    |
+| `specialty` (especialidade)                        | administrativo | visualizar                                                        | visualizar                | visualizar, criar, editar | não                    |
+| `professional` (ficha profissional)                | administrativo | visualizar                                                        | visualizar                | visualizar, criar, editar | não                    |
+| `unit_professionals` (equipe da unidade)           | administrativo | visualizar                                                        | visualizar                | visualizar                | sim, todos os papéis   |
+| `patient_registration` (cadastro)                  | pessoal        | visualizar, criar, editar                                         | visualizar, criar, editar | —                         | não                    |
+| `schedule` (configuração da agenda)                | administrativo | visualizar                                                        | visualizar, criar, editar | visualizar, criar, editar | sim, todos os papéis   |
+| `appointment` (consultas e espera)                 | pessoal        | visualizar, só da própria agenda                                  | visualizar, criar, editar | —                         | sim, todos os papéis   |
+| `encounter` (atendimento)                          | clínico        | conforme o vínculo                                                | —                         | —                         | não                    |
+| `clinical_summary` (resumo de segurança)           | clínico        | visualizar, conforme o vínculo                                    | —                         | —                         | não                    |
+| `clinical_record` (prontuário)                     | clínico        | visualizar, criar, editar, corrigir, assinar (conforme o vínculo) | —                         | —                         | não (é da organização) |
+| `emergency_access` (acesso emergencial)            | clínico        | pedir                                                             | —                         | —                         | não                    |
+| `emergency_review` (revisão do acesso emergencial) | auditoria      | —                                                                 | —                         | visualizar, editar        | não                    |
+| `audit_event` (auditoria)                          | auditoria      | —                                                                 | —                         | visualizar                | não                    |
 
 - **Exportar e compartilhar** não estão liberados para ninguém no MVP. Entram com a reautenticação e a auditoria reforçada, depois da validação jurídica.
 - **Agenda (Etapa 4):** a configuração (`schedule`) é separada das consultas (`appointment`), porque o administrador configura agendas, mas não vê pacientes. Ver [agenda.md](agenda.md).
 - **Cadastro, agenda e prontuário** entraram na matriz antes para que as Etapas 3, 4 e 6 já nasçam com a regra testada. As rotas desses recursos ainda não existem.
-- **Vínculo assistencial:** nesta etapa, o médico só tem acesso clínico com um vínculo nos estados "atendimento iniciado" ou "acompanhamento ativo". A tabela completa por estado (seção 5.2 de [03-arquitetura.md](../planejamento/03-arquitetura.md)) chega na Etapa 5 e **precisa de validação médica**.
+- **Vínculo assistencial (Etapa 5):** o que o médico vê e faz em cada estado do vínculo está em [atendimento-e-vinculo.md](atendimento-e-vinculo.md). A tabela é uma proposta e **precisa de validação médica**.
 - O prontuário é do paciente na organização, não da unidade, por isso não tem escopo de unidade (seção 9 da arquitetura).
 
 ## Regras de negócio

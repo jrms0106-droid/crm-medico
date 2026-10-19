@@ -36,6 +36,9 @@ const envSchema = z
     LOGIN_LOCK_MINUTES: z.coerce.number().int().positive().default(15),
     LOGIN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
     REAUTH_VALID_MINUTES: z.coerce.number().int().positive().default(5),
+    // Prazos do vínculo assistencial (docs/api/atendimento-e-vinculo.md), pendentes de validação médica.
+    CARE_COURTESY_DAYS: z.coerce.number().int().min(0).max(365).default(30),
+    EMERGENCY_ACCESS_HOURS: z.coerce.number().int().min(1).max(24).default(4),
     COOKIE_SECURE: booleanFromEnv,
     TRUST_PROXY: booleanFromEnv,
   })
