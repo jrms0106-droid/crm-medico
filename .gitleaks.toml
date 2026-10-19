@@ -1,0 +1,7 @@
+# Senhas de desenvolvimento conhecidas e sem valor real ficam fora do alerta.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Credenciais fictícias de desenvolvimento e CI"
+regexes = ['''crm_dev_only''', '''crm_ci_only''']

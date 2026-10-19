@@ -1,1 +1,57 @@
-# crm-medico
+# CRM Médico
+
+Sistema de gestão de clínica multiespecialidades com prontuário eletrônico, agenda, CRM, financeiro e IA assistiva.
+
+> **Em desenvolvimento. Não apto a uso clínico real.** Use somente dados fictícios. O sistema só poderá atender pacientes após as validações técnicas, clínicas, jurídicas e regulatórias descritas em [docs/planejamento](docs/planejamento).
+
+## O que existe hoje (Etapa 0: fundação)
+
+- Monorepo TypeScript com API (NestJS), aplicativo web instalável (React + Vite, PWA) e pacotes compartilhados.
+- Banco PostgreSQL com migrações versionadas (Prisma) e dados fictícios de exemplo.
+- Formato único de erros da API, cabeçalhos de segurança e identificador por requisição.
+- Motor de autorização com negação por padrão (as regras de cada perfil chegam na Etapa 2).
+- Verificações automáticas a cada alteração: tipos, lint, formatação, testes, vulnerabilidades e segredos.
+
+O plano completo está em [docs/planejamento/04-plano-do-mvp.md](docs/planejamento/04-plano-do-mvp.md).
+
+## Estrutura
+
+```
+apps/api           backend NestJS (um módulo por domínio)
+apps/web           frontend React + Vite (PWA)
+packages/shared    esquemas de validação, tipos e códigos de erro usados por API e web
+packages/policy    motor de autorização RBAC + ABAC (sem banco, 100% testável)
+prisma/            esquema e migrações do banco
+scripts/           dados fictícios e utilitários
+docs/adr/          decisões arquiteturais
+docs/planejamento/ stack, ambiente, arquitetura e plano do MVP
+```
+
+## Como rodar no seu computador
+
+Pré-requisitos: Node.js 22 e Docker (ou um PostgreSQL 16 próprio).
+
+```bash
+cp .env.example .env          # configurações locais (nunca coloque credenciais reais)
+docker compose up -d          # sobe o PostgreSQL de desenvolvimento e o de testes
+npm install                   # instala dependências e gera o cliente do banco
+npm run db:migrate            # cria as tabelas
+npm run db:seed               # cria a clínica fictícia de exemplo
+npm run build                 # compila os pacotes
+npm run dev                   # API em http://localhost:3000 e app em http://localhost:5173
+```
+
+## Verificações
+
+```bash
+npm run check    # formatação + lint + tipos + todos os testes
+```
+
+Os testes de integração usam um banco real separado (`DATABASE_URL_TEST`, nome terminado em `_test`), que é apagado e recriado a cada execução.
+
+## Regras do projeto
+
+- Nenhum dado real de paciente fora de produção.
+- Credenciais nunca entram no repositório (`.env` é ignorado; o CI procura segredos).
+- Toda mudança entra por Pull Request com CI verde e aprovação humana.
+- Regras de acesso e de negócio são aplicadas no servidor, nunca só na tela.
