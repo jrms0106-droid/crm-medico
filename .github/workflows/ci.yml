@@ -64,6 +64,6 @@ jobs:
       - name: Auditoria de vulnerabilidades (falha em alta ou crítica)
         run: npm audit --audit-level=high
       - name: Varredura de segredos (Gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
