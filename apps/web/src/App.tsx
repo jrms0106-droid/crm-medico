@@ -1,48 +1,76 @@
-import { useEffect, useState } from 'react';
-import type { HealthResponse } from '@crm/shared';
-import { fetchHealth } from './api';
+import { useCallback, useEffect, useState } from 'react';
+import type { SessionInfo } from '@crm/shared';
+import { ApiError, api } from './api';
+import { Card, DevBanner } from './components';
+import {
+  ChangePasswordScreen,
+  HomeScreen,
+  LoginScreen,
+  MfaSetupScreen,
+  MfaVerifyScreen,
+} from './screens';
 
-type State = { kind: 'loading' } | { kind: 'ready'; health: HealthResponse } | { kind: 'error' };
+type View =
+  | { kind: 'loading' }
+  | { kind: 'offline' }
+  | { kind: 'anonymous' }
+  | { kind: 'session'; session: SessionInfo };
 
 export function App() {
-  const [state, setState] = useState<State>({ kind: 'loading' });
+  const [view, setView] = useState<View>({ kind: 'loading' });
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchHealth(controller.signal)
-      .then((health) => setState({ kind: 'ready', health }))
-      .catch(() => {
-        if (!controller.signal.aborted) setState({ kind: 'error' });
-      });
-    return () => controller.abort();
+  const refresh = useCallback(() => {
+    api.me().then(
+      (session) => setView({ kind: 'session', session }),
+      (e) => setView({ kind: e instanceof ApiError && e.status === 401 ? 'anonymous' : 'offline' }),
+    );
   }, []);
+
+  useEffect(refresh, [refresh]);
+
+  const onSession = (session: SessionInfo) => setView({ kind: 'session', session });
+  const logout = () => {
+    api.logout().finally(() => setView({ kind: 'anonymous' }));
+  };
 
   return (
     <div className="page">
-      <div className="banner" role="note">
-        Ambiente de desenvolvimento com dados fictícios. Não use com pacientes reais.
-      </div>
-      <main className="card">
-        <h1>CRM Médico</h1>
-        <p className="muted">Fundação do sistema (Etapa 0)</p>
-        <section aria-live="polite">
-          {state.kind === 'loading' && <p>Verificando o servidor…</p>}
-          {state.kind === 'error' && (
-            <p className="status status-error">Não foi possível falar com o servidor.</p>
-          )}
-          {state.kind === 'ready' && (
-            <ul className="checks">
-              <li className={state.health.status === 'ok' ? 'ok' : 'warn'}>
-                Servidor: {state.health.status === 'ok' ? 'funcionando' : 'com problemas'}
-              </li>
-              <li className={state.health.database === 'ok' ? 'ok' : 'warn'}>
-                Banco de dados: {state.health.database === 'ok' ? 'conectado' : 'indisponível'}
-              </li>
-              <li className="warn">Uso clínico: ainda não aprovado</li>
-            </ul>
-          )}
-        </section>
-      </main>
+      <DevBanner />
+      {view.kind === 'loading' && <Card title="CRM Médico" subtitle="Carregando…" />}
+      {view.kind === 'offline' && (
+        <Card title="Sem conexão" subtitle="Não foi possível falar com o servidor.">
+          <button type="button" onClick={refresh}>
+            Tentar de novo
+          </button>
+        </Card>
+      )}
+      {view.kind === 'anonymous' && <LoginScreen onSession={onSession} />}
+      {view.kind === 'session' && (
+        <SessionView session={view.session} onSession={onSession} onLogout={logout} />
+      )}
     </div>
   );
+}
+
+function SessionView({
+  session,
+  onSession,
+  onLogout,
+}: {
+  session: SessionInfo;
+  onSession: (s: SessionInfo) => void;
+  onLogout: () => void;
+}) {
+  switch (session.state) {
+    case 'pending_mfa':
+      return session.mfaEnabled ? (
+        <MfaVerifyScreen onSession={onSession} onCancel={onLogout} />
+      ) : (
+        <MfaSetupScreen onSession={onSession} onCancel={onLogout} />
+      );
+    case 'password_change_required':
+      return <ChangePasswordScreen session={session} onSession={onSession} />;
+    case 'active':
+      return <HomeScreen session={session} onLogout={onLogout} />;
+  }
 }

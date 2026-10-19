@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ErrorCode, type ErrorResponse } from '@crm/shared';
 import type { Response } from 'express';
+import { AppError } from './app-error.js';
 
 const CODE_BY_STATUS: Record<number, { code: ErrorCode; message: string }> = {
   400: { code: ErrorCode.VALIDATION_FAILED, message: 'Dados inválidos.' },
@@ -33,6 +34,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const res = host.switchToHttp().getResponse<Response>();
     const requestId = String(res.locals['requestId'] ?? 'unknown');
+
+    if (exception instanceof AppError) {
+      const body: ErrorResponse = {
+        error: {
+          code: exception.code,
+          message: exception.publicMessage,
+          requestId,
+          details: exception.details,
+        },
+      };
+      res.status(exception.getStatus()).json(body);
+      return;
+    }
 
     const status =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;

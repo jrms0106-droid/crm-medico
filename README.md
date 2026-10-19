@@ -4,12 +4,13 @@ Sistema de gestão de clínica multiespecialidades com prontuário eletrônico, 
 
 > **Em desenvolvimento. Não apto a uso clínico real.** Use somente dados fictícios. O sistema só poderá atender pacientes após as validações técnicas, clínicas, jurídicas e regulatórias descritas em [docs/planejamento](docs/planejamento).
 
-## O que existe hoje (Etapa 0: fundação)
+## O que existe hoje
 
 - Monorepo TypeScript com API (NestJS), aplicativo web instalável (React + Vite, PWA) e pacotes compartilhados.
 - Banco PostgreSQL com migrações versionadas (Prisma) e dados fictícios de exemplo.
 - Formato único de erros da API, cabeçalhos de segurança e identificador por requisição.
 - Motor de autorização com negação por padrão (as regras de cada perfil chegam na Etapa 2).
+- Login com senha (Argon2id), sessão no servidor, bloqueio por tentativas, verificação em duas etapas (TOTP) obrigatória para médicos e administradores, troca de senha e recuperação de acesso pelo administrador ([regras](docs/api/identidade.md)).
 - Verificações automáticas a cada alteração: tipos, lint, formatação, testes, vulnerabilidades e segredos.
 
 O plano completo está em [docs/planejamento/04-plano-do-mvp.md](docs/planejamento/04-plano-do-mvp.md).
@@ -40,6 +41,10 @@ npm run db:seed               # cria a clínica fictícia de exemplo
 npm run build                 # compila os pacotes
 npm run dev                   # API em http://localhost:3000 e app em http://localhost:5173
 ```
+
+Usuários fictícios criados pelo seed (senha `senha-de-desenvolvimento`, só para desenvolvimento):
+`admin@clinica-ficticia.test`, `medico@clinica-ficticia.test` e `secretaria@clinica-ficticia.test`.
+No primeiro login, médico e administrador cadastram a verificação em duas etapas num aplicativo autenticador.
 
 ## Verificações
 

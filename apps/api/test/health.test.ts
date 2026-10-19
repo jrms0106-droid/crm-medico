@@ -3,17 +3,19 @@ import type { INestApplication } from '@nestjs/common';
 import { errorResponseSchema, healthResponseSchema } from '@crm/shared';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startTestApp } from './helpers.js';
+import { type TestApp, startTestApp } from './helpers.js';
 
 describe('API: saúde e formato de erro (integração com PostgreSQL real)', () => {
+  let t: TestApp;
   let app: INestApplication;
 
   beforeAll(async () => {
-    app = await startTestApp();
+    t = await startTestApp();
+    app = t.app;
   });
 
   afterAll(async () => {
-    await app.close();
+    await t.close();
   });
 
   it('GET /api/v1/health responde ok com o banco conectado', async () => {

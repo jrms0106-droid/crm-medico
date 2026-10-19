@@ -90,3 +90,85 @@ h1 {
 .status-error {
   color: var(--error);
 }
+
+form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field span {
+  font-weight: 600;
+}
+
+input {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--muted);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+button.link {
+  background: none;
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.form-error {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--error);
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.steps {
+  padding-left: 20px;
+  line-height: 1.5;
+}
+
+.qr {
+  text-align: center;
+}
+
+.qr img {
+  background: #fff;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.secret {
+  word-break: break-all;
+  user-select: all;
+}
