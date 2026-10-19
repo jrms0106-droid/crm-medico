@@ -46,7 +46,8 @@ Ações: visualizar (`view`), criar (`create`), editar (`edit`), corrigir (`corr
 
 - **Exportar e compartilhar** não estão liberados para ninguém no MVP. Entram com a reautenticação e a auditoria reforçada, depois da validação jurídica.
 - **Agenda (Etapa 4):** a configuração (`schedule`) é separada das consultas (`appointment`), porque o administrador configura agendas, mas não vê pacientes. Ver [agenda.md](agenda.md).
-- **Cadastro, agenda e prontuário** entraram na matriz antes para que as Etapas 3, 4 e 6 já nasçam com a regra testada. As rotas desses recursos ainda não existem.
+- **Cadastro, agenda e prontuário** entraram na matriz antes para que as Etapas 3, 4 e 6 já nasçam com a regra testada.
+- **Prontuário (Etapa 6):** as rotas e as regras de autoria, sensibilidade, assinatura e correção estão em [prontuario.md](prontuario.md).
 - **Vínculo assistencial (Etapa 5):** o que o médico vê e faz em cada estado do vínculo está em [atendimento-e-vinculo.md](atendimento-e-vinculo.md). A tabela é uma proposta e **precisa de validação médica**.
 - O prontuário é do paciente na organização, não da unidade, por isso não tem escopo de unidade (seção 9 da arquitetura).
 

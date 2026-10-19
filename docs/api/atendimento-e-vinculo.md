@@ -47,7 +47,7 @@ Regras que valem em todos os estados:
 4. **Só médico.** Secretária e administrador nunca acessam dado clínico. O administrador que também é médico acessa pelo papel de médico.
 5. Exportar e compartilhar continuam negados para todos no MVP, inclusive no acesso emergencial.
 
-Os registros do prontuário chegam na Etapa 6. Nesta etapa as regras já ficam no motor de política, testadas estado por estado, e a rota `GET /patients/:id/care-access` mostra ao médico o que ele pode fazer com cada paciente.
+As regras ficam no motor de política, testadas estado por estado, e valem para os registros do prontuário ([prontuario.md](prontuario.md)). A rota `GET /patients/:id/care-access` mostra ao médico o que ele pode fazer com cada paciente.
 
 ## Atendimento
 
@@ -92,4 +92,4 @@ Os registros do prontuário chegam na Etapa 6. Nesta etapa as regras já ficam n
 
 ## Fora desta etapa
 
-Registros do prontuário e sensibilidade por registro (Etapa 6), notificação imediata do acesso emergencial (módulo de mensagens), regras de sensibilidade por especialidade (validação médica), telas (Etapa 7).
+Notificação imediata do acesso emergencial (módulo de mensagens), regras de sensibilidade por especialidade (validação médica), telas (Etapa 7).

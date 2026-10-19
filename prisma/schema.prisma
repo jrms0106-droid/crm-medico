@@ -11,7 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care"]
+  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
@@ -257,6 +257,7 @@ model Patient {
   waitlist             WaitlistEntry[]
   encounters           Encounter[]
   emergencyAccesses    EmergencyAccess[]
+  clinicalRecords      ClinicalRecord[]
 
   @@unique([organizationId, cpfHash])
   @@index([organizationId, birthDate])
@@ -494,6 +495,8 @@ model Encounter {
   closedAt       DateTime?       @map("closed_at") @db.Timestamptz(3)
   followUpUntil  DateTime?       @map("follow_up_until") @db.Timestamptz(3)
 
+  records ClinicalRecord[]
+
   @@index([doctorUserId, patientId])
   @@index([organizationId])
   @@map("encounters")
@@ -526,4 +529,115 @@ model EmergencyAccess {
   @@index([organizationId, reviewedAt])
   @@map("emergency_accesses")
   @@schema("care")
+}
+
+enum RecordKind {
+  consultation
+  evolution
+  addendum
+
+  @@schema("records")
+}
+
+enum RecordStatus {
+  draft
+  finalized
+  signed
+  rectified
+  archived
+  discarded
+
+  @@schema("records")
+}
+
+enum RecordSensitivity {
+  normal
+  elevated
+  restricted
+
+  @@schema("records")
+}
+
+/// Registro clínico. Depois de assinado, o conteúdo fica congelado por gatilho no banco.
+model ClinicalRecord {
+  id                String            @id @default(uuid(7)) @db.Uuid
+  organizationId    String            @map("organization_id") @db.Uuid
+  patientId         String            @map("patient_id") @db.Uuid
+  patient           Patient           @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  authorUserId      String            @map("author_user_id") @db.Uuid
+  encounterId       String?           @map("encounter_id") @db.Uuid
+  encounter         Encounter?        @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  unitId            String?           @map("unit_id") @db.Uuid
+  kind              RecordKind        @default(consultation)
+  clinicalDate      DateTime          @map("clinical_date") @db.Date
+  sensitivity       RecordSensitivity @default(normal)
+  status            RecordStatus      @default(draft)
+  version           Int               @default(1)
+  formVersion       String            @default("generic-v1") @map("form_version") @db.VarChar(40)
+  content           Json
+  /// Já esteve finalizado alguma vez (rascunho assim não pode ser descartado).
+  everFinalized     Boolean           @default(false) @map("ever_finalized")
+  contentHash       String?           @map("content_hash") @db.Char(64)
+  signedAt          DateTime?         @map("signed_at") @db.Timestamptz(3)
+  signatureEvidence Json?             @map("signature_evidence")
+  rectifiesId       String?           @map("rectifies_id") @db.Uuid
+  rectifiedById     String?           @unique @map("rectified_by_id") @db.Uuid
+  addendumOfId      String?           @map("addendum_of_id") @db.Uuid
+  justification     String?           @db.VarChar(1000)
+  archivedAt        DateTime?         @map("archived_at") @db.Timestamptz(3)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  versions          RecordVersion[]
+  events            RecordEvent[]
+
+  @@index([patientId, clinicalDate])
+  @@index([authorUserId])
+  @@index([rectifiesId])
+  @@index([addendumOfId])
+  @@map("clinical_records")
+  @@schema("records")
+}
+
+/// Versões salvas do rascunho, somente-acréscimo.
+model RecordVersion {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  recordId      String         @map("record_id") @db.Uuid
+  record        ClinicalRecord @relation(fields: [recordId], references: [id], onDelete: Restrict)
+  version       Int
+  content       Json
+  savedAt       DateTime       @map("saved_at") @db.Timestamptz(3)
+  savedByUserId String         @map("saved_by_user_id") @db.Uuid
+
+  @@unique([recordId, version])
+  @@map("record_versions")
+  @@schema("records")
+}
+
+/// Histórico de estados do registro, somente-acréscimo.
+model RecordEvent {
+  id       String         @id @default(uuid(7)) @db.Uuid
+  seq      BigInt         @unique @default(autoincrement())
+  recordId String         @map("record_id") @db.Uuid
+  record   ClinicalRecord @relation(fields: [recordId], references: [id], onDelete: Restrict)
+  type     String         @db.VarChar(40)
+  at       DateTime       @db.Timestamptz(3)
+  byUserId String         @map("by_user_id") @db.Uuid
+  details  Json?
+
+  @@index([recordId])
+  @@map("record_events")
+  @@schema("records")
+}
+
+/// Justificativas para abrir registros sensíveis de outros autores, somente-acréscimo.
+model AccessJustification {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  recordId      String   @map("record_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  justification String   @db.VarChar(1000)
+  at            DateTime @db.Timestamptz(3)
+
+  @@index([recordId])
+  @@map("access_justifications")
+  @@schema("records")
 }
