@@ -10,6 +10,8 @@ regexes = [
   '''crm_ci_only''',
   # Chave de MFA pública de desenvolvimento/teste (.env.example e apps/api/test/helpers.ts)
   '''ZGV2LXNvbWVudGUtbmFvLXVzYXItZW0tcHJvZHVjYW8=''',
+  # Chave pública de dados pessoais de desenvolvimento/teste (.env.example e apps/api/test/helpers.ts)
+  '''cGlpLWRldi1zb21lbnRlLW5hby11c2FyLWVtLXByb2Q=''',
   # Senhas fictícias de testes automatizados e do seed
   '''senha-ficticia-forte-2026''',
   '''senha-de-desenvolvimento''',

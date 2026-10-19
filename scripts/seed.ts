@@ -4,6 +4,7 @@
  */
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { normalizeSearch } from '@crm/shared';
 import { PrismaClient, type Role } from '../apps/api/src/generated/prisma/client.js';
 import { hashPassword } from '../apps/api/src/identity/password.js';
 
@@ -85,9 +86,49 @@ await prisma.professional.upsert({
   },
 });
 
+// Pacientes fictícios, sem CPF (o CPF exige a chave de criptografia e não é necessário para testar).
+const patients = [
+  { fullName: 'José da Silva (fictício)', birthDate: '1980-05-20', phone: '11987654321' },
+  {
+    fullName: 'Maria Conceição Souza (fictícia)',
+    socialName: 'Mel Souza',
+    birthDate: '1992-11-03',
+    phone: '11976543210',
+  },
+  { fullName: 'Antônio Pereira Lima (fictício)', birthDate: '1957-02-14', phone: '1132345678' },
+];
+const secretaryId = created['secretaria@clinica-ficticia.test'] ?? '';
+for (const p of patients) {
+  const exists = await prisma.patient.findFirst({
+    where: { organizationId: org.id, fullName: p.fullName },
+  });
+  if (exists) continue;
+  const row = await prisma.patient.create({
+    data: {
+      organizationId: org.id,
+      fullName: p.fullName,
+      socialName: p.socialName ?? null,
+      nameSearch: normalizeSearch(`${p.fullName} ${p.socialName ?? ''}`),
+      birthDate: new Date(`${p.birthDate}T00:00:00.000Z`),
+      phones: { create: [{ number: p.phone, whatsapp: p.phone.length === 11, position: 0 }] },
+    },
+  });
+  await prisma.patientVersion.create({
+    data: {
+      patientId: row.id,
+      version: 1,
+      changedAt: new Date(),
+      changedByUserId: secretaryId,
+      changedFields: ['created'],
+      snapshot: { fullName: p.fullName, origem: 'seed' },
+    },
+  });
+}
+
 console.log(
   `Dados fictícios prontos: "${org.name}", 1 unidade, ${users.length} usuários, ` +
-    `${specialtyNames.length} especialidades e 1 ficha profissional (CRM 000001/SP, fictício).`,
+    `${specialtyNames.length} especialidades, 1 ficha profissional (CRM 000001/SP, fictício) ` +
+    `e ${patients.length} pacientes.`,
 );
 console.log(`Senha de todos (só desenvolvimento): ${DEV_PASSWORD}`);
 for (const u of users) console.log(`  ${u.email}  (${u.roles.join(', ')})`);

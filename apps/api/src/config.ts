@@ -16,6 +16,10 @@ const envSchema = z
     MFA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, {
       message: 'MFA_ENCRYPTION_KEY precisa ter 32 bytes em base64 (openssl rand -base64 32)',
     }),
+    /** Chave de 32 bytes em base64 para criptografar dados pessoais sensíveis (CPF). */
+    PII_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, {
+      message: 'PII_ENCRYPTION_KEY precisa ter 32 bytes em base64 (openssl rand -base64 32)',
+    }),
     MFA_REQUIRED_ROLES: z
       .string()
       .default('doctor,admin')
@@ -44,6 +48,12 @@ const envSchema = z
 
 export type AppConfig = z.infer<typeof envSchema>;
 
+/** Chaves publicadas no .env.example: servem só para desenvolvimento e testes. */
+const PUBLIC_DEV_KEYS = new Set([
+  'ZGV2LXNvbWVudGUtbmFvLXVzYXItZW0tcHJvZHVjYW8=',
+  'cGlpLWRldi1zb21lbnRlLW5hby11c2FyLWVtLXByb2Q=',
+]);
+
 /** Lê e valida as variáveis de ambiente. Falha cedo, com mensagem clara, se faltar algo. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = envSchema.safeParse(env);
@@ -51,8 +61,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     const problems = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`);
     throw new Error(`Configuração inválida:\n${problems.join('\n')}`);
   }
-  if (parsed.data.NODE_ENV === 'production' && !parsed.data.COOKIE_SECURE) {
-    throw new Error('Configuração inválida: COOKIE_SECURE não pode ser false em produção.');
+  const config = parsed.data;
+  if (config.NODE_ENV === 'production') {
+    if (!config.COOKIE_SECURE) {
+      throw new Error('Configuração inválida: COOKIE_SECURE não pode ser false em produção.');
+    }
+    if (
+      PUBLIC_DEV_KEYS.has(config.MFA_ENCRYPTION_KEY) ||
+      PUBLIC_DEV_KEYS.has(config.PII_ENCRYPTION_KEY)
+    ) {
+      throw new Error('Configuração inválida: chave pública de desenvolvimento usada em produção.');
+    }
   }
-  return parsed.data;
+  if (config.MFA_ENCRYPTION_KEY === config.PII_ENCRYPTION_KEY) {
+    throw new Error(
+      'Configuração inválida: MFA_ENCRYPTION_KEY e PII_ENCRYPTION_KEY precisam ser diferentes.',
+    );
+  }
+  return config;
 }
