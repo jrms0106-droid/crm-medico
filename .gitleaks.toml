@@ -1,7 +1,16 @@
-# Senhas de desenvolvimento conhecidas e sem valor real ficam fora do alerta.
+# Valores fictícios e públicos de desenvolvimento e teste ficam fora do alerta.
+# Só entram aqui valores que NUNCA protegem nada real; cada um está documentado onde é usado.
 [extend]
 useDefault = true
 
 [allowlist]
-description = "Credenciais fictícias de desenvolvimento e CI"
-regexes = ['''crm_dev_only''', '''crm_ci_only''']
+description = "Credenciais fictícias de desenvolvimento, teste e CI"
+regexes = [
+  '''crm_dev_only''',
+  '''crm_ci_only''',
+  # Chave de MFA pública de desenvolvimento/teste (.env.example e apps/api/test/helpers.ts)
+  '''ZGV2LXNvbWVudGUtbmFvLXVzYXItZW0tcHJvZHVjYW8=''',
+  # Senhas fictícias de testes automatizados e do seed
+  '''senha-ficticia-forte-2026''',
+  '''senha-de-desenvolvimento''',
+]
