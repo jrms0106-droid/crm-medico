@@ -1,0 +1,44 @@
+// Esquema do banco. Cada módulo do sistema tem seu próprio schema no PostgreSQL
+// (ver docs/planejamento/03-arquitetura.md, seção 2). Toda alteração vira uma
+// migração versionada em prisma/migrations.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../apps/api/src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["org"]
+}
+
+/// Organização (pessoa jurídica controladora dos dados).
+model Organization {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @db.VarChar(200)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  units     Unit[]
+
+  @@map("organizations")
+  @@schema("org")
+}
+
+/// Unidade de atendimento. Todo dado operacional carrega o id da unidade.
+model Unit {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name           String       @db.VarChar(200)
+  timezone       String       @default("America/Sao_Paulo") @db.VarChar(64)
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("units")
+  @@schema("org")
+}
