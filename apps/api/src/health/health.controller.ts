@@ -1,7 +1,9 @@
 import { Controller, Get, HttpCode, Inject } from '@nestjs/common';
 import type { HealthResponse } from '@crm/shared';
 import { PrismaService } from '../database/prisma.service.js';
+import { Public } from '../identity/auth.decorators.js';
 
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
