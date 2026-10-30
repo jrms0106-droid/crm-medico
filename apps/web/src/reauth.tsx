@@ -74,7 +74,10 @@ interface Pending {
  * Executa uma ação e, se a API pedir reautenticação (403 REAUTH_REQUIRED), mostra a
  * confirmação de identidade e repete a ação depois dela.
  */
-export function useReauth(session: SessionInfo) {
+export function useReauth(
+  session: SessionInfo,
+  reason = 'Mudanças de acesso exigem a senha de novo.',
+) {
   const [pending, setPending] = useState<Pending | null>(null);
 
   async function guarded<T>(fn: () => Promise<T>): Promise<T> {
@@ -112,7 +115,7 @@ export function useReauth(session: SessionInfo) {
       }}
     >
       <p>
-        <strong>Confirme sua identidade.</strong> Mudanças de acesso exigem a senha de novo.
+        <strong>Confirme sua identidade.</strong> {reason}
       </p>
     </ReauthDialog>
   ) : null;

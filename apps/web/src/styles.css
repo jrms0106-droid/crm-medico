@@ -360,6 +360,7 @@ td {
 
 .badge {
   display: inline-block;
+  white-space: nowrap;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 0.8rem;

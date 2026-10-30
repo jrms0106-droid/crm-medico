@@ -1,6 +1,7 @@
 import { ROLE_LABELS, type RoleName, type SessionInfo } from '@crm/shared';
 import { AuditPage } from './pages/admin';
 import { AgendaPage } from './pages/agenda';
+import { BillingPage } from './pages/billing';
 import { HomePage } from './pages/home';
 import { PatientPage, PatientsPage } from './pages/patients';
 import { ProfessionalsPage } from './pages/professionals';
@@ -16,12 +17,13 @@ interface NavItem {
 
 /**
  * Menus por perfil. É só a navegação: quem decide o acesso é a API, que nega por padrão.
- * O administrador não vê pacientes, agenda nem prontuário.
+ * O administrador não vê pacientes, agenda nem prontuário; o médico não vê o financeiro.
  */
 export const NAV: NavItem[] = [
   { path: '', label: 'Início', roles: ['admin', 'doctor', 'secretary'] },
   { path: 'pacientes', label: 'Pacientes', roles: ['doctor', 'secretary'] },
   { path: 'agenda', label: 'Agenda', roles: ['doctor', 'secretary'] },
+  { path: 'financeiro', label: 'Financeiro', roles: ['admin', 'secretary'] },
   { path: 'profissionais', label: 'Profissionais', roles: ['admin', 'doctor', 'secretary'] },
   { path: 'auditoria', label: 'Auditoria', roles: ['admin'] },
   { path: 'configuracoes', label: 'Configurações', roles: ['admin'] },
@@ -95,6 +97,8 @@ function Section({
       return id ? (
         <RecordPage session={session} patientId={id} encounterId={params.get('atendimento')} />
       ) : null;
+    case 'financeiro':
+      return <BillingPage session={session} />;
     case 'profissionais':
       return <ProfessionalsPage />;
     case 'auditoria':

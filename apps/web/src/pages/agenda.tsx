@@ -202,6 +202,16 @@ function DayList({
                         </button>
                       </>
                     )}
+                    {isSecretary && a.status === 'arrived' && (
+                      <a
+                        className="button small"
+                        href={href(
+                          `/financeiro?paciente=${a.patient.id}&consulta=${a.id}&unidade=${a.unitId}`,
+                        )}
+                      >
+                        Cobrar
+                      </a>
+                    )}
                     {isDoctor && a.status === 'arrived' && (
                       <button type="button" onClick={() => void start(a)} disabled={action.busy}>
                         Iniciar atendimento

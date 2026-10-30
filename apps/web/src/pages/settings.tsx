@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import {
   BRAZIL_STATES,
+  type PriceItemDto,
   type ProfessionalDto,
   ROLES,
   ROLE_LABELS,
@@ -11,13 +12,16 @@ import {
   type UnitDto,
   type UserAccountDto,
   WEEKDAY_LABELS,
+  formatCents,
+  parseReais,
 } from '@crm/shared';
 import { api } from '../api';
 import { useReauth } from '../reauth';
 import { Alert, Badge, Loading, Notice, Page, Panel, useAction, useLoad } from '../ui';
 
 /**
- * Configurações do administrador: usuários, unidades, especialidades, profissionais e agendas.
+ * Configurações do administrador: usuários, unidades, especialidades, profissionais, agendas e
+ * tabela de preços.
  * Mudanças de acesso pedem reautenticação (a API exige; a tela só pergunta a senha).
  */
 export function SettingsPage({ session }: { session: SessionInfo }) {
@@ -58,6 +62,7 @@ export function SettingsPage({ session }: { session: SessionInfo }) {
         units={(units.data ?? []).filter((u) => u.active)}
         professionals={(professionals.data ?? []).filter((p) => p.active)}
       />
+      <PricesSection />
     </Page>
   );
 }
@@ -709,5 +714,126 @@ function ScheduleEditor({ schedule, onChanged }: { schedule: ScheduleDto; onChan
         </button>
       </div>
     </div>
+  );
+}
+
+/** Tabela de preços do particular. Mudar o valor não altera cobranças já feitas. */
+function PricesSection() {
+  const prices = useLoad(() => api.get<PriceItemDto[]>('/billing/prices?includeInactive=true'), []);
+  const action = useAction();
+  const [name, setName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const cents = (text: string) => {
+    const value = parseReais(text);
+    if (value === null)
+      throw new Error('Valor inválido. Use reais com vírgula, por exemplo 150,00.');
+    return value;
+  };
+
+  const create = (event: FormEvent) => {
+    event.preventDefault();
+    void action.run(async () => {
+      await api.post('/billing/prices', { name, amountCents: cents(amount) });
+      setName('');
+      setAmount('');
+      prices.reload();
+    });
+  };
+  const save = (item: PriceItemDto, event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    void action.run(async () => {
+      await api.patch(`/billing/prices/${item.id}`, {
+        name: String(data.get('name') ?? ''),
+        amountCents: cents(String(data.get('amount') ?? '')),
+      });
+      setEditing(null);
+      prices.reload();
+    });
+  };
+  const toggle = (item: PriceItemDto) =>
+    action.run(async () => {
+      await api.patch(`/billing/prices/${item.id}`, { active: !item.active });
+      prices.reload();
+    });
+
+  return (
+    <Panel title="Tabela de preços (particular)">
+      <Alert message={prices.error ?? action.error} />
+      {!prices.data && !prices.error && <Loading what="a tabela de preços" />}
+      {prices.data && prices.data.length === 0 && <p className="muted">Nenhum item cadastrado.</p>}
+      <ul>
+        {prices.data?.map((item) =>
+          editing === item.id ? (
+            <li key={item.id}>
+              <form
+                className="inline"
+                onSubmit={(e) => save(item, e)}
+                aria-label={`Editar ${item.name}`}
+              >
+                <label className="field grow">
+                  <span>Nome</span>
+                  <input name="name" defaultValue={item.name} maxLength={120} required />
+                </label>
+                <label className="field">
+                  <span>Valor (R$)</span>
+                  <input
+                    name="amount"
+                    defaultValue={(item.amountCents / 100).toFixed(2).replace('.', ',')}
+                    inputMode="decimal"
+                    required
+                  />
+                </label>
+                <button type="submit" disabled={action.busy}>
+                  Salvar
+                </button>
+                <button type="button" className="link" onClick={() => setEditing(null)}>
+                  Cancelar
+                </button>
+              </form>
+            </li>
+          ) : (
+            <li key={item.id}>
+              {item.name}: <strong>{formatCents(item.amountCents)}</strong>{' '}
+              {!item.active && <Badge tone="warn">Inativo</Badge>}{' '}
+              <button type="button" className="link" onClick={() => setEditing(item.id)}>
+                Editar
+              </button>{' '}
+              <button type="button" className="link" onClick={() => void toggle(item)}>
+                {item.active ? 'Desativar' : 'Reativar'}
+              </button>
+            </li>
+          ),
+        )}
+      </ul>
+      <form className="inline" onSubmit={create} aria-label="Novo item da tabela">
+        <label className="field grow">
+          <span>Novo item</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={120}
+            placeholder="Consulta"
+            required
+          />
+        </label>
+        <label className="field">
+          <span>Valor (R$)</span>
+          <input
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            inputMode="decimal"
+            placeholder="250,00"
+            required
+          />
+        </label>
+        <button type="submit" disabled={action.busy}>
+          Adicionar item
+        </button>
+      </form>
+      <p className="muted small">Mudar o valor de um item não muda as cobranças já feitas.</p>
+    </Panel>
   );
 }

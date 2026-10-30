@@ -211,6 +211,11 @@ export function PatientPage({ session, patientId }: { session: SessionInfo; pati
               Agendar consulta
             </a>
           )}
+          {isSecretary && (
+            <a className="button" href={href(`/financeiro?paciente=${patient.id}`)}>
+              Nova cobrança
+            </a>
+          )}
           {isDoctor && (
             <a className="button" href={href(`/prontuario/${patient.id}`)}>
               Prontuário

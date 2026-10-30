@@ -37,8 +37,9 @@ async function call<T extends z.ZodType>(
   path: string,
   schema: T | null,
   body?: unknown,
+  extraHeaders: Record<string, string> = {},
 ): Promise<z.infer<T>> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...extraHeaders };
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (method !== 'GET') headers['x-csrf-token'] = csrfToken;
 
@@ -71,8 +72,13 @@ async function call<T extends z.ZodType>(
  * Chamada às rotas de negócio. As respostas são do próprio backend, com os tipos de
  * `@crm/shared`; a validação de entrada fica no servidor.
  */
-async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
-  return (await call(method, path, z.unknown(), body)) as T;
+async function request<T>(
+  method: Method,
+  path: string,
+  body?: unknown,
+  headers?: Record<string, string>,
+): Promise<T> {
+  return (await call(method, path, z.unknown(), body, headers)) as T;
 }
 
 /** Monta a query string, ignorando valores vazios. */
@@ -109,7 +115,8 @@ export const api = {
   reauth: (password: string, code?: string) =>
     call('POST', '/auth/reauth', null, { password, ...(code ? { code } : {}) }),
   get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body: unknown = {}) => request<T>('POST', path, body),
+  post: <T>(path: string, body: unknown = {}, headers?: Record<string, string>) =>
+    request<T>('POST', path, body, headers),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
   put: <T>(path: string, body: unknown) => request<T>('PUT', path, body),
 };
