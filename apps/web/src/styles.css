@@ -462,3 +462,13 @@ fieldset {
   border: 1px solid rgb(127 127 127 / 30%);
   border-radius: 8px;
 }
+
+.panel.nested {
+  box-shadow: none;
+  border: 1px solid rgb(127 127 127 / 30%);
+}
+
+.panel h3 {
+  margin: 0;
+  font-size: 1rem;
+}

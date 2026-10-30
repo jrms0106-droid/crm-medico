@@ -10,14 +10,14 @@ Sistema de gestão de clínica multiespecialidades com prontuário eletrônico, 
 - Banco PostgreSQL com migrações versionadas (Prisma) e dados fictícios de exemplo.
 - Formato único de erros da API, cabeçalhos de segurança e identificador por requisição.
 - Motor de autorização com negação por padrão e matriz de permissões por perfil (médico, secretária, administrador), com auditoria de toda decisão de acesso ([regras](docs/api/organizacao-e-permissoes.md)).
-- Cadastro de unidades, especialidades, fichas profissionais (CRM/UF e RQE) e contas de usuário pelo administrador (por enquanto só pela API; as telas chegam na Etapa 7).
+- Cadastro de unidades, especialidades, fichas profissionais (CRM/UF e RQE) e contas de usuário pelo administrador.
 - Login com senha (Argon2id), sessão no servidor, bloqueio por tentativas, verificação em duas etapas (TOTP) obrigatória para médicos e administradores, troca de senha e recuperação de acesso pelo administrador ([regras](docs/api/identidade.md)).
 - Cadastro de pacientes com nome social, CPF validado e criptografado, responsáveis, contatos de emergência e preferências de comunicação; busca sem acento por nome, CPF ou telefone; alerta de duplicidade; histórico de versões ([regras](docs/api/pacientes.md)).
 - Agenda por profissional e unidade: horários de atendimento, bloqueios, disponibilidade, encaixe, retorno, confirmação, presença, falta, cancelamento com motivo, reagendamento com histórico e lista de espera. O banco impede duas consultas no mesmo horário, mesmo com pedidos simultâneos ([regras](docs/api/agenda.md)).
 - Atendimento e vínculo assistencial: o que o médico vê do paciente depende do estado do vínculo (agendado, confirmado, atendimento iniciado, acompanhamento ativo, encerrado, expirado), com acesso emergencial temporário, justificado e revisado pelo administrador ([regras](docs/api/atendimento-e-vinculo.md)). A tabela de estados é uma proposta que precisa de validação médica.
 - Prontuário básico (formulário genérico): rascunho com salvamento por versões e aviso de conflito de edição, finalização, assinatura eletrônica interna com reautenticação e resumo SHA-256, registro assinado congelado pelo próprio banco, retificação e adendo com justificativa, sensibilidade com justificativa de acesso e linha do tempo ([regras](docs/api/prontuario.md)). A assinatura não é ICP-Brasil e o nível exigido depende de validação jurídica.
 - Trilha de auditoria encadeada por hash, calculada pelo próprio banco, com verificação que aponta evento alterado, apagado ou fora de ordem ([regras](docs/api/auditoria.md)).
-- Telas por perfil no aplicativo web: pacientes, agenda, prontuário com assinatura, profissionais, auditoria e configurações, com testes ponta a ponta no navegador ([telas](docs/telas.md)).
+- Telas por perfil no aplicativo web: pacientes, agenda, prontuário com assinatura, profissionais, auditoria e configurações (usuários, unidades, especialidades, fichas profissionais e agendas), com testes ponta a ponta no navegador ([telas](docs/telas.md)).
 - Verificações automáticas a cada alteração: tipos, lint, formatação, testes, vulnerabilidades e segredos.
 
 O plano completo está em [docs/planejamento/04-plano-do-mvp.md](docs/planejamento/04-plano-do-mvp.md).

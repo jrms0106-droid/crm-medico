@@ -1,10 +1,11 @@
 import { ROLE_LABELS, type RoleName, type SessionInfo } from '@crm/shared';
-import { AuditPage, SettingsPage } from './pages/admin';
+import { AuditPage } from './pages/admin';
 import { AgendaPage } from './pages/agenda';
 import { HomePage } from './pages/home';
 import { PatientPage, PatientsPage } from './pages/patients';
 import { ProfessionalsPage } from './pages/professionals';
 import { RecordPage } from './pages/record';
+import { SettingsPage } from './pages/settings';
 import { href, useRoute } from './router';
 
 interface NavItem {
@@ -99,7 +100,7 @@ function Section({
     case 'auditoria':
       return <AuditPage />;
     case 'configuracoes':
-      return <SettingsPage />;
+      return <SettingsPage session={session} />;
     default:
       return <HomePage session={session} />;
   }

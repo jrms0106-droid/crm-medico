@@ -22,7 +22,7 @@ Interface web/PWA das etapas anteriores. Toda regra de acesso continua no backen
 - **Agenda:** escolha da agenda e do dia; lista das consultas com a situação. A secretária confirma, registra a chegada e cancela (com motivo), e marca consultas escolhendo o paciente e um horário livre. O médico vê só a própria agenda e inicia o atendimento quando o paciente chegou.
 - **Prontuário:** mostra o estado do vínculo e a linha do tempo. Com atendimento iniciado ou acompanhamento, o médico cria registros. O rascunho salva sozinho três segundos depois de parar de digitar; se outra janela salvou antes, a tela avisa e mantém o texto. Finalizar, assinar (com senha e código), reabrir, retificar e adendar seguem [prontuario.md](api/prontuario.md). Registro sensível de outro médico só abre com justificativa.
 - **Auditoria:** lista de eventos com filtro por resultado, verificação da trilha encadeada ([auditoria.md](api/auditoria.md)) e fila de revisão dos acessos emergenciais.
-- **Configurações:** consulta de unidades e usuários. Criar e alterar ainda é pela API; as telas de edição ficam para uma próxima entrega.
+- **Configurações:** o administrador cria e edita usuários (perfis e unidades), redefine acesso (mostra a senha temporária uma única vez), desativa e reativa contas; cria e desativa unidades e especialidades; cria fichas profissionais (CRM, UF, especialidade e RQE) para usuários com perfil Médico; cria agendas por unidade e edita as faixas de atendimento por dia da semana. Mudanças de acesso pedem a senha (e o código) de novo, como a API exige. Para configurar as agendas de uma unidade, o administrador precisa estar vinculado a ela.
 
 ## Dados no aparelho
 
@@ -35,7 +35,8 @@ Nenhum dado de paciente é guardado no navegador: o token de proteção (CSRF) f
 1. os menus mudam conforme o perfil, e o endereço de uma área de outro perfil não abre;
 2. a secretária cadastra um paciente, marca a consulta, confirma e registra a chegada;
 3. o médico inicia o atendimento, escreve o registro, finaliza, assina com senha e código, vê "Conteúdo íntegro" e encerra o atendimento;
-4. o administrador verifica a trilha de auditoria.
+4. o administrador verifica a trilha de auditoria;
+5. o administrador cadastra um médico (confirmando a identidade), cria a ficha profissional e a agenda com uma faixa de horário.
 
 No contêiner de desenvolvimento, use o Chromium já instalado: `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e`. Com `E2E_SCREENSHOTS=<pasta>`, o teste guarda imagens das telas.
 
