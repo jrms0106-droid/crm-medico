@@ -161,3 +161,16 @@ export interface FinancialReportDto {
 export function formatCents(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
+
+/**
+ * Valor digitado em reais → centavos. Aceita "150", "150,5", "1.234,56" e "R$ 80,00".
+ * Devolve null se não for um valor válido (mais de duas casas, letras, vazio).
+ */
+export function parseReais(text: string): number | null {
+  const clean = text.replace(/R\$/i, '').replace(/\s/g, '');
+  const match = /^(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/.exec(clean);
+  if (!match) return null;
+  const reais = Number(match[1]!.replaceAll('.', ''));
+  const centavos = Number((match[2] ?? '0').padEnd(2, '0'));
+  return reais * 100 + centavos;
+}

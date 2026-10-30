@@ -36,6 +36,9 @@ export function HomePage({ session }: { session: SessionInfo }) {
               <li>
                 <a href={href('/agenda')}>Marcar consulta e registrar chegada</a>
               </li>
+              <li>
+                <a href={href('/financeiro')}>Cobranças e pagamentos</a>
+              </li>
             </>
           )}
           {canSee(session, ['doctor']) && (
@@ -49,7 +52,10 @@ export function HomePage({ session }: { session: SessionInfo }) {
                 <a href={href('/auditoria')}>Auditoria e verificação da trilha</a>
               </li>
               <li>
-                <a href={href('/configuracoes')}>Usuários e unidades</a>
+                <a href={href('/configuracoes')}>Usuários, unidades e tabela de preços</a>
+              </li>
+              <li>
+                <a href={href('/financeiro')}>Relatório financeiro e estornos</a>
               </li>
             </>
           )}

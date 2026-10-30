@@ -44,6 +44,7 @@ test.describe.serial('fluxos por perfil', () => {
     await login(page, 'admin');
     await expect(menu(page).getByRole('link')).toHaveText([
       'Início',
+      'Financeiro',
       'Profissionais',
       'Auditoria',
       'Configurações',
@@ -58,6 +59,7 @@ test.describe.serial('fluxos por perfil', () => {
       'Início',
       'Pacientes',
       'Agenda',
+      'Financeiro',
       'Profissionais',
     ]);
     await page.goto('/#/auditoria');
@@ -184,5 +186,79 @@ test.describe.serial('fluxos por perfil', () => {
     await agenda.getByRole('button', { name: 'Salvar horários' }).click();
     await expect(agenda.getByRole('status')).toHaveText('Horários salvos.');
     await snap(page, '5-configuracoes');
+  });
+
+  test('financeiro: administrador cria o preço, secretária cobra e recebe, administrador estorna', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await login(page, 'admin');
+    await menu(page).getByRole('link', { name: 'Configurações' }).click();
+    const item = page.getByRole('form', { name: 'Novo item da tabela' });
+    await item.getByLabel('Novo item').fill('Consulta particular');
+    await item.getByLabel('Valor (R$)').fill('250,00');
+    await item.getByRole('button', { name: 'Adicionar item' }).click();
+    await expect(page.getByText('Consulta particular: R$ 250,00')).toBeVisible();
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    // A secretária cobra a consulta pela agenda, com desconto, e recebe em duas partes.
+    await login(page, 'secretary');
+    await menu(page).getByRole('link', { name: 'Agenda' }).click();
+    await page
+      .getByRole('row', { name: new RegExp(PATIENT) })
+      .getByRole('link', { name: 'Cobrar' })
+      .click();
+    const nova = page.getByRole('form', { name: 'Nova cobrança' });
+    await nova.getByLabel('Item da tabela').selectOption({ index: 1 });
+    await expect(nova.getByLabel('Valor (R$)')).toHaveValue('250,00');
+    await nova.getByLabel('Desconto (R$, opcional)').fill('50');
+    await nova.getByRole('button', { name: 'Criar cobrança' }).click();
+
+    const row = page.getByRole('row', { name: new RegExp(PATIENT) }).first();
+    await expect(row).toContainText('R$ 200,00');
+    await expect(row).toContainText('Em aberto');
+    await row.getByRole('button', { name: 'Abrir' }).click();
+    const pay = page.getByRole('form', { name: 'Registrar pagamento' });
+    await expect(pay.getByLabel('Valor recebido (R$)')).toHaveValue('200,00');
+    await pay.getByLabel('Forma').selectOption({ label: 'Pix' });
+    await pay.getByLabel('Valor recebido (R$)').fill('120,00');
+    await pay.getByRole('button', { name: 'Registrar pagamento' }).click();
+    await expect(pay.getByRole('status')).toHaveText('Pagamento de R$ 120,00 registrado.');
+    await expect(row).toContainText('Pago em parte');
+    await expect(pay.getByLabel('Valor recebido (R$)')).toHaveValue('80,00');
+    await pay.getByLabel('Forma').selectOption({ label: 'Dinheiro' });
+    await pay.getByRole('button', { name: 'Registrar pagamento' }).click();
+    await expect(row).toContainText('Quitada');
+    await expect(page.getByLabel('Resumo financeiro')).toContainText('R$ 200,00');
+    await snap(page, '8-financeiro-secretaria');
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    // Só o administrador estorna, com motivo e confirmação de identidade.
+    await login(page, 'admin');
+    await menu(page).getByRole('link', { name: 'Financeiro' }).click();
+    const adminRow = page.getByRole('row', { name: new RegExp(PATIENT) }).first();
+    await adminRow.getByRole('button', { name: 'Abrir' }).click();
+    await expect(page.getByRole('form', { name: 'Registrar pagamento' })).toHaveCount(0);
+    page.once('dialog', (d) => void d.accept('Registrado na forma errada'));
+    await page
+      .getByRole('list', { name: 'Pagamentos' })
+      .getByRole('button', { name: 'Estornar' })
+      .first()
+      .click();
+    const dialog = page.getByRole('form', { name: 'Confirmar identidade' });
+    await dialog.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await dialog.getByLabel('Código de 6 dígitos').fill(await nextCode('admin'));
+    await dialog.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(page.getByText('Registrado na forma errada')).toBeVisible();
+    await expect(adminRow).toContainText('Pago em parte');
+    await expect(adminRow).toContainText('R$ 120,00');
+    await snap(page, '9-financeiro-estorno');
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    // O médico não vê o financeiro, nem digitando o endereço.
+    await login(page, 'doctor');
+    await expect(menu(page).getByRole('link', { name: 'Financeiro' })).toHaveCount(0);
+    await page.goto('/#/financeiro');
+    await expect(page.getByText('Esta área não faz parte do seu perfil.')).toBeVisible();
   });
 });
