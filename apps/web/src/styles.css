@@ -172,3 +172,293 @@ button.link {
   word-break: break-all;
   user-select: all;
 }
+
+/* Sistema logado (Etapa 7) */
+
+.error {
+  color: var(--error);
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 8px 16px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--brand);
+}
+
+.topbar nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+}
+
+.topbar nav a {
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.topbar nav a[aria-current='page'] {
+  background: var(--brand);
+  color: #fff;
+}
+
+.who {
+  display: grid;
+  font-size: 0.875rem;
+}
+
+.who small {
+  color: var(--muted);
+}
+
+.content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.notice {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border-left: 4px solid var(--brand);
+  background: var(--surface);
+}
+
+.notice.warn {
+  border-left-color: var(--warn);
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+
+.grow {
+  flex: 1;
+  min-width: 200px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+select,
+textarea {
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--muted);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+textarea {
+  resize: vertical;
+}
+
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+button.secondary,
+a.button {
+  background: transparent;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+}
+
+a.button {
+  display: inline-block;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid rgb(127 127 127 / 25%);
+  vertical-align: top;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.row-actions button {
+  padding: 6px 10px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid currentcolor;
+}
+
+.badge.ok {
+  color: var(--ok);
+}
+
+.badge.warn {
+  color: var(--warn);
+}
+
+.badge.info {
+  color: var(--brand);
+}
+
+.badge.neutral {
+  color: var(--muted);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+}
+
+.facts div {
+  display: contents;
+}
+
+.facts dt {
+  font-weight: 600;
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.pre {
+  white-space: pre-wrap;
+}
+
+.timeline {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.timeline .entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid rgb(127 127 127 / 30%);
+}
+
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+}
+
+.slots legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.slot {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid rgb(127 127 127 / 40%);
+  border-radius: 8px;
+}
+
+.picks,
+.shortcuts {
+  list-style: none;
+  padding: 0;
+}
+
+.dialog {
+  border: 2px solid var(--brand);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+fieldset {
+  border: 1px solid rgb(127 127 127 / 30%);
+  border-radius: 8px;
+}

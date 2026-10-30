@@ -15,4 +15,7 @@ regexes = [
   # Senhas fictícias de testes automatizados e do seed
   '''senha-ficticia-forte-2026''',
   '''senha-de-desenvolvimento''',
+  # Senha e segredo TOTP públicos dos testes ponta a ponta (e2e/fixtures.ts)
+  '''senha-ficticia-e2e-2026''',
+  '''JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP''',
 ]

@@ -14,11 +14,12 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev": "npm run dev --workspace @crm/api & npm run dev --workspace @crm/web",
-    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p scripts/tsconfig.json && tsc -p e2e/tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "e2e": "playwright test",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.64.1",
     "dotenv": "^18.0.8",
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "7.1.1",

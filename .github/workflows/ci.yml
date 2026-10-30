@@ -16,7 +16,7 @@ jobs:
   verificar:
     name: Tipos, lint, formatação e testes
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16
@@ -48,6 +48,17 @@ jobs:
       - run: npm test
       - name: Migrações aplicam do zero
         run: npx prisma migrate status
+      - name: Navegador para os testes ponta a ponta
+        run: npx playwright install --with-deps chromium
+      - name: Testes ponta a ponta (Playwright)
+        run: npm run e2e
+      - name: Rastros dos testes ponta a ponta que falharam
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-rastros
+          path: test-results/
+          retention-days: 7
 
   seguranca:
     name: Dependências e segredos

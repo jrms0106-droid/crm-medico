@@ -16,6 +16,8 @@ Sistema de gestão de clínica multiespecialidades com prontuário eletrônico, 
 - Agenda por profissional e unidade: horários de atendimento, bloqueios, disponibilidade, encaixe, retorno, confirmação, presença, falta, cancelamento com motivo, reagendamento com histórico e lista de espera. O banco impede duas consultas no mesmo horário, mesmo com pedidos simultâneos ([regras](docs/api/agenda.md)).
 - Atendimento e vínculo assistencial: o que o médico vê do paciente depende do estado do vínculo (agendado, confirmado, atendimento iniciado, acompanhamento ativo, encerrado, expirado), com acesso emergencial temporário, justificado e revisado pelo administrador ([regras](docs/api/atendimento-e-vinculo.md)). A tabela de estados é uma proposta que precisa de validação médica.
 - Prontuário básico (formulário genérico): rascunho com salvamento por versões e aviso de conflito de edição, finalização, assinatura eletrônica interna com reautenticação e resumo SHA-256, registro assinado congelado pelo próprio banco, retificação e adendo com justificativa, sensibilidade com justificativa de acesso e linha do tempo ([regras](docs/api/prontuario.md)). A assinatura não é ICP-Brasil e o nível exigido depende de validação jurídica.
+- Trilha de auditoria encadeada por hash, calculada pelo próprio banco, com verificação que aponta evento alterado, apagado ou fora de ordem ([regras](docs/api/auditoria.md)).
+- Telas por perfil no aplicativo web: pacientes, agenda, prontuário com assinatura, profissionais, auditoria e configurações, com testes ponta a ponta no navegador ([telas](docs/telas.md)).
 - Verificações automáticas a cada alteração: tipos, lint, formatação, testes, vulnerabilidades e segredos.
 
 O plano completo está em [docs/planejamento/04-plano-do-mvp.md](docs/planejamento/04-plano-do-mvp.md).
@@ -56,6 +58,7 @@ O seed também cria a "Unidade Centro", quatro especialidades, a ficha profissio
 
 ```bash
 npm run check    # formatação + lint + tipos + todos os testes
+npm run e2e      # testes no navegador (depois de npm run build; ver docs/telas.md)
 ```
 
 Os testes de integração usam um banco real separado (`DATABASE_URL_TEST`, nome terminado em `_test`), que é apagado e recriado a cada execução.
