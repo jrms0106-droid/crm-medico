@@ -29,7 +29,7 @@ export const RECORD_STATUS_LABELS: Record<RecordStatus, string> = {
 export const GENERIC_FORM_VERSION = 'generic-v1';
 
 const longText = z.string().max(20_000, 'Máximo de 20.000 caracteres.');
-const ICD10 = /^[A-TV-Z][0-9][0-9AB](\.[0-9A-Z]{1,2})?$/;
+export const ICD10_PATTERN = /^[A-TV-Z][0-9][0-9AB](\.[0-9A-Z]{1,2})?$/;
 
 export const recordContentSchema = z.strictObject({
   chiefComplaint: longText.optional(),
@@ -43,7 +43,7 @@ export const recordContentSchema = z.strictObject({
           .string()
           .trim()
           .toUpperCase()
-          .regex(ICD10, 'CID-10 em formato inválido (exemplo: J06.9).')
+          .regex(ICD10_PATTERN, 'CID-10 em formato inválido (exemplo: J06.9).')
           .optional(),
       }),
     )

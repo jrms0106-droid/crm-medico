@@ -40,11 +40,12 @@ Ações: visualizar (`view`), criar (`create`), editar (`edit`), corrigir (`corr
 | `encounter` (atendimento)                          | clínico        | conforme o vínculo                                                | —                         | —                         | não                    |
 | `clinical_summary` (resumo de segurança)           | clínico        | visualizar, conforme o vínculo                                    | —                         | —                         | não                    |
 | `clinical_record` (prontuário)                     | clínico        | visualizar, criar, editar, corrigir, assinar (conforme o vínculo) | —                         | —                         | não (é da organização) |
+| `medical_document` (documentos médicos)            | clínico        | visualizar, criar, editar, corrigir, assinar, exportar (vínculo)  | —                         | —                         | não (é da organização) |
 | `emergency_access` (acesso emergencial)            | clínico        | pedir                                                             | —                         | —                         | não                    |
 | `emergency_review` (revisão do acesso emergencial) | auditoria      | —                                                                 | —                         | visualizar, editar        | não                    |
 | `audit_event` (auditoria)                          | auditoria      | —                                                                 | —                         | visualizar                | não                    |
 
-- **Exportar e compartilhar** não estão liberados para ninguém no MVP. Entram com a reautenticação e a auditoria reforçada, depois da validação jurídica.
+- **Compartilhar** não está liberado para ninguém. **Exportar** está liberado só para o PDF de documento médico, pelo médico e conforme o vínculo ([documentos.md](documentos.md)). As demais exportações entram com a reautenticação e a auditoria reforçada, depois da validação jurídica.
 - **Agenda (Etapa 4):** a configuração (`schedule`) é separada das consultas (`appointment`), porque o administrador configura agendas, mas não vê pacientes. Ver [agenda.md](agenda.md).
 - **Cadastro, agenda e prontuário** entraram na matriz antes para que as Etapas 3, 4 e 6 já nasçam com a regra testada.
 - **Prontuário (Etapa 6):** as rotas e as regras de autoria, sensibilidade, assinatura e correção estão em [prontuario.md](prontuario.md).
