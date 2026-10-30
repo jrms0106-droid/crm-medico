@@ -11,7 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records"]
+  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records", "documents"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
@@ -265,6 +265,7 @@ model Patient {
   encounters           Encounter[]
   emergencyAccesses    EmergencyAccess[]
   clinicalRecords      ClinicalRecord[]
+  medicalDocuments     MedicalDocument[]
 
   @@unique([organizationId, cpfHash])
   @@index([organizationId, birthDate])
@@ -502,7 +503,8 @@ model Encounter {
   closedAt       DateTime?       @map("closed_at") @db.Timestamptz(3)
   followUpUntil  DateTime?       @map("follow_up_until") @db.Timestamptz(3)
 
-  records ClinicalRecord[]
+  records   ClinicalRecord[]
+  documents MedicalDocument[]
 
   @@index([doctorUserId, patientId])
   @@index([organizationId])
@@ -647,4 +649,74 @@ model AccessJustification {
   @@index([recordId])
   @@map("access_justifications")
   @@schema("records")
+}
+
+enum DocumentKind {
+  prescription
+  certificate
+  exam_request
+  referral
+  report
+
+  @@schema("documents")
+}
+
+enum DocumentStatus {
+  draft
+  signed
+  cancelled
+  discarded
+
+  @@schema("documents")
+}
+
+/// Documento médico (receita, atestado, pedido, encaminhamento, relatório). Depois de assinado,
+/// fica congelado por gatilho no banco (docs/api/documentos.md).
+model MedicalDocument {
+  id                String          @id @default(uuid(7)) @db.Uuid
+  organizationId    String          @map("organization_id") @db.Uuid
+  patientId         String          @map("patient_id") @db.Uuid
+  patient           Patient         @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  authorUserId      String          @map("author_user_id") @db.Uuid
+  encounterId       String?         @map("encounter_id") @db.Uuid
+  encounter         Encounter?      @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  unitId            String?         @map("unit_id") @db.Uuid
+  kind              DocumentKind
+  status            DocumentStatus  @default(draft)
+  version           Int             @default(1)
+  content           Json
+  /// Emitente, paciente e local no momento da assinatura.
+  snapshot          Json?
+  /// Data de emissão, local da unidade.
+  issuedOn          DateTime?       @map("issued_on") @db.Date
+  contentHash       String?         @map("content_hash") @db.Char(64)
+  signedAt          DateTime?       @map("signed_at") @db.Timestamptz(3)
+  signatureEvidence Json?           @map("signature_evidence")
+  cancelledAt       DateTime?       @map("cancelled_at") @db.Timestamptz(3)
+  cancelledByUserId String?         @map("cancelled_by_user_id") @db.Uuid
+  cancelReason      String?         @map("cancel_reason") @db.VarChar(1000)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  events            DocumentEvent[]
+
+  @@index([patientId, createdAt])
+  @@index([authorUserId])
+  @@map("medical_documents")
+  @@schema("documents")
+}
+
+/// Histórico de estados do documento, somente-acréscimo.
+model DocumentEvent {
+  id         String          @id @default(uuid(7)) @db.Uuid
+  seq        BigInt          @unique @default(autoincrement())
+  documentId String          @map("document_id") @db.Uuid
+  document   MedicalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  type       String          @db.VarChar(40)
+  at         DateTime        @db.Timestamptz(3)
+  byUserId   String          @map("by_user_id") @db.Uuid
+  details    Json?
+
+  @@index([documentId])
+  @@map("document_events")
+  @@schema("documents")
 }

@@ -66,7 +66,7 @@ export async function startTestApp(env: Record<string, string> = {}): Promise<Te
 /** Apaga os dados entre testes (ordem respeita as chaves estrangeiras). */
 export async function resetData(db: PrismaClient): Promise<void> {
   await db.$executeRawUnsafe(
-    `TRUNCATE records.access_justifications, records.record_events, records.record_versions, records.clinical_records,
+    `TRUNCATE documents.document_events, documents.medical_documents, records.access_justifications, records.record_events, records.record_versions, records.clinical_records,
       care.emergency_accesses, care.encounters, scheduling.appointment_events, scheduling.waitlist_entries, scheduling.appointments, scheduling.schedule_blocks, scheduling.schedule_rules, scheduling.schedules,
       patients.versions, patients.contacts, patients.phones, patients.patients, audit.events, org.professional_specialties, org.professionals, org.specialties,
       org.unit_memberships, identity.sessions, identity.users, org.units, org.organizations CASCADE`,

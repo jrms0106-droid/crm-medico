@@ -9,6 +9,8 @@ import { Clock, SystemClock } from './common/clock.js';
 import { APP_CONFIG } from './config.tokens.js';
 import type { AppConfig } from './config.js';
 import { PrismaService } from './database/prisma.service.js';
+import { DocumentsController } from './documents/documents.controller.js';
+import { DocumentsService } from './documents/documents.service.js';
 import { HealthController } from './health/health.controller.js';
 import { AdminUsersController } from './identity/admin-users.controller.js';
 import { AuthController } from './identity/auth.controller.js';
@@ -56,6 +58,7 @@ export class AppModule {
         WaitlistController,
         CareController,
         RecordsController,
+        DocumentsController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
@@ -71,6 +74,7 @@ export class AppModule {
         SchedulingService,
         CareService,
         RecordsService,
+        DocumentsService,
         { provide: APP_GUARD, useClass: AuthGuard },
       ],
     };

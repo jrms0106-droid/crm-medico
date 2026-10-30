@@ -36,6 +36,7 @@ export const RESOURCE_TYPES = [
   'encounter',
   'clinical_summary',
   'clinical_record',
+  'medical_document',
   'emergency_access',
   'emergency_review',
   'audit_event',

@@ -29,6 +29,7 @@ const EXPECTED: Record<ResourceType, Record<Role, string>> = {
   encounter: { doctor: 've', secretary: '', admin: '' },
   clinical_summary: { doctor: 'v', secretary: '', admin: '' },
   clinical_record: { doctor: 'vcers', secretary: '', admin: '' },
+  medical_document: { doctor: 'vcersx', secretary: '', admin: '' },
   emergency_access: { doctor: 'c', secretary: '', admin: '' },
   emergency_review: { doctor: '', secretary: '', admin: 've' },
   audit_event: { doctor: '', secretary: '', admin: 'v' },
@@ -85,11 +86,12 @@ describe('matriz papel × recurso × ação (mesma organização, mesma unidade,
 });
 
 describe('regras de atributo', () => {
-  it('ninguém exporta nem compartilha nada no MVP', () => {
+  it('ninguém compartilha nada; exportar, só o PDF de documento médico', () => {
     for (const type of RESOURCE_TYPES) {
       for (const action of ['export', 'share'] as const) {
+        const allowed = action === 'export' && type === 'medical_document';
         expect(decide(request(['doctor', 'secretary', 'admin'], action, type), RULES).allowed).toBe(
-          false,
+          allowed,
         );
       }
     }
@@ -112,7 +114,12 @@ describe('regras de atributo', () => {
   });
 
   it('médico sem vínculo assistencial não acessa nada clínico, só pede acesso emergencial', () => {
-    for (const type of ['clinical_summary', 'clinical_record', 'encounter'] as const) {
+    for (const type of [
+      'clinical_summary',
+      'clinical_record',
+      'medical_document',
+      'encounter',
+    ] as const) {
       for (const action of ACTIONS) {
         const req = { ...request(['doctor'], action, type), context: {} };
         expect(decide(req, RULES)).toEqual({ allowed: false, reason: 'no_care_relationship' });
@@ -195,7 +202,7 @@ const BY_STATE: Record<
 
 function clinical(
   action: Action,
-  type: 'clinical_summary' | 'clinical_record' | 'encounter',
+  type: 'clinical_summary' | 'clinical_record' | 'medical_document' | 'encounter',
   context: AccessRequest['context'],
   resource: Partial<AccessRequest['resource']> = {},
 ): AccessRequest {
@@ -326,6 +333,66 @@ describe('o que o médico vê e faz em cada estado do vínculo', () => {
       ask.resource.type = 'emergency_access';
       ask.subject.roles = roles;
       expect(decide(ask, RULES).allowed).toBe(false);
+    }
+  });
+});
+
+describe('documentos médicos (docs/api/documentos.md)', () => {
+  const own = { authorUserId: 'u1' };
+  const other = { authorUserId: 'u2' };
+  const allowed = (action: Action, state: CareRelationshipState | undefined, res: object = {}) =>
+    decide(
+      clinical(action, 'medical_document', state ? { careRelationship: state } : {}, res),
+      RULES,
+    ).allowed;
+
+  it('agendado ou confirmado não libera documentos', () => {
+    for (const state of ['scheduled', 'confirmed'] as const) {
+      for (const action of ACTIONS) expect(allowed(action, state, other)).toBe(false);
+      expect(allowed('create', state)).toBe(false);
+    }
+  });
+
+  it('atendimento iniciado e acompanhamento: cria, assina, cancela e gera PDF', () => {
+    for (const state of ['started', 'follow_up'] as const) {
+      expect(allowed('create', state)).toBe(true);
+      for (const action of ['view', 'edit', 'sign', 'correct', 'export'] as const) {
+        expect(allowed(action, state, own), `${state} ${action}`).toBe(true);
+      }
+    }
+  });
+
+  it('encerrado: termina os próprios, mas não cria documento novo', () => {
+    expect(allowed('create', 'closed')).toBe(false);
+    for (const action of ['view', 'edit', 'sign', 'correct', 'export'] as const) {
+      expect(allowed(action, 'closed', own)).toBe(true);
+    }
+  });
+
+  it('expirado: só os próprios, para ver, cancelar e gerar o PDF', () => {
+    for (const action of ['view', 'correct', 'export'] as const) {
+      expect(allowed(action, 'expired', own)).toBe(true);
+      expect(allowed(action, 'expired', other)).toBe(false);
+    }
+    for (const action of ['create', 'edit', 'sign'] as const) {
+      expect(allowed(action, 'expired', own)).toBe(false);
+    }
+  });
+
+  it('editar, assinar e cancelar só os próprios; ver e gerar PDF dos alheios com vínculo', () => {
+    for (const action of ['edit', 'sign', 'correct'] as const) {
+      expect(
+        decide(clinical(action, 'medical_document', { careRelationship: 'started' }, other), RULES),
+      ).toEqual({ allowed: false, reason: 'not_author' });
+    }
+    expect(allowed('view', 'started', other)).toBe(true);
+    expect(allowed('export', 'started', other)).toBe(true);
+  });
+
+  it('acesso emergencial não libera documentos', () => {
+    const ctx = { emergencyAccess: true };
+    for (const action of ['view', 'export'] as const) {
+      expect(decide(clinical(action, 'medical_document', ctx, other), RULES).allowed).toBe(false);
     }
   });
 });

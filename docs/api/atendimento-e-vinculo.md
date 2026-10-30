@@ -26,7 +26,7 @@ O estado vale para um médico e um paciente. Quando mais de um se aplica, vale o
 
 ## O que cada estado libera
 
-Recursos clínicos: `clinical_summary` (resumo de segurança: motivo da consulta, alergias e problemas ativos), `clinical_record` (registros do prontuário) e `encounter` (atendimento).
+Recursos clínicos: `clinical_summary` (resumo de segurança: motivo da consulta, alergias e problemas ativos), `clinical_record` (registros do prontuário), `medical_document` (documentos médicos, ver [documentos.md](documentos.md)) e `encounter` (atendimento).
 
 | Estado      | Resumo de segurança | Registros do prontuário                                                                | Atendimento                          |
 | ----------- | ------------------- | -------------------------------------------------------------------------------------- | ------------------------------------ |
@@ -45,7 +45,7 @@ Regras que valem em todos os estados:
 2. **Autoria:** editar, adendar e assinar só os próprios registros. Os registros de sua autoria o médico sempre pode ver e adendar, mesmo com o vínculo expirado (obrigação documental).
 3. **Sensibilidade:** registros de outros autores com sensibilidade `elevated` (por exemplo, saúde mental) ou `restricted` (marcado pelo autor) exigem justificativa registrada, mesmo com vínculo em andamento. Sem justificativa, a resposta é negar (`justification_required`). O acesso emergencial já é uma justificativa.
 4. **Só médico.** Secretária e administrador nunca acessam dado clínico. O administrador que também é médico acessa pelo papel de médico.
-5. Exportar e compartilhar continuam negados para todos no MVP, inclusive no acesso emergencial.
+5. Compartilhar continua negado para todos. Exportar só vale para o PDF de documento médico, nos estados que liberam documentos; nunca no acesso emergencial.
 
 As regras ficam no motor de política, testadas estado por estado, e valem para os registros do prontuário ([prontuario.md](prontuario.md)). A rota `GET /patients/:id/care-access` mostra ao médico o que ele pode fazer com cada paciente.
 

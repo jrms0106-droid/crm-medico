@@ -22,7 +22,7 @@ const MANAGE: readonly Action[] = ['view', 'create', 'edit'];
 
 /**
  * Matriz papel × recurso × ação. Fonte única, documentada em docs/api/organizacao-e-permissoes.md.
- * Exportar e compartilhar não estão concedidos a ninguém no MVP.
+ * Compartilhar não está concedido a ninguém. Exportar, só o PDF de documento médico.
  */
 export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
   unit: {
@@ -82,6 +82,11 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
     unitScope: 'none',
     grants: { doctor: ['view', 'create', 'edit', 'correct', 'sign'] },
   },
+  medical_document: {
+    dataClass: 'clinical',
+    unitScope: 'none',
+    grants: { doctor: ['view', 'create', 'edit', 'correct', 'sign', 'export'] },
+  },
   emergency_access: {
     dataClass: 'clinical',
     unitScope: 'none',
@@ -103,10 +108,13 @@ export function dataClassOf(type: ResourceType): DataClass {
   return RESOURCE_CATALOG[type].dataClass;
 }
 
-type ClinicalType = 'encounter' | 'clinical_summary' | 'clinical_record' | 'emergency_access';
+type ClinicalType =
+  'encounter' | 'clinical_summary' | 'clinical_record' | 'medical_document' | 'emergency_access';
 type CareGrants = Partial<Record<ClinicalType, readonly Action[]>>;
 
 const RECORD_WORK: readonly Action[] = ['view', 'create', 'edit', 'correct', 'sign'];
+/** Documento médico: cancelar o assinado conta como `correct`; gerar o PDF, como `export`. */
+const DOCUMENT_WORK: readonly Action[] = [...RECORD_WORK, 'export'];
 
 /**
  * O que cada estado do vínculo libera (docs/api/atendimento-e-vinculo.md). Proposta técnica,
@@ -118,12 +126,19 @@ export const CARE_MATRIX: Readonly<Record<CareRelationshipState, CareGrants>> = 
   started: {
     clinical_summary: ['view'],
     clinical_record: RECORD_WORK,
+    medical_document: DOCUMENT_WORK,
     encounter: ['view', 'edit'],
   },
-  follow_up: { clinical_summary: ['view'], clinical_record: RECORD_WORK, encounter: ['view'] },
+  follow_up: {
+    clinical_summary: ['view'],
+    clinical_record: RECORD_WORK,
+    medical_document: DOCUMENT_WORK,
+    encounter: ['view'],
+  },
   closed: {
     clinical_summary: ['view'],
     clinical_record: ['view', 'edit', 'correct', 'sign'],
+    medical_document: ['view', 'edit', 'correct', 'sign', 'export'],
     encounter: ['view'],
   },
   expired: {},
@@ -164,8 +179,12 @@ export const careRelationshipAccess: Rule = ({ subject, action, resource, contex
   if (AUTHOR_ONLY.includes(action) && resource.authorUserId !== undefined && !isAuthor) {
     return deny('not_author');
   }
-  // Obrigação documental: o autor sempre vê e adenda os próprios registros.
+  // Obrigação documental: o autor sempre vê e adenda os próprios registros, e sempre vê, cancela
+  // e gera o PDF dos próprios documentos.
   if (type === 'clinical_record' && isAuthor && (action === 'view' || action === 'correct')) {
+    return undefined;
+  }
+  if (type === 'medical_document' && isAuthor && ['view', 'correct', 'export'].includes(action)) {
     return undefined;
   }
   const state = context?.careRelationship;
