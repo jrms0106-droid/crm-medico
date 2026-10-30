@@ -11,7 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records", "documents"]
+  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records", "documents", "billing"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
@@ -266,6 +266,7 @@ model Patient {
   emergencyAccesses    EmergencyAccess[]
   clinicalRecords      ClinicalRecord[]
   medicalDocuments     MedicalDocument[]
+  charges              Charge[]
 
   @@unique([organizationId, cpfHash])
   @@index([organizationId, birthDate])
@@ -427,6 +428,7 @@ model Appointment {
   updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
   events            AppointmentEvent[]
   encounter         Encounter?
+  charges           Charge[]
 
   @@index([scheduleId, startsAt])
   @@index([patientId, startsAt])
@@ -719,4 +721,83 @@ model DocumentEvent {
   @@index([documentId])
   @@map("document_events")
   @@schema("documents")
+}
+
+/// Item da tabela de preços (atendimento particular, docs/api/financeiro.md).
+model PriceItem {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(120)
+  amountCents    Int      @map("amount_cents")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  charges        Charge[]
+
+  @@unique([organizationId, name])
+  @@map("price_items")
+  @@schema("billing")
+}
+
+/// Cobrança ao paciente. Valor e desconto não mudam; corrige-se cancelando.
+model Charge {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  unitId          String       @map("unit_id") @db.Uuid
+  patientId       String       @map("patient_id") @db.Uuid
+  patient         Patient      @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointmentId   String?      @map("appointment_id") @db.Uuid
+  appointment     Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  priceItemId     String?      @map("price_item_id") @db.Uuid
+  priceItem       PriceItem?   @relation(fields: [priceItemId], references: [id], onDelete: Restrict)
+  description     String       @db.VarChar(200)
+  amountCents     Int          @map("amount_cents")
+  discountCents   Int          @default(0) @map("discount_cents")
+  cancelledAt     DateTime?    @map("cancelled_at") @db.Timestamptz(3)
+  cancelledById   String?      @map("cancelled_by_id") @db.Uuid
+  cancelReason    String?      @map("cancel_reason") @db.VarChar(200)
+  createdByUserId String       @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  payments        Payment[]
+
+  @@index([organizationId, unitId, createdAt])
+  @@index([patientId])
+  @@map("charges")
+  @@schema("billing")
+}
+
+enum PaymentMethod {
+  cash
+  pix
+  debit_card
+  credit_card
+  other
+
+  @@schema("billing")
+}
+
+/// Pagamento recebido. Não muda; só pode ser estornado (docs/api/financeiro.md).
+model Payment {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  organizationId   String        @map("organization_id") @db.Uuid
+  chargeId         String        @map("charge_id") @db.Uuid
+  charge           Charge        @relation(fields: [chargeId], references: [id], onDelete: Restrict)
+  method           PaymentMethod
+  amountCents      Int           @map("amount_cents")
+  paidAt           DateTime      @map("paid_at") @db.Timestamptz(3)
+  receivedByUserId String        @map("received_by_user_id") @db.Uuid
+  idempotencyKey   String        @map("idempotency_key") @db.VarChar(100)
+  /// SHA-256 do pedido original, para recusar a mesma chave com outros dados.
+  requestHash      String        @map("request_hash") @db.Char(64)
+  reversedAt       DateTime?     @map("reversed_at") @db.Timestamptz(3)
+  reversedById     String?       @map("reversed_by_id") @db.Uuid
+  reverseReason    String?       @map("reverse_reason") @db.VarChar(200)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([chargeId])
+  @@index([organizationId, paidAt])
+  @@map("payments")
+  @@schema("billing")
 }

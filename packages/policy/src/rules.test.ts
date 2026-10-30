@@ -33,6 +33,9 @@ const EXPECTED: Record<ResourceType, Record<Role, string>> = {
   emergency_access: { doctor: 'c', secretary: '', admin: '' },
   emergency_review: { doctor: '', secretary: '', admin: 've' },
   audit_event: { doctor: '', secretary: '', admin: 'v' },
+  price_item: { doctor: '', secretary: 'v', admin: 'vce' },
+  charge: { doctor: '', secretary: 'vce', admin: 'vr' },
+  financial_report: { doctor: '', secretary: 'v', admin: 'v' },
 };
 
 const LETTER: Record<Action, string> = {
@@ -394,5 +397,29 @@ describe('documentos médicos (docs/api/documentos.md)', () => {
     for (const action of ['view', 'export'] as const) {
       expect(decide(clinical(action, 'medical_document', ctx, other), RULES).allowed).toBe(false);
     }
+  });
+});
+
+describe('financeiro (docs/api/financeiro.md)', () => {
+  it('secretária de outra unidade não vê nem cria cobrança, nem vê o relatório', () => {
+    for (const action of ['view', 'create', 'edit'] as const) {
+      const req = request(['secretary'], action, 'charge', { unitIds: ['unit-b'] });
+      expect(decide(req, RULES)).toEqual({ allowed: false, reason: 'other_unit' });
+    }
+    const report = request(['secretary'], 'view', 'financial_report', { unitIds: ['unit-b'] });
+    expect(decide(report, RULES)).toEqual({ allowed: false, reason: 'other_unit' });
+  });
+
+  it('administrador vê cobranças e relatório de qualquer unidade, mas não registra pagamento', () => {
+    const view = request(['admin'], 'view', 'charge', { unitIds: [] });
+    expect(decide(view, RULES).allowed).toBe(true);
+    const report = request(['admin'], 'view', 'financial_report', { unitIds: [] });
+    expect(decide(report, RULES).allowed).toBe(true);
+    expect(decide(request(['admin'], 'edit', 'charge'), RULES).allowed).toBe(false);
+  });
+
+  it('só o administrador estorna', () => {
+    expect(decide(request(['admin'], 'correct', 'charge'), RULES).allowed).toBe(true);
+    expect(decide(request(['secretary'], 'correct', 'charge'), RULES).allowed).toBe(false);
   });
 });
