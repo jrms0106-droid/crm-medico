@@ -12,6 +12,7 @@ import {
 } from '@crm/shared';
 import { ApiError, api, query } from '../api';
 import { ReauthDialog } from '../reauth';
+import { DocumentsPanel } from './documents';
 import {
   Alert,
   Badge,
@@ -170,6 +171,9 @@ export function RecordPage({
           ))}
         </ol>
       </Panel>
+      {can && (can.viewHistory || can.viewOwnRecords) && (
+        <DocumentsPanel session={session} patientId={patientId} canCreate={can.createRecords} />
+      )}
     </Page>
   );
 }

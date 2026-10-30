@@ -91,7 +91,7 @@ test.describe.serial('fluxos por perfil', () => {
     await snap(page, '1-agenda-secretaria');
   });
 
-  test('médico atende, registra e assina o prontuário', async ({ page }) => {
+  test('médico atende, registra e assina o prontuário e uma receita', async ({ page }) => {
     await login(page, 'doctor');
     await menu(page).getByRole('link', { name: 'Agenda' }).click();
     const row = page.getByRole('row', { name: new RegExp(PATIENT) });
@@ -111,8 +111,30 @@ test.describe.serial('fluxos por perfil', () => {
     await page.getByLabel('Código de 6 dígitos').fill(await nextCode('doctor'));
     await page.getByRole('button', { name: 'Confirmar e assinar' }).click();
     await expect(page.getByText('Conteúdo íntegro.')).toBeVisible();
-    await expect(page.locator('.timeline')).toContainText('Assinado');
+    await expect(page.locator('.timeline').first()).toContainText('Assinado');
     await snap(page, '3-prontuario-assinado');
+
+    // Receita simples: rascunho, assinatura e PDF.
+    const docs = page.locator('.panel', { has: page.getByRole('heading', { name: 'Documentos' }) });
+    await docs.getByRole('button', { name: 'Receita simples' }).click();
+    await page.getByLabel('Medicamento 1').fill('Dipirona 500 mg (fictício)');
+    await page.getByLabel('Posologia 1').fill('1 comprimido a cada 6 horas, se dor.');
+    await page.getByLabel('Quantidade (opcional) 1').fill('1 caixa');
+    await page.getByRole('button', { name: 'Salvar rascunho' }).click();
+    const doc = page.locator('[aria-label="Documento"]');
+    await expect(doc.getByText('Rascunho', { exact: true })).toBeVisible();
+    await doc.getByRole('button', { name: 'Assinar' }).click();
+    await page.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await page.getByLabel('Código de 6 dígitos').fill(await nextCode('doctor'));
+    await page.getByRole('button', { name: 'Confirmar e assinar' }).click();
+    await expect(doc.getByText('Conteúdo íntegro.')).toBeVisible();
+    await expect(docs.locator('.timeline')).toContainText('Receita simples');
+    await snap(page, '6-receita-assinada');
+    const href = await doc.getByRole('link', { name: 'Abrir PDF' }).getAttribute('href');
+    const pdf = await page.request.get(href ?? '');
+    expect(pdf.status()).toBe(200);
+    expect(pdf.headers()['content-type']).toBe('application/pdf');
+    expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
 
     await page.getByRole('button', { name: 'Encerrar atendimento' }).click();
     await expect(page.getByText('Vínculo: Atendimento encerrado')).toBeVisible();
