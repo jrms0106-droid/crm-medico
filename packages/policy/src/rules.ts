@@ -102,6 +102,23 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
     unitScope: 'none',
     grants: { admin: ['view'] },
   },
+  // Financeiro particular (docs/api/financeiro.md). O médico não acessa nesta fase.
+  price_item: {
+    dataClass: 'financial',
+    unitScope: 'none',
+    grants: { secretary: ['view'], admin: MANAGE },
+  },
+  // Cobranças e pagamentos. Estornar pagamento é `correct`, só do administrador.
+  charge: {
+    dataClass: 'financial',
+    unitScope: 'except_admin',
+    grants: { secretary: MANAGE, admin: ['view', 'correct'] },
+  },
+  financial_report: {
+    dataClass: 'financial',
+    unitScope: 'except_admin',
+    grants: { secretary: ['view'], admin: ['view'] },
+  },
 };
 
 export function dataClassOf(type: ResourceType): DataClass {

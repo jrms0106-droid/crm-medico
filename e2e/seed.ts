@@ -18,7 +18,7 @@ const mfaKey = TEST_KEYS.MFA_ENCRYPTION_KEY;
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 await db.$executeRawUnsafe(
-  `TRUNCATE documents.document_events, documents.medical_documents, records.access_justifications, records.record_events, records.record_versions, records.clinical_records,
+  `TRUNCATE billing.payments, billing.charges, billing.price_items, documents.document_events, documents.medical_documents, records.access_justifications, records.record_events, records.record_versions, records.clinical_records,
     care.emergency_accesses, care.encounters, scheduling.appointment_events, scheduling.waitlist_entries,
     scheduling.appointments, scheduling.schedule_blocks, scheduling.schedule_rules, scheduling.schedules,
     patients.versions, patients.contacts, patients.phones, patients.patients, audit.events,

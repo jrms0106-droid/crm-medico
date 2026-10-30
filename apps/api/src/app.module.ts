@@ -2,6 +2,8 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AuditController } from './audit/audit.controller.js';
 import { AuditService } from './audit/audit.service.js';
+import { BillingController } from './billing/billing.controller.js';
+import { BillingService } from './billing/billing.service.js';
 import { AuthorizationService } from './authz/authorization.service.js';
 import { CareController } from './care/care.controller.js';
 import { CareService } from './care/care.service.js';
@@ -59,6 +61,7 @@ export class AppModule {
         CareController,
         RecordsController,
         DocumentsController,
+        BillingController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
@@ -75,6 +78,7 @@ export class AppModule {
         CareService,
         RecordsService,
         DocumentsService,
+        BillingService,
         { provide: APP_GUARD, useClass: AuthGuard },
       ],
     };

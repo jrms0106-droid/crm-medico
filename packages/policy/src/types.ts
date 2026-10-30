@@ -40,6 +40,9 @@ export const RESOURCE_TYPES = [
   'emergency_access',
   'emergency_review',
   'audit_event',
+  'price_item',
+  'charge',
+  'financial_report',
 ] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
