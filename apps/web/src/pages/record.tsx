@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CARE_STATE_LABELS,
   type CareAccessDto,
@@ -11,6 +11,7 @@ import {
   type SessionInfo,
 } from '@crm/shared';
 import { ApiError, api, query } from '../api';
+import { ReauthDialog } from '../reauth';
 import {
   Alert,
   Badge,
@@ -407,8 +408,10 @@ function RecordReadOnly({
         </div>
       )}
       {signing && (
-        <SignDialog
+        <ReauthDialog
           session={session}
+          label="Confirmar assinatura"
+          confirmText="Confirmar e assinar"
           onCancel={() => setSigning(false)}
           onConfirm={async () => {
             onChange(
@@ -416,68 +419,14 @@ function RecordReadOnly({
             );
             setSigning(false);
           }}
-        />
+        >
+          <p>
+            <strong>Assinatura eletrônica interna.</strong> Depois de assinado, o registro não pode
+            mais ser alterado; correções só por retificação ou adendo.
+          </p>
+        </ReauthDialog>
       )}
     </>
-  );
-}
-
-/** Confirmação de identidade antes de assinar (reautenticação). */
-function SignDialog({
-  session,
-  onCancel,
-  onConfirm,
-}: {
-  session: SessionInfo;
-  onCancel: () => void;
-  onConfirm: () => Promise<void>;
-}) {
-  const action = useAction();
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    await action.run(async () => {
-      await api.reauth(
-        String(data.get('password') ?? ''),
-        String(data.get('code') ?? '') || undefined,
-      );
-      await onConfirm();
-    });
-  }
-  return (
-    <form className="dialog" onSubmit={submit} aria-label="Confirmar assinatura">
-      <p>
-        <strong>Assinatura eletrônica interna.</strong> Depois de assinado, o registro não pode mais
-        ser alterado; correções só por retificação ou adendo.
-      </p>
-      <input type="hidden" name="username" autoComplete="username" value={session.user.email} />
-      <label className="field">
-        <span>Sua senha</span>
-        <input name="password" type="password" autoComplete="current-password" required />
-      </label>
-      {session.mfaEnabled && (
-        <label className="field">
-          <span>Código de 6 dígitos</span>
-          <input
-            name="code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="[0-9]{6}"
-            maxLength={6}
-            required
-          />
-        </label>
-      )}
-      <Alert message={action.error} />
-      <div className="actions">
-        <button type="submit" disabled={action.busy}>
-          Confirmar e assinar
-        </button>
-        <button type="button" className="link" onClick={onCancel}>
-          Cancelar
-        </button>
-      </div>
-    </form>
   );
 }
 

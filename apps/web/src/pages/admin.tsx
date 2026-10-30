@@ -1,24 +1,7 @@
 import { useState } from 'react';
-import {
-  type AuditChainReportDto,
-  type AuditEventDto,
-  type EmergencyAccessDto,
-  ROLE_LABELS,
-  type UnitDto,
-  type UserAccountDto,
-} from '@crm/shared';
+import { type AuditChainReportDto, type AuditEventDto, type EmergencyAccessDto } from '@crm/shared';
 import { api, query } from '../api';
-import {
-  Alert,
-  Badge,
-  Loading,
-  Notice,
-  Page,
-  Panel,
-  formatDateTime,
-  useAction,
-  useLoad,
-} from '../ui';
+import { Alert, Badge, Loading, Page, Panel, formatDateTime, useAction, useLoad } from '../ui';
 
 const OUTCOME_LABELS = { allowed: 'Permitido', denied: 'Negado', not_found: 'Não encontrado' };
 const ISSUE_LABELS = {
@@ -162,55 +145,5 @@ function EmergencyReviews() {
         ))}
       </ul>
     </Panel>
-  );
-}
-
-export function SettingsPage() {
-  const users = useLoad(() => api.get<UserAccountDto[]>('/admin/users'), []);
-  const units = useLoad(() => api.get<UnitDto[]>('/units'), []);
-  return (
-    <Page title="Configurações">
-      <Notice>
-        Criar e alterar usuários, unidades e agendas ainda é feito pela API. As telas de edição
-        entram numa próxima entrega.
-      </Notice>
-      <Panel title="Unidades">
-        <Alert message={units.error} />
-        <ul>
-          {units.data?.map((u) => (
-            <li key={u.id}>
-              {u.name} ({u.timezone}){!u.active && ' · inativa'}
-            </li>
-          ))}
-        </ul>
-      </Panel>
-      <Panel title="Usuários">
-        <Alert message={users.error} />
-        {users.data && (
-          <table>
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>E-mail</th>
-                <th>Perfis</th>
-                <th>Duas etapas</th>
-                <th>Situação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.data.map((u) => (
-                <tr key={u.id}>
-                  <td>{u.name}</td>
-                  <td>{u.email}</td>
-                  <td>{u.roles.map((r) => ROLE_LABELS[r]).join(', ')}</td>
-                  <td>{u.mfaEnabled ? 'Ativa' : 'Não ativada'}</td>
-                  <td>{u.active ? 'Ativo' : 'Inativo'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Panel>
-    </Page>
   );
 }

@@ -125,4 +125,42 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(page.getByRole('status')).toContainText('Trilha íntegra');
     await snap(page, '4-auditoria-verificada');
   });
+
+  test('administrador cadastra médico, ficha profissional e agenda pelas telas', async ({
+    page,
+  }) => {
+    // Os códigos de duas etapas não se repetem: pode ser preciso esperar a próxima janela.
+    test.setTimeout(180_000);
+    await login(page, 'admin');
+    await menu(page).getByRole('link', { name: 'Configurações' }).click();
+
+    await page.getByRole('button', { name: 'Novo usuário' }).click();
+    const form = page.getByRole('form', { name: 'Novo usuário' });
+    await form.getByLabel('Nome').fill('Dra. Helena Nova (fictícia)');
+    await form.getByLabel('E-mail').fill(`helena.${Date.now()}@e2e-ficticia.test`);
+    await form.getByLabel('Médico(a)').check();
+    await form.getByLabel('Unidade Teste').check();
+    await form.getByRole('button', { name: 'Criar usuário' }).click();
+    // Criar conta exige confirmar a identidade.
+    const dialog = page.getByRole('form', { name: 'Confirmar identidade' });
+    await dialog.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await dialog.getByLabel('Código de 6 dígitos').fill(await nextCode('admin'));
+    await dialog.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(page.getByText('Senha temporária de Dra. Helena Nova (fictícia)')).toBeVisible();
+
+    const ficha = page.getByRole('form', { name: 'Nova ficha profissional' });
+    await ficha.getByLabel('Médico').selectOption({ label: 'Dra. Helena Nova (fictícia)' });
+    await ficha.getByLabel('CRM', { exact: true }).fill('654321');
+    await ficha.getByRole('button', { name: 'Criar ficha' }).click();
+    await expect(page.getByText('Dra. Helena Nova (fictícia) · CRM 654321/SP')).toBeVisible();
+
+    const nova = page.getByRole('form', { name: 'Nova agenda' });
+    await nova.getByLabel('Profissional').selectOption({ label: 'Dra. Helena Nova (fictícia)' });
+    await nova.getByRole('button', { name: 'Criar agenda' }).click();
+    const agenda = page.getByLabel('Agenda de Dra. Helena Nova (fictícia)');
+    await agenda.getByRole('button', { name: 'Adicionar faixa' }).click();
+    await agenda.getByRole('button', { name: 'Salvar horários' }).click();
+    await expect(agenda.getByRole('status')).toHaveText('Horários salvos.');
+    await snap(page, '5-configuracoes');
+  });
 });
