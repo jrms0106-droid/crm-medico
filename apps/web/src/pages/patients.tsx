@@ -9,6 +9,7 @@ import {
 import { ApiError, api, query } from '../api';
 import { href, navigate } from '../router';
 import { canSee } from '../shell';
+import { PatientRightsPanel } from './privacy';
 import {
   Alert,
   Loading,
@@ -249,6 +250,7 @@ export function PatientPage({ session, patientId }: { session: SessionInfo; pati
           <dd>{patient.email ?? '—'}</dd>
         </dl>
       </Panel>
+      {isSecretary && <PatientRightsPanel session={session} patient={patient} />}
     </Page>
   );
 }
