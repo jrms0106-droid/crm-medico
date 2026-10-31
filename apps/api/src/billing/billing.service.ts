@@ -441,7 +441,7 @@ export class BillingService {
     return dto as ChargeDto;
   }
 
-  private async chargeDtos(rows: ChargeWithPayments[]): Promise<ChargeDto[]> {
+  async chargeDtos(rows: ChargeWithPayments[]): Promise<ChargeDto[]> {
     const userIds = rows.flatMap((c) => [
       c.createdByUserId,
       ...c.payments.flatMap((p) => [

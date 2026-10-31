@@ -24,7 +24,8 @@ DECLARE
   s text;
 BEGIN
   FOREACH s IN ARRAY ARRAY[
-    'org', 'identity', 'audit', 'patients', 'scheduling', 'care', 'records', 'documents', 'billing'
+    'org', 'identity', 'audit', 'patients', 'scheduling', 'care', 'records', 'documents', 'billing',
+    'privacy'
   ] LOOP
     -- Começa do zero a cada execução, para nenhuma permissão antiga sobrar.
     EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA %I FROM crm_app', s);
