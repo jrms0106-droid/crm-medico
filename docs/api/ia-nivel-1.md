@@ -17,13 +17,12 @@ A tela sempre diz que o texto é uma sugestão do modelo simulado.
 
 ## Funcionalidades
 
-| Funcionalidade          | Chave            | Quem usa   | O que faz                                                                               |
-| ----------------------- | ---------------- | ---------- | --------------------------------------------------------------------------------------- |
-| Rascunho de mensagem    | `message_draft`  | secretária | escreve uma mensagem administrativa ao paciente (confirmação, remarcação, falta, aviso) |
-| Classificação de pedido | `request_triage` | secretária | separa a mensagem que o paciente mandou em uma categoria e sugere uma resposta          |
-
-Organização de agenda e relatórios administrativos assistidos ficam para a próxima entrega
-desta fase.
+| Funcionalidade          | Chave                  | Quem usa      | O que faz                                                                               |
+| ----------------------- | ---------------------- | ------------- | --------------------------------------------------------------------------------------- |
+| Rascunho de mensagem    | `message_draft`        | secretária    | escreve uma mensagem administrativa ao paciente (confirmação, remarcação, falta, aviso) |
+| Classificação de pedido | `request_triage`       | secretária    | separa a mensagem que o paciente mandou em uma categoria e sugere uma resposta          |
+| Organização da agenda   | `schedule_suggestions` | secretária    | sugere como preencher os horários livres do dia com a lista de espera e o que confirmar |
+| Relatório assistido     | `admin_report`         | administrador | escreve um resumo do período a partir dos números calculados pelo sistema               |
 
 ### Rascunho de mensagem
 
@@ -55,6 +54,38 @@ Saída, sempre dentro de um formato fixo:
 
 Se o modelo devolver algo fora do formato, a resposta é descartada e a API devolve erro 502
 (`AI_INVALID_OUTPUT`); nada é mostrado como se fosse válido.
+
+### Organização da agenda
+
+Entrada: a agenda (médico e unidade) e o dia.
+
+O **sistema** calcula os fatos: horários livres do dia, consultas ainda não confirmadas e quem
+está na lista de espera da unidade (para este médico ou para qualquer um). O que vai para o
+modelo é só isto, com **códigos no lugar das pessoas** (`H1` para um horário, `E1` para uma
+pessoa da lista de espera, `C1` para uma consulta): horário de cada código, a preferência escrita
+na lista de espera (por exemplo "prefere manhã") e desde quando a pessoa espera. **Nunca** nome,
+CPF, telefone ou dado clínico.
+
+Saída, sempre num formato fixo: até 10 sugestões, cada uma `fill_slot` (oferecer o horário `H?`
+para a pessoa `E?`) ou `confirm` (pedir confirmação da consulta `C?`), com um motivo curto. O
+sistema confere cada sugestão: código que não existe, horário usado duas vezes ou formato errado
+fazem a resposta inteira ser descartada (502). Só depois de conferir o sistema troca os códigos
+pelos nomes e horários reais, para a secretária ver.
+
+Nada é marcado nem enviado: a secretária decide e faz pela agenda, como sempre.
+
+### Relatório assistido
+
+Entrada: o período (até 92 dias) e, se quiser, uma unidade.
+
+O **sistema** calcula os números do período, todos agregados: consultas por situação, taxa de
+faltas, encaixes, pacientes novos, pessoas na lista de espera, lembretes enviados e com falha, e o
+financeiro particular (cobrado, recebido, em aberto). Nenhum dado de paciente vai para o modelo.
+
+Saída: até 6 frases curtas de destaque. **Todo número que aparece no texto precisa estar entre os
+números calculados** (ou nas datas do período); se aparecer um número que o sistema não calculou,
+a resposta é descartada (502). A tela mostra os números do sistema ao lado do texto, para
+conferência.
 
 ## Proteções (seção 15)
 
@@ -88,13 +119,16 @@ avaliação jurídica (matriz de conformidade).
 
 | Ação                                      | Secretária | Médico | Administrador                    |
 | ----------------------------------------- | ---------- | ------ | -------------------------------- |
-| Usar rascunho e classificação             | sim        | não    | não                              |
-| Ver o próprio histórico de uso            | sim        | não    | —                                |
+| Usar rascunho, classificação e agenda     | sim        | não    | não                              |
+| Usar o relatório assistido                | não        | não    | sim                              |
+| Ver o próprio histórico de uso, com texto | sim        | não    | sim                              |
 | Ver o uso de todos (sem o texto da saída) | não        | não    | sim                              |
 | Ver e mudar os interruptores              | ver        | não    | ver e mudar (com reautenticação) |
 
 Recursos de autorização: `ai_assist` (secretária: visualizar, criar, editar a própria decisão) e
-`ai_settings` (secretária: visualizar; administrador: visualizar e editar). Negação por padrão.
+`ai_settings` (secretária: visualizar; administrador: visualizar e editar) e `ai_report`
+(administrador: criar e editar a própria decisão). Negação por padrão. A organização da agenda
+também passa pela permissão de ver as consultas daquela agenda (unidade da secretária).
 
 ## Rotas
 
@@ -104,6 +138,8 @@ Recursos de autorização: `ai_assist` (secretária: visualizar, criar, editar a
 | `PUT /ai/features/:feature`      | liga ou desliga (`{ "enabled": true }`), administrador         |
 | `POST /ai/message-drafts`        | rascunho de mensagem                                           |
 | `POST /ai/request-triage`        | classificação de pedido                                        |
+| `POST /ai/schedule-suggestions`  | sugestões para a agenda (`{ "scheduleId", "date" }`)           |
+| `POST /ai/admin-reports`         | relatório assistido (`{ "from", "to", "unitId"? }`)            |
 | `POST /ai/requests/:id/decision` | `{ "decision": "accepted", "edited": true }` ou `discarded`    |
 | `GET /ai/requests`               | histórico de uso (o próprio, ou de todos para o administrador) |
 
@@ -118,5 +154,9 @@ Recursos de autorização: `ai_assist` (secretária: visualizar, criar, editar a
 - Saída fora do formato vira 502 e não é mostrada.
 - O registro guarda resumo e tamanho da entrada, nunca o texto; a decisão humana é gravada uma vez
   e o banco recusa mudar o resto.
-- Médico e administrador não usam as funcionalidades (403); secretária não muda interruptor (403);
+- A organização da agenda só sugere horários livres de verdade e pessoas que estão na lista de
+  espera daquela unidade; o modelo recebe códigos, não nomes; código inventado vira 502.
+- O relatório assistido usa só números agregados; um número que o sistema não calculou vira 502.
+- Agenda de outra unidade dá 403; a secretária não usa o relatório (403); o médico não usa nada.
+- Médico e administrador não usam as funcionalidades da recepção (403); secretária não muda interruptor (403);
   paciente ou consulta de outra organização dá 404.

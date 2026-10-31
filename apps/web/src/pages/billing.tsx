@@ -18,6 +18,7 @@ import {
   parseReais,
 } from '@crm/shared';
 import { api, query } from '../api';
+import { AdminReportPanel } from './assistant';
 import { useReauth } from '../reauth';
 import { href, navigate, useRoute } from '../router';
 import { canSee } from '../shell';
@@ -134,6 +135,9 @@ export function BillingPage({ session }: { session: SessionInfo }) {
           from={from}
           to={to}
         />
+      )}
+      {canSee(session, ['admin']) && from && to && (
+        <AdminReportPanel key={`ia-${unitId}-${from}-${to}`} unitId={unitId} from={from} to={to} />
       )}
       {isSecretary && patientId && (
         <NewChargePanel

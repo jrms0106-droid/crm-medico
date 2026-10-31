@@ -909,6 +909,8 @@ model OutboundMessage {
 enum AiFeature {
   message_draft
   request_triage
+  schedule_suggestions
+  admin_report
 
   @@schema("ai")
 }

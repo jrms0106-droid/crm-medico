@@ -13,5 +13,5 @@
   - Chamar um fornecedor direto agora: exige contrato e credenciais e mandaria dados para fora sem avaliação.
   - Guardar a entrada no registro: facilitaria a auditoria, mas guardaria texto de paciente sem necessidade (minimização).
   - Ligar as funcionalidades por padrão: o responsável deve decidir o uso de IA na clínica.
-- **Consequências:** As sugestões do modelo simulado são simples (palavras-chave e modelos de texto). O prazo de guarda de `ai.requests` precisa ser decidido com a avaliação jurídica. Organização de agenda e relatórios administrativos assistidos ficam para a próxima entrega.
+- **Consequências:** As sugestões do modelo simulado são simples (palavras-chave e modelos de texto). O prazo de guarda de `ai.requests` precisa ser decidido com a avaliação jurídica. Organização de agenda e relatório assistido vieram depois (ADR 0026).
 - **Revisar quando:** O responsável autorizar um fornecedor de IA (novo adaptador, avaliação de contrato e privacidade), começar o nível 2 (documental, com dados clínicos) ou a classificação precisar de algo além de palavras-chave.

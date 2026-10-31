@@ -142,6 +142,12 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
     unitScope: 'none',
     grants: { secretary: ['view', 'create', 'edit'], admin: ['view'] },
   },
+  // Relatório administrativo assistido: só o administrador, com números agregados.
+  ai_report: {
+    dataClass: 'ai',
+    unitScope: 'none',
+    grants: { admin: ['create', 'edit'] },
+  },
   ai_settings: {
     dataClass: 'administrative',
     unitScope: 'none',

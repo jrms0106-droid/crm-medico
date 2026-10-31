@@ -13,7 +13,7 @@ import {
 import { api, query } from '../api';
 import { href, navigate, useRoute } from '../router';
 import { canSee } from '../shell';
-import { AppointmentMessageDraft } from './assistant';
+import { AppointmentMessageDraft, ScheduleSuggestionsPanel } from './assistant';
 import {
   Alert,
   Badge,
@@ -118,6 +118,13 @@ export function AgendaPage({ session }: { session: SessionInfo }) {
           date={date}
           initialPatientId={params.get('paciente')}
           onBooked={() => setVersion((v) => v + 1)}
+        />
+      )}
+      {isSecretary && scheduleId && (
+        <ScheduleSuggestionsPanel
+          key={`ia-${scheduleId}-${date}-${version}`}
+          scheduleId={scheduleId}
+          date={date}
         />
       )}
     </Page>

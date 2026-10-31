@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import {
   AI_DECISION_LABELS,
+  type AdminReportDto,
   type AiFeature,
   type AiFeatureDto,
   type AiRequestDto,
@@ -8,7 +9,10 @@ import {
   type MessageDraftDto,
   type MessagePurpose,
   type RequestTriageDto,
+  type ScheduleSuggestionsDto,
   TRIAGE_CATEGORY_LABELS,
+  formatCents,
+  formatPercent,
   TRIAGE_URGENT_NOTICE,
 } from '@crm/shared';
 import { api } from '../api';
@@ -19,7 +23,9 @@ import {
   Notice,
   Page,
   Panel,
+  formatDate,
   formatDateTime,
+  formatTime,
   useAction,
   useLoad,
 } from '../ui';
@@ -35,11 +41,13 @@ function DraftReview({
   text,
   notice,
   onDecided,
+  maxLength = 1000,
 }: {
   requestId: string;
   text: string;
   notice: string;
   onDecided?: () => void;
+  maxLength?: number;
 }) {
   const [value, setValue] = useState(text);
   const [decided, setDecided] = useState<string | null>(null);
@@ -71,7 +79,7 @@ function DraftReview({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           rows={5}
-          maxLength={1000}
+          maxLength={maxLength}
           disabled={decided !== null}
         />
       </label>
@@ -283,6 +291,13 @@ function NoticePanel({ enabled, onUsed }: { enabled: boolean; onUsed: () => void
   );
 }
 
+const FEATURE_SHORT: Record<AiFeature, string> = {
+  message_draft: 'Rascunho',
+  request_triage: 'Classificação',
+  schedule_suggestions: 'Agenda',
+  admin_report: 'Relatório',
+};
+
 function HistoryTable({ rows, showOutput }: { rows: AiRequestDto[]; showOutput: boolean }) {
   return (
     <table aria-label="Usos do assistente">
@@ -301,7 +316,7 @@ function HistoryTable({ rows, showOutput }: { rows: AiRequestDto[]; showOutput: 
           <tr key={r.id}>
             <td>{formatDateTime(r.createdAt)}</td>
             <td>
-              {r.feature === 'request_triage' ? 'Classificação' : 'Rascunho'}
+              {FEATURE_SHORT[r.feature]}
               <div className="muted small">{r.purpose}</div>
             </td>
             {!showOutput && <td>{r.user.name}</td>}
@@ -359,6 +374,194 @@ export function AiSettingsSection({ guarded }: { guarded: Guarded }) {
       <Alert message={usage.error} />
       {usage.data && usage.data.length === 0 && <p className="muted">Nenhum uso ainda.</p>}
       {usage.data && usage.data.length > 0 && <HistoryTable rows={usage.data} showOutput={false} />}
+    </Panel>
+  );
+}
+
+/** Marca a sugestão como útil ou descartada, uma vez (sem texto para editar). */
+function DecisionButtons({ requestId }: { requestId: string }) {
+  const [decided, setDecided] = useState<string | null>(null);
+  const action = useAction();
+  const decide = (decision: 'accepted' | 'discarded') =>
+    void action.run(async () => {
+      await api.post(`/ai/requests/${requestId}/decision`, {
+        decision,
+        ...(decision === 'accepted' ? { edited: false } : {}),
+      });
+      setDecided(decision === 'accepted' ? 'Marcado como útil.' : 'Sugestões descartadas.');
+    });
+  if (decided) return <p role="status">{decided}</p>;
+  return (
+    <>
+      <div className="inline">
+        <button type="button" onClick={() => decide('accepted')} disabled={action.busy}>
+          Marcar como útil
+        </button>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => decide('discarded')}
+          disabled={action.busy}
+        >
+          Descartar
+        </button>
+      </div>
+      <Alert message={action.error} />
+    </>
+  );
+}
+
+/**
+ * Organização da agenda (IA nível 1), aberta pela Agenda. As sugestões só usam horários livres e
+ * pessoas da lista de espera conferidos pelo sistema; nada é marcado sozinho.
+ */
+export function ScheduleSuggestionsPanel({
+  scheduleId,
+  date,
+}: {
+  scheduleId: string;
+  date: string;
+}) {
+  const [result, setResult] = useState<ScheduleSuggestionsDto | null>(null);
+  const action = useAction();
+  const generate = () =>
+    void action.run(async () =>
+      setResult(
+        await api.post<ScheduleSuggestionsDto>('/ai/schedule-suggestions', { scheduleId, date }),
+      ),
+    );
+  return (
+    <Panel title="Organizar o dia (IA)">
+      <p className="muted">
+        Sugere quem da lista de espera pode ocupar os horários livres de {formatDate(date)} e quais
+        consultas ainda pedem confirmação. Você decide e marca pela agenda, como sempre.
+      </p>
+      <button type="button" onClick={generate} disabled={action.busy}>
+        Sugerir organização do dia
+      </button>
+      <Alert message={action.error} />
+      {result && (
+        <div className="ai-draft">
+          <Notice kind="warn">{result.notice}</Notice>
+          <p className="muted small">
+            Conferido pelo sistema: {result.facts.freeSlots} horários livres,{' '}
+            {result.facts.unconfirmed} consultas sem confirmação e {result.facts.waiting} pessoas na
+            lista de espera.
+          </p>
+          {result.suggestions.length === 0 ? (
+            <p role="status">Nenhuma sugestão para este dia.</p>
+          ) : (
+            <ol aria-label="Sugestões para a agenda">
+              {result.suggestions.map((s, i) => (
+                <li key={i}>
+                  {s.kind === 'fill_slot' ? (
+                    <>
+                      <strong>{formatTime(s.startsAt)}</strong>: oferecer o horário para{' '}
+                      <strong>{s.patientName}</strong> (lista de espera
+                      {s.preference ? `, ${s.preference}` : ''}).
+                    </>
+                  ) : (
+                    <>
+                      <strong>{formatTime(s.startsAt)}</strong>: pedir confirmação a{' '}
+                      <strong>{s.patientName}</strong>.
+                    </>
+                  )}
+                  <div className="muted small">{s.reason}</div>
+                </li>
+              ))}
+            </ol>
+          )}
+          <DecisionButtons key={result.requestId} requestId={result.requestId} />
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/**
+ * Relatório assistido (IA nível 1), para o administrador no Financeiro. Os números ao lado vêm
+ * do sistema; o texto só pode citar esses números.
+ */
+export function AdminReportPanel({
+  unitId,
+  from,
+  to,
+}: {
+  unitId: string;
+  from: string;
+  to: string;
+}) {
+  const [result, setResult] = useState<AdminReportDto | null>(null);
+  const action = useAction();
+  const generate = () =>
+    void action.run(async () =>
+      setResult(
+        await api.post<AdminReportDto>('/ai/admin-reports', {
+          from,
+          to,
+          ...(unitId ? { unitId } : {}),
+        }),
+      ),
+    );
+  const m = result?.metrics;
+  return (
+    <Panel title="Resumo assistido do período (IA)">
+      <p className="muted">
+        O sistema calcula os números de {formatDate(from)} a {formatDate(to)} e o assistente escreve
+        os destaques, sem nenhum dado de paciente.
+      </p>
+      <button type="button" onClick={generate} disabled={action.busy}>
+        Gerar resumo assistido
+      </button>
+      <Alert message={action.error} />
+      {result && m && (
+        <>
+          <table aria-label="Números do período">
+            <tbody>
+              <tr>
+                <th>Consultas na agenda</th>
+                <td>{m.appointments.total}</td>
+              </tr>
+              <tr>
+                <th>Presentes / faltas / cancelamentos</th>
+                <td>
+                  {m.appointments.arrived} / {m.appointments.noShow} / {m.appointments.cancelled}
+                </td>
+              </tr>
+              <tr>
+                <th>Taxa de faltas</th>
+                <td>{m.noShowRate === null ? 'sem base' : `${formatPercent(m.noShowRate)}%`}</td>
+              </tr>
+              <tr>
+                <th>Pacientes novos / lista de espera</th>
+                <td>
+                  {m.newPatients} / {m.waiting}
+                </td>
+              </tr>
+              <tr>
+                <th>Lembretes enviados / com falha</th>
+                <td>
+                  {m.reminders.sent} / {m.reminders.failed}
+                </td>
+              </tr>
+              <tr>
+                <th>Cobrado / recebido / em aberto</th>
+                <td>
+                  {formatCents(m.billing.netCents)} / {formatCents(m.billing.receivedCents)} /{' '}
+                  {formatCents(m.billing.openCents)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <DraftReview
+            key={result.requestId}
+            requestId={result.requestId}
+            text={result.highlights.join('\n')}
+            notice={result.notice}
+            maxLength={2000}
+          />
+        </>
+      )}
     </Panel>
   );
 }

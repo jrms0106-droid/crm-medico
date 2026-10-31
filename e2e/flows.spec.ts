@@ -442,6 +442,11 @@ test.describe.serial('fluxos por perfil', () => {
       .getByRole('button', { name: 'Ligar' })
       .click();
     await expect(ai.getByRole('listitem').filter({ hasText: 'Rascunho' })).toContainText('Ligado');
+    for (const label of ['Organização da agenda', 'Relatório administrativo']) {
+      const item = ai.getByRole('listitem').filter({ hasText: label });
+      await item.getByRole('button', { name: 'Ligar' }).click();
+      await expect(item).toContainText('Ligado');
+    }
     await page.getByRole('button', { name: 'Sair' }).click();
 
     await login(page, 'secretary');
@@ -479,5 +484,32 @@ test.describe.serial('fluxos por perfil', () => {
     );
     await page.getByRole('button', { name: 'Descartar' }).click();
     await expect(page.getByText('Sugestão descartada.')).toBeVisible();
+
+    // Organização do dia: só fatos conferidos pelo sistema; nada é marcado sozinho.
+    const organize = page.locator('.panel', {
+      has: page.getByRole('heading', { name: 'Organizar o dia (IA)' }),
+    });
+    await organize.getByRole('button', { name: 'Sugerir organização do dia' }).click();
+    await expect(organize.getByText(/Conferido pelo sistema/)).toBeVisible();
+    await expect(organize.getByText(/modelo simulado/)).toBeVisible();
+    await snap(page, '15-assistente-agenda');
+    await organize.getByRole('button', { name: 'Marcar como útil' }).click();
+    await expect(organize.getByText('Marcado como útil.')).toBeVisible();
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    // Relatório assistido: o administrador gera no Financeiro, com os números ao lado.
+    await login(page, 'admin');
+    await menu(page).getByRole('link', { name: 'Financeiro' }).click();
+    const report = page.locator('.panel', {
+      has: page.getByRole('heading', { name: 'Resumo assistido do período (IA)' }),
+    });
+    await report.getByRole('button', { name: 'Gerar resumo assistido' }).click();
+    await expect(report.getByRole('table', { name: 'Números do período' })).toBeVisible();
+    await expect(report.getByLabel('Sugestão (revise e edite antes de usar)')).toHaveValue(
+      /Financeiro particular:/,
+    );
+    await snap(page, '16-assistente-relatorio');
+    await report.getByRole('button', { name: 'Copiar e marcar como usado' }).click();
+    await expect(report.getByText('Texto copiado e marcado como usado.')).toBeVisible();
   });
 });
