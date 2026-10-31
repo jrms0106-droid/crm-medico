@@ -1,5 +1,8 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { AiController } from './ai/ai.controller.js';
+import { AiService } from './ai/ai.service.js';
+import { LanguageModel, SimulatedModel } from './ai/language-model.js';
 import { AuditController } from './audit/audit.controller.js';
 import { AuditService } from './audit/audit.service.js';
 import { BillingController } from './billing/billing.controller.js';
@@ -48,6 +51,7 @@ import { UnitsController } from './org/units.controller.js';
 export interface AppOverrides {
   clock?: Clock;
   messageSender?: MessageSender;
+  languageModel?: LanguageModel;
 }
 
 @Module({})
@@ -74,6 +78,7 @@ export class AppModule {
         BillingController,
         PrivacyController,
         CrmController,
+        AiController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
@@ -91,6 +96,8 @@ export class AppModule {
         RecordsService,
         ClinicalCopyService,
         FhirCopyService,
+        AiService,
+        { provide: LanguageModel, useValue: overrides.languageModel ?? new SimulatedModel() },
         PatientImportService,
         DocumentsService,
         BillingService,

@@ -41,6 +41,9 @@ export const ErrorCode = {
   IDEMPOTENCY_KEY_REQUIRED: 'IDEMPOTENCY_KEY_REQUIRED',
   IDEMPOTENCY_CONFLICT: 'IDEMPOTENCY_CONFLICT',
   AMOUNT_EXCEEDS_BALANCE: 'AMOUNT_EXCEEDS_BALANCE',
+  // IA (docs/api/ia-nivel-1.md)
+  AI_FEATURE_DISABLED: 'AI_FEATURE_DISABLED',
+  AI_INVALID_OUTPUT: 'AI_INVALID_OUTPUT',
 } as const;
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

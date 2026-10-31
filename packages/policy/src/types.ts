@@ -46,6 +46,8 @@ export const RESOURCE_TYPES = [
   'patient_rights',
   'communication',
   'patient_import',
+  'ai_assist',
+  'ai_settings',
 ] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 

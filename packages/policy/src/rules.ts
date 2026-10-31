@@ -135,6 +135,18 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
   },
   // Importação de pacientes por planilha (docs/api/integracoes.md): só a recepção. Conferir e
   // importar são `create`; cada paciente criado ainda passa pelas regras do cadastro.
+  // IA nível 1, administrativa (docs/api/ia-nivel-1.md). Usar é `create`; registrar a decisão
+  // humana sobre o próprio uso é `edit`. Os interruptores são `ai_settings`.
+  ai_assist: {
+    dataClass: 'ai',
+    unitScope: 'none',
+    grants: { secretary: ['view', 'create', 'edit'], admin: ['view'] },
+  },
+  ai_settings: {
+    dataClass: 'administrative',
+    unitScope: 'none',
+    grants: { secretary: ['view'], admin: ['view', 'edit'] },
+  },
   patient_import: {
     dataClass: 'personal',
     unitScope: 'none',

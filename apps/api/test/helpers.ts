@@ -70,7 +70,7 @@ export async function startTestApp(
 /** Apaga os dados entre testes (ordem respeita as chaves estrangeiras). */
 export async function resetData(db: PrismaClient): Promise<void> {
   await db.$executeRawUnsafe(
-    `TRUNCATE crm.messages, privacy.subject_requests, billing.payments, billing.charges, billing.price_items, documents.document_events, documents.medical_documents, records.access_justifications, records.record_events, records.record_versions, records.clinical_records,
+    `TRUNCATE ai.requests, ai.feature_settings, crm.messages, privacy.subject_requests, billing.payments, billing.charges, billing.price_items, documents.document_events, documents.medical_documents, records.access_justifications, records.record_events, records.record_versions, records.clinical_records,
       care.emergency_accesses, care.encounters, scheduling.appointment_events, scheduling.waitlist_entries, scheduling.appointments, scheduling.schedule_blocks, scheduling.schedule_rules, scheduling.schedules,
       patients.versions, patients.contacts, patients.phones, patients.patients, audit.events, org.professional_specialties, org.professionals, org.specialties,
       org.unit_memberships, identity.sessions, identity.users, org.units, org.organizations CASCADE`,
@@ -141,6 +141,10 @@ export class Client {
 
   patch(path: string, body: object) {
     return this.agent.patch(`/api/v1${path}`).set('x-csrf-token', this.csrf).send(body);
+  }
+
+  put(path: string, body: object) {
+    return this.agent.put(`/api/v1${path}`).set('x-csrf-token', this.csrf).send(body);
   }
 
   /**

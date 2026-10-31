@@ -64,6 +64,7 @@ test.describe.serial('fluxos por perfil', () => {
       'Lembretes',
       'Direitos do paciente',
       'Importar pacientes',
+      'Assistente (IA)',
       'Profissionais',
     ]);
     await page.goto('/#/auditoria');
@@ -411,5 +412,72 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(page.getByRole('status')).toContainText('1 paciente(s) cadastrado(s)');
     await lines.getByRole('link', { name }).click();
     await expect(page.getByRole('heading', { name })).toBeVisible();
+  });
+
+  test('assistente de IA: administrador liga, secretária classifica, escreve e revisa', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await login(page, 'admin');
+    await menu(page).getByRole('link', { name: 'Configurações' }).click();
+    const ai = page.locator('.panel', {
+      has: page.getByRole('heading', { name: /Assistente de IA/ }),
+    });
+    await ai
+      .getByRole('listitem')
+      .filter({ hasText: 'Classificação' })
+      .getByRole('button', { name: 'Ligar' })
+      .click();
+    const dialog = page.getByRole('form', { name: 'Confirmar identidade' });
+    await dialog.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await dialog.getByLabel('Código de 6 dígitos').fill(await nextCode('admin'));
+    await dialog.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(ai.getByRole('listitem').filter({ hasText: 'Classificação' })).toContainText(
+      'Ligado',
+    );
+    // A reautenticação ainda vale: o segundo interruptor não pede a senha de novo.
+    await ai
+      .getByRole('listitem')
+      .filter({ hasText: 'Rascunho' })
+      .getByRole('button', { name: 'Ligar' })
+      .click();
+    await expect(ai.getByRole('listitem').filter({ hasText: 'Rascunho' })).toContainText('Ligado');
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    await login(page, 'secretary');
+    await menu(page).getByRole('link', { name: 'Assistente (IA)' }).click();
+    const triage = page.getByRole('form', { name: 'Classificar pedido' });
+    await triage
+      .getByLabel('Mensagem do paciente')
+      .fill('Estou com dor no peito desde cedo, posso ir hoje?');
+    await triage.getByRole('button', { name: 'Classificar' }).click();
+    await expect(page.getByText('Dúvida de saúde (passar ao médico)')).toBeVisible();
+    await expect(page.getByText(/ligar 192/)).toBeVisible();
+    await expect(page.getByText(/modelo simulado/).first()).toBeVisible();
+    await snap(page, '14-assistente-classificacao');
+    await page.getByRole('button', { name: 'Copiar e marcar como usado' }).click();
+    await expect(page.getByText('Texto copiado e marcado como usado.')).toBeVisible();
+    const history = page.getByRole('table', { name: 'Usos do assistente' });
+    await expect(history).toContainText('Usado');
+
+    await menu(page).getByRole('link', { name: 'Agenda' }).click();
+    // O nome acessível do campo inclui a opção escolhida, então o campo é achado pelo rótulo.
+    await page
+      .locator('label.field', { has: page.getByText('Agenda', { exact: true }) })
+      .locator('select')
+      .selectOption({ label: USERS.doctor.name });
+    const row = page.getByRole('row', { name: new RegExp(PATIENT) }).first();
+    await row.getByRole('button', { name: 'Mensagem (IA)' }).click();
+    const draft = page.getByRole('form', { name: 'Rascunho de mensagem' });
+    await draft.getByLabel('Motivo').selectOption({ label: 'Falta na consulta' });
+    await draft.getByRole('button', { name: 'Gerar rascunho' }).click();
+    const text = page.getByLabel('Sugestão (revise e edite antes de usar)');
+    await expect(text).toHaveValue(
+      new RegExp(
+        `Sentimos sua falta na consulta com ${USERS.doctor.name.replace(/[()]/g, '\\$&')}`,
+      ),
+    );
+    await page.getByRole('button', { name: 'Descartar' }).click();
+    await expect(page.getByText('Sugestão descartada.')).toBeVisible();
   });
 });

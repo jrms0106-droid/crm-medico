@@ -11,20 +11,22 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records", "documents", "billing", "privacy", "crm"]
+  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records", "documents", "billing", "privacy", "crm", "ai"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
 model Organization {
-  id            String         @id @default(uuid(7)) @db.Uuid
-  name          String         @db.VarChar(200)
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id            String             @id @default(uuid(7)) @db.Uuid
+  name          String             @db.VarChar(200)
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
   units         Unit[]
   users         User[]
   specialties   Specialty[]
   professionals Professional[]
   patients      Patient[]
+  aiSettings    AiFeatureSetting[]
+  aiRequests    AiRequest[]
 
   @@map("organizations")
   @@schema("org")
@@ -60,26 +62,29 @@ enum Role {
 
 /// Pessoa que acessa o sistema. Senha guardada só como hash Argon2id.
 model User {
-  id                 String           @id @default(uuid(7)) @db.Uuid
-  organizationId     String           @map("organization_id") @db.Uuid
-  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  name               String           @db.VarChar(200)
+  id                 String             @id @default(uuid(7)) @db.Uuid
+  organizationId     String             @map("organization_id") @db.Uuid
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  name               String             @db.VarChar(200)
   /// Sempre em minúsculas.
-  email              String           @unique @db.VarChar(254)
-  passwordHash       String           @map("password_hash") @db.VarChar(255)
+  email              String             @unique @db.VarChar(254)
+  passwordHash       String             @map("password_hash") @db.VarChar(255)
   roles              Role[]
-  active             Boolean          @default(true)
-  mustChangePassword Boolean          @default(false) @map("must_change_password")
+  active             Boolean            @default(true)
+  mustChangePassword Boolean            @default(false) @map("must_change_password")
   /// Segredo TOTP criptografado com AES-256-GCM (nunca em texto puro).
-  mfaSecretEnc       String?          @map("mfa_secret_enc") @db.VarChar(255)
-  mfaEnabled         Boolean          @default(false) @map("mfa_enabled")
+  mfaSecretEnc       String?            @map("mfa_secret_enc") @db.VarChar(255)
+  mfaEnabled         Boolean            @default(false) @map("mfa_enabled")
   /// Último passo de 30 s aceito; impede reutilizar o mesmo código.
-  mfaLastStep        BigInt?          @map("mfa_last_step")
-  failedLoginCount   Int              @default(0) @map("failed_login_count")
-  lockedUntil        DateTime?        @map("locked_until") @db.Timestamptz(3)
-  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  mfaLastStep        BigInt?            @map("mfa_last_step")
+  failedLoginCount   Int                @default(0) @map("failed_login_count")
+  lockedUntil        DateTime?          @map("locked_until") @db.Timestamptz(3)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
   sessions           Session[]
+  aiSettingsUpdated  AiFeatureSetting[]
+  aiRequests         AiRequest[]        @relation("AiRequestUser")
+  aiDecisions        AiRequest[]        @relation("AiRequestDecidedBy")
   unitMemberships    UnitMembership[]
   professional       Professional?
 
@@ -897,4 +902,66 @@ model OutboundMessage {
   @@index([patientId])
   @@map("messages")
   @@schema("crm")
+}
+
+// IA nível 1, administrativa (docs/api/ia-nivel-1.md).
+
+enum AiFeature {
+  message_draft
+  request_triage
+
+  @@schema("ai")
+}
+
+enum AiDecision {
+  draft
+  accepted
+  discarded
+
+  @@schema("ai")
+}
+
+/// Interruptor de cada funcionalidade de IA por organização. Sem linha = desligada.
+model AiFeatureSetting {
+  organizationId  String       @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  feature         AiFeature
+  enabled         Boolean
+  updatedByUserId String       @map("updated_by_user_id") @db.Uuid
+  updatedBy       User         @relation(fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  updatedAt       DateTime     @map("updated_at") @db.Timestamptz(3)
+
+  @@id([organizationId, feature])
+  @@map("feature_settings")
+  @@schema("ai")
+}
+
+/// Um uso da IA. Guarda resumo e tamanho da entrada, nunca a entrada; a decisão humana só uma vez.
+model AiRequest {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  userId          String       @map("user_id") @db.Uuid
+  user            User         @relation("AiRequestUser", fields: [userId], references: [id], onDelete: Restrict)
+  feature         AiFeature
+  purpose         String       @db.VarChar(60)
+  provider        String       @db.VarChar(40)
+  model           String       @db.VarChar(80)
+  modelVersion    String       @map("model_version") @db.VarChar(40)
+  inputSha256     String       @map("input_sha256") @db.Char(64)
+  inputChars      Int          @map("input_chars")
+  output          String       @db.VarChar(4000)
+  /// Campos estruturados da saída (por exemplo, categoria da classificação).
+  outputMeta      Json         @default("{}") @map("output_meta")
+  decision        AiDecision   @default(draft)
+  edited          Boolean?
+  decidedByUserId String?      @map("decided_by_user_id") @db.Uuid
+  decidedBy       User?        @relation("AiRequestDecidedBy", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+  decidedAt       DateTime?    @map("decided_at") @db.Timestamptz(3)
+  createdAt       DateTime     @map("created_at") @db.Timestamptz(3)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("requests")
+  @@schema("ai")
 }

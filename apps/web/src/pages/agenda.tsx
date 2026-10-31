@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, Fragment, useEffect, useState } from 'react';
 import {
   APPOINTMENT_STATUS_LABELS,
   type AppointmentDto,
@@ -13,6 +13,7 @@ import {
 import { api, query } from '../api';
 import { href, navigate, useRoute } from '../router';
 import { canSee } from '../shell';
+import { AppointmentMessageDraft } from './assistant';
 import {
   Alert,
   Badge,
@@ -140,6 +141,7 @@ function DayList({
   const action = useAction();
   const isSecretary = canSee(session, ['secretary']);
   const isDoctor = canSee(session, ['doctor']);
+  const [drafting, setDrafting] = useState<string | null>(null);
 
   const act = (id: string, verb: string, body: object = {}) =>
     action.run(async () => {
@@ -175,56 +177,76 @@ function DayList({
           </thead>
           <tbody>
             {list.data.map((a) => (
-              <tr key={a.id}>
-                <td>
-                  {formatTime(a.startsAt)}–{formatTime(a.endsAt)}
-                </td>
-                <td>
-                  <a href={href(`/pacientes/${a.patient.id}`)}>{a.patient.displayName}</a>
-                </td>
-                <td>
-                  <Badge tone={STATUS_TONE[a.status]}>{APPOINTMENT_STATUS_LABELS[a.status]}</Badge>
-                </td>
-                <td>
-                  <div className="row-actions">
-                    {isSecretary && a.status === 'scheduled' && (
-                      <button type="button" onClick={() => void act(a.id, 'confirm')}>
-                        Confirmar
-                      </button>
-                    )}
-                    {isSecretary && (a.status === 'scheduled' || a.status === 'confirmed') && (
-                      <>
-                        <button type="button" onClick={() => void act(a.id, 'check-in')}>
-                          Registrar chegada
+              <Fragment key={a.id}>
+                <tr>
+                  <td>
+                    {formatTime(a.startsAt)}–{formatTime(a.endsAt)}
+                  </td>
+                  <td>
+                    <a href={href(`/pacientes/${a.patient.id}`)}>{a.patient.displayName}</a>
+                  </td>
+                  <td>
+                    <Badge tone={STATUS_TONE[a.status]}>
+                      {APPOINTMENT_STATUS_LABELS[a.status]}
+                    </Badge>
+                  </td>
+                  <td>
+                    <div className="row-actions">
+                      {isSecretary && a.status === 'scheduled' && (
+                        <button type="button" onClick={() => void act(a.id, 'confirm')}>
+                          Confirmar
                         </button>
-                        <button type="button" className="link" onClick={() => cancel(a)}>
-                          Cancelar
+                      )}
+                      {isSecretary && (a.status === 'scheduled' || a.status === 'confirmed') && (
+                        <>
+                          <button type="button" onClick={() => void act(a.id, 'check-in')}>
+                            Registrar chegada
+                          </button>
+                          <button type="button" className="link" onClick={() => cancel(a)}>
+                            Cancelar
+                          </button>
+                        </>
+                      )}
+                      {isSecretary && a.status === 'arrived' && (
+                        <a
+                          className="button small"
+                          href={href(
+                            `/financeiro?paciente=${a.patient.id}&consulta=${a.id}&unidade=${a.unitId}`,
+                          )}
+                        >
+                          Cobrar
+                        </a>
+                      )}
+                      {isDoctor && a.status === 'arrived' && (
+                        <button type="button" onClick={() => void start(a)} disabled={action.busy}>
+                          Iniciar atendimento
                         </button>
-                      </>
-                    )}
-                    {isSecretary && a.status === 'arrived' && (
-                      <a
-                        className="button small"
-                        href={href(
-                          `/financeiro?paciente=${a.patient.id}&consulta=${a.id}&unidade=${a.unitId}`,
-                        )}
-                      >
-                        Cobrar
-                      </a>
-                    )}
-                    {isDoctor && a.status === 'arrived' && (
-                      <button type="button" onClick={() => void start(a)} disabled={action.busy}>
-                        Iniciar atendimento
-                      </button>
-                    )}
-                    {isDoctor && (
-                      <a href={href(`/prontuario/${a.patient.id}`)} className="small">
-                        Prontuário
-                      </a>
-                    )}
-                  </div>
-                </td>
-              </tr>
+                      )}
+                      {isDoctor && (
+                        <a href={href(`/prontuario/${a.patient.id}`)} className="small">
+                          Prontuário
+                        </a>
+                      )}
+                      {isSecretary && (
+                        <button
+                          type="button"
+                          className="link"
+                          onClick={() => setDrafting(drafting === a.id ? null : a.id)}
+                        >
+                          Mensagem (IA)
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+                {drafting === a.id && (
+                  <tr>
+                    <td colSpan={4}>
+                      <AppointmentMessageDraft appointmentId={a.id} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>
