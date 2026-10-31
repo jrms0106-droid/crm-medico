@@ -1,3 +1,4 @@
+import { AiSettingsSection } from './assistant';
 import { type FormEvent, useState } from 'react';
 import {
   BRAZIL_STATES,
@@ -63,6 +64,7 @@ export function SettingsPage({ session }: { session: SessionInfo }) {
         professionals={(professionals.data ?? []).filter((p) => p.active)}
       />
       <PricesSection />
+      <AiSettingsSection guarded={reauth.guarded} />
     </Page>
   );
 }

@@ -1,5 +1,6 @@
 import { ROLE_LABELS, type RoleName, type SessionInfo } from '@crm/shared';
 import { AuditPage } from './pages/admin';
+import { AssistantPage } from './pages/assistant';
 import { AgendaPage } from './pages/agenda';
 import { BillingPage } from './pages/billing';
 import { HomePage } from './pages/home';
@@ -30,6 +31,7 @@ export const NAV: NavItem[] = [
   { path: 'lembretes', label: 'Lembretes', roles: ['secretary'] },
   { path: 'direitos', label: 'Direitos do paciente', roles: ['secretary'] },
   { path: 'importar', label: 'Importar pacientes', roles: ['secretary'] },
+  { path: 'assistente', label: 'Assistente (IA)', roles: ['secretary'] },
   { path: 'profissionais', label: 'Profissionais', roles: ['admin', 'doctor', 'secretary'] },
   { path: 'auditoria', label: 'Auditoria', roles: ['admin'] },
   { path: 'configuracoes', label: 'Configurações', roles: ['admin'] },
@@ -111,6 +113,8 @@ function Section({
       return <PrivacyPage />;
     case 'importar':
       return <ImportPage />;
+    case 'assistente':
+      return <AssistantPage />;
     case 'profissionais':
       return <ProfessionalsPage />;
     case 'auditoria':

@@ -478,3 +478,10 @@ ul.plain {
   margin: 0;
   padding-left: 1.1rem;
 }
+
+.ai-panel,
+.ai-draft {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}

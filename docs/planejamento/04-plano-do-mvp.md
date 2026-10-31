@@ -50,7 +50,7 @@ Cada etapa abaixo vira um ou mais Pull Requests. Nenhuma tela é considerada pro
 
 ## Fora do MVP (próximas fases, na ordem da seção 28)
 
-Documentos médicos e assinatura ICP-Brasil → financeiro → CRM/WhatsApp → integrações → IA nível 1 → IA nível 2 → IA nível 3 (após validações). Também antes de produção: matriz de conformidade, modelagem de ameaças completa, plano de backup testado e resposta a incidentes, escolha e contratação de hospedagem (com sua autorização). Os quatro primeiros foram preparados em 2026-10-31 ([conformidade](../conformidade/matriz-de-conformidade.md), [operação](../operacao/backup-e-restauracao.md)); a hospedagem depende da sua autorização. Documentos, financeiro, CRM/WhatsApp (envio simulado) e as integrações sem serviço contratado (cópia FHIR e importação de pacientes por CSV, [regras](../api/integracoes.md)) já estão prontos.
+Documentos médicos e assinatura ICP-Brasil → financeiro → CRM/WhatsApp → integrações → IA nível 1 → IA nível 2 → IA nível 3 (após validações). Também antes de produção: matriz de conformidade, modelagem de ameaças completa, plano de backup testado e resposta a incidentes, escolha e contratação de hospedagem (com sua autorização). Os quatro primeiros foram preparados em 2026-10-31 ([conformidade](../conformidade/matriz-de-conformidade.md), [operação](../operacao/backup-e-restauracao.md)); a hospedagem depende da sua autorização. Documentos, financeiro, CRM/WhatsApp (envio simulado) e as integrações sem serviço contratado (cópia FHIR e importação de pacientes por CSV, [regras](../api/integracoes.md)) já estão prontos. A IA nível 1 (administrativa) começou com classificação de pedidos e rascunho de mensagens, com modelo simulado ([regras](../api/ia-nivel-1.md)).
 
 ## Como as entregas chegam a você
 
