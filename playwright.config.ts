@@ -9,6 +9,9 @@ import { TEST_KEYS } from './e2e/fixtures.js';
 const API_PORT = 3100;
 const WEB_PORT = 4173;
 const dbUrl = process.env['E2E_DATABASE_URL'] ?? process.env['DATABASE_URL_TEST'] ?? '';
+// Com E2E_API_DATABASE_URL, a API conecta com outro papel (por exemplo `crm_app`, o papel de
+// produção sem permissões de dono); o preparo do banco continua com o papel dono.
+const apiDbUrl = process.env['E2E_API_DATABASE_URL'] ?? dbUrl;
 
 export default defineConfig({
   testDir: 'e2e',
@@ -43,7 +46,7 @@ export default defineConfig({
       reuseExistingServer: false,
       env: {
         ...TEST_KEYS,
-        DATABASE_URL: dbUrl,
+        DATABASE_URL: apiDbUrl,
         API_PORT: String(API_PORT),
         WEB_ORIGIN: `http://localhost:${WEB_PORT}`,
         NODE_ENV: 'test',

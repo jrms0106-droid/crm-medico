@@ -34,6 +34,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://crm:crm_ci_only@localhost:5432/crm_test
       DATABASE_URL_TEST: postgresql://crm:crm_ci_only@localhost:5432/crm_test
+      DATABASE_URL_APP: postgresql://crm_app:crm_app_ci_only@localhost:5432/crm_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,10 +49,24 @@ jobs:
       - run: npm test
       - name: Migrações aplicam do zero
         run: npx prisma migrate status
+      - name: Papel da aplicação sem poderes de dono
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/db/papel-aplicacao.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "ALTER ROLE crm_app PASSWORD 'crm_app_ci_only'"
+          psql "$DATABASE_URL_APP" -v ON_ERROR_STOP=1 -f scripts/db/verificar-papel.sql
       - name: Navegador para os testes ponta a ponta
         run: npx playwright install --with-deps chromium
-      - name: Testes ponta a ponta (Playwright)
+      - name: Testes ponta a ponta (Playwright), com a API no papel da aplicação
         run: npm run e2e
+        env:
+          E2E_API_DATABASE_URL: ${{ env.DATABASE_URL_APP }}
+      - name: Ensaio de backup cifrado e restauração
+        run: |
+          sudo apt-get install -y age
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE crm_restore"
+          SOURCE_DATABASE_URL="$DATABASE_URL" \
+          RESTORE_DATABASE_URL="postgresql://crm:crm_ci_only@localhost:5432/crm_restore" \
+            scripts/ops/ensaio-de-restauracao.sh
       - name: Rastros dos testes ponta a ponta que falharam
         if: failure()
         uses: actions/upload-artifact@v4
