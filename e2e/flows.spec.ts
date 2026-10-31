@@ -154,7 +154,6 @@ test.describe.serial('fluxos por perfil', () => {
     page,
   }) => {
     // Os códigos de duas etapas não se repetem: pode ser preciso esperar a próxima janela.
-    // Quatro códigos de MFA novos (cada um pode esperar até 30 s pela próxima janela) e o fluxo.
     test.setTimeout(300_000);
     await login(page, 'admin');
     await menu(page).getByRole('link', { name: 'Configurações' }).click();
