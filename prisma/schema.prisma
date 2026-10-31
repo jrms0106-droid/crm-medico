@@ -11,7 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records", "documents", "billing", "privacy"]
+  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records", "documents", "billing", "privacy", "crm"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
@@ -269,6 +269,7 @@ model Patient {
   medicalDocuments     MedicalDocument[]
   charges              Charge[]
   subjectRequests      SubjectRequest[]
+  messages             OutboundMessage[]
 
   @@unique([organizationId, cpfHash])
   @@index([organizationId, birthDate])
@@ -431,6 +432,7 @@ model Appointment {
   events            AppointmentEvent[]
   encounter         Encounter?
   charges           Charge[]
+  messages          OutboundMessage[]
 
   @@index([scheduleId, startsAt])
   @@index([patientId, startsAt])
@@ -845,4 +847,54 @@ model SubjectRequest {
   @@index([patientId])
   @@map("subject_requests")
   @@schema("privacy")
+}
+
+// CRM e lembretes (docs/api/crm-e-lembretes.md). A autorização do paciente é a preferência de
+// comunicação do cadastro (patients.patients.comm_channels e appointment_reminders).
+
+enum MessageKind {
+  appointment_reminder
+
+  @@schema("crm")
+}
+
+enum MessageStatus {
+  queued
+  sent
+  failed
+  cancelled
+
+  @@schema("crm")
+}
+
+/// Mensagem para o paciente. Texto e número ficam como foram gerados.
+model OutboundMessage {
+  id                String        @id @default(uuid(7)) @db.Uuid
+  organizationId    String        @map("organization_id") @db.Uuid
+  unitId            String        @map("unit_id") @db.Uuid
+  patientId         String        @map("patient_id") @db.Uuid
+  patient           Patient       @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  appointmentId     String        @map("appointment_id") @db.Uuid
+  appointment       Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+  kind              MessageKind
+  channel           CommChannel
+  toNumber          String        @map("to_number") @db.VarChar(11)
+  body              String        @db.VarChar(1000)
+  status            MessageStatus @default(queued)
+  scheduledFor      DateTime      @map("scheduled_for") @db.Timestamptz(3)
+  attempts          Int           @default(0)
+  sentAt            DateTime?     @map("sent_at") @db.Timestamptz(3)
+  providerRef       String?       @map("provider_ref") @db.VarChar(100)
+  lastError         String?       @map("last_error") @db.VarChar(300)
+  cancelledByUserId String?       @map("cancelled_by_user_id") @db.Uuid
+  cancelReason      String?       @map("cancel_reason") @db.VarChar(200)
+  createdAt         DateTime      @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime      @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([appointmentId, kind])
+  @@index([status, scheduledFor])
+  @@index([organizationId, unitId, scheduledFor])
+  @@index([patientId])
+  @@map("messages")
+  @@schema("crm")
 }

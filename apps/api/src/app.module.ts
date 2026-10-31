@@ -25,6 +25,10 @@ import { PatientsController } from './patients/patients.controller.js';
 import { PatientsService } from './patients/patients.service.js';
 import { PrivacyController } from './privacy/privacy.controller.js';
 import { PrivacyService } from './privacy/privacy.service.js';
+import { CrmController } from './crm/crm.controller.js';
+import { MessageSender, SimulatedSender } from './crm/message-sender.js';
+import { RemindersRunner } from './crm/reminders.runner.js';
+import { RemindersService } from './crm/reminders.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { ClinicalCopyService } from './records/clinical-copy.service.js';
 import { RecordsService } from './records/records.service.js';
@@ -41,6 +45,7 @@ import { UnitsController } from './org/units.controller.js';
 
 export interface AppOverrides {
   clock?: Clock;
+  messageSender?: MessageSender;
 }
 
 @Module({})
@@ -66,6 +71,7 @@ export class AppModule {
         DocumentsController,
         BillingController,
         PrivacyController,
+        CrmController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
@@ -85,6 +91,9 @@ export class AppModule {
         DocumentsService,
         BillingService,
         PrivacyService,
+        RemindersService,
+        RemindersRunner,
+        { provide: MessageSender, useValue: overrides.messageSender ?? new SimulatedSender() },
         { provide: APP_GUARD, useClass: AuthGuard },
       ],
     };
