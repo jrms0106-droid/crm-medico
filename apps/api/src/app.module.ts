@@ -29,6 +29,8 @@ import { CrmController } from './crm/crm.controller.js';
 import { MessageSender, SimulatedSender } from './crm/message-sender.js';
 import { RemindersRunner } from './crm/reminders.runner.js';
 import { RemindersService } from './crm/reminders.service.js';
+import { FhirCopyService } from './integrations/fhir-copy.service.js';
+import { PatientImportService } from './integrations/patient-import.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { ClinicalCopyService } from './records/clinical-copy.service.js';
 import { RecordsService } from './records/records.service.js';
@@ -88,6 +90,8 @@ export class AppModule {
         CareService,
         RecordsService,
         ClinicalCopyService,
+        FhirCopyService,
+        PatientImportService,
         DocumentsService,
         BillingService,
         PrivacyService,

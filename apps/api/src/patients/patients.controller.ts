@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Inject,
   Param,
   ParseUUIDPipe,
@@ -13,8 +14,10 @@ import {
   type PatientDto,
   type PatientSummaryDto,
   type PatientVersionDto,
+  type PatientImportResultDto,
   duplicateCheckSchema,
   patientCreateSchema,
+  patientImportSchema,
   patientSearchSchema,
   patientUpdateSchema,
 } from '@crm/shared';
@@ -22,6 +25,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { AuthorizationService } from '../authz/authorization.service.js';
 import { parseBody } from '../common/validation.js';
 import { Auth } from '../identity/auth.decorators.js';
+import { PatientImportService } from '../integrations/patient-import.service.js';
 import type { AuthContext } from '../identity/session.service.js';
 import { PatientsService } from './patients.service.js';
 
@@ -35,7 +39,32 @@ export class PatientsController {
     @Inject(AuthorizationService) private readonly authz: AuthorizationService,
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(PatientsService) private readonly patients: PatientsService,
+    @Inject(PatientImportService) private readonly imports: PatientImportService,
   ) {}
+
+  /** Confere a planilha linha por linha, sem gravar nada (docs/api/integracoes.md). */
+  @Post('import/preview')
+  @HttpCode(200)
+  async importPreview(
+    @Auth() ctx: AuthContext,
+    @Body() body: unknown,
+  ): Promise<PatientImportResultDto> {
+    await this.authz.authorize(ctx, 'create', { type: 'patient_import' });
+    const { csv } = parseBody(patientImportSchema, body);
+    return this.imports.preview(ctx, csv);
+  }
+
+  /** Cadastra só as linhas sem erro e sem duplicidade; devolve o resultado por linha. */
+  @Post('import')
+  @HttpCode(200)
+  async importCommit(
+    @Auth() ctx: AuthContext,
+    @Body() body: unknown,
+  ): Promise<PatientImportResultDto> {
+    await this.authz.authorize(ctx, 'create', { type: 'patient_import' });
+    const { csv } = parseBody(patientImportSchema, body);
+    return this.imports.commit(ctx, csv);
+  }
 
   @Get()
   async search(@Auth() ctx: AuthContext, @Query() query: unknown): Promise<PatientSummaryDto[]> {

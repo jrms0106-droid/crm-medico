@@ -608,3 +608,128 @@ describe('cópia do prontuário pedida pelo paciente', () => {
     expect(missing.status).toBe(404);
   });
 });
+
+describe('cópia do prontuário no padrão FHIR', () => {
+  type Entry = { fullUrl: string; resource: { resourceType: string } & Record<string, unknown> };
+
+  /** Toda referência `urn:uuid:` do arquivo precisa apontar para um recurso do próprio arquivo. */
+  function danglingReferences(bundle: { entry: Entry[] }): string[] {
+    const urls = new Set(bundle.entry.map((e) => e.fullUrl));
+    const found: string[] = [];
+    const walk = (v: unknown) => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') {
+        for (const [k, inner] of Object.entries(v)) {
+          if (k === 'reference' && typeof inner === 'string') found.push(inner);
+          else walk(inner);
+        }
+      }
+    };
+    walk(bundle.entry.map((e) => e.resource));
+    return found.filter((r) => !urls.has(r));
+  }
+
+  it('o médico com vínculo baixa um Bundle FHIR com o mesmo conteúdo da cópia', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'otherDoctor', '10:00');
+    const othersSensitive = await signedRecord(c, 'otherDoctor', { sensitivity: 'elevated' });
+    await startEncounter(c, 'doctor', '09:00');
+    const own = await signedRecord(c);
+    const doc = await c.as.doctor.post(`/patients/${c.patientId}/documents`, {
+      kind: 'report',
+      content: { title: 'Relatório fictício', body: 'Paciente fictício em bom estado.' },
+    });
+    expect(doc.status).toBe(201);
+    expect(
+      (await c.as.doctor.post(`/documents/${doc.body.id}/sign`, { version: doc.body.version }))
+        .status,
+    ).toBe(200);
+
+    await c.as.doctor.reauth(c.doctor, t.clock);
+    const res = await c.as.doctor.get(`/patients/${c.patientId}/clinical-copy/fhir`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/^application\/fhir\+json/);
+    expect(res.headers['content-disposition']).toMatch(
+      /^attachment; filename="copia-do-prontuario-fhir-\d{4}-\d{2}-\d{2}\.json"$/,
+    );
+    const bundle = JSON.parse(res.text) as { resourceType: string; type: string; entry: Entry[] };
+    expect(bundle).toMatchObject({ resourceType: 'Bundle', type: 'collection' });
+    expect(danglingReferences(bundle)).toEqual([]);
+    const byType = (type: string) => bundle.entry.filter((e) => e.resource.resourceType === type);
+
+    expect(byType('Patient')).toHaveLength(1);
+    expect(byType('Patient')[0]!.fullUrl).toBe(`urn:uuid:${c.patientId}`);
+    expect(byType('Patient')[0]!.resource).not.toHaveProperty('identifier');
+
+    const compositions = byType('Composition');
+    expect(compositions.map((e) => e.fullUrl)).toEqual([`urn:uuid:${own.id}`]);
+    expect(compositions[0]!.resource).toMatchObject({
+      status: 'final',
+      type: { coding: [{ system: 'http://loinc.org', code: '11488-4' }] },
+      identifier: { system: 'urn:crm-medico:sha256', value: own.contentHash },
+      attester: [{ mode: 'legal', time: own.signedAt }],
+    });
+    const json = JSON.stringify(bundle);
+    expect(json).not.toContain(othersSensitive.id);
+    expect(json).toContain('Dor de garganta há três dias (dado fictício).');
+
+    expect(byType('Condition').map((e) => e.resource.code)).toEqual([
+      {
+        coding: [{ system: 'http://hl7.org/fhir/sid/icd-10', code: 'J02.9' }],
+        text: 'Faringite viral',
+      },
+    ]);
+
+    const practitioner = byType('Practitioner').find(
+      (e) => e.fullUrl === `urn:uuid:${c.doctor.id}`,
+    );
+    expect(practitioner?.resource.identifier).toEqual([
+      {
+        system: expect.stringMatching(/^urn:crm-medico:crm:[A-Z]{2}$/),
+        value: expect.stringMatching(/^\d+$/),
+      },
+    ]);
+
+    const refs = byType('DocumentReference');
+    expect(refs.map((e) => e.fullUrl)).toEqual([`urn:uuid:${doc.body.id}`]);
+    const attachment = (refs[0]!.resource.content as { attachment: { data: string } }[])[0]!
+      .attachment;
+    expect(JSON.parse(Buffer.from(attachment.data, 'base64').toString('utf8'))).toMatchObject({
+      kind: 'report',
+      content: { title: 'Relatório fictício' },
+    });
+
+    const outcome = byType('OperationOutcome')[0]!.resource as unknown as {
+      issue: { code: string }[];
+    };
+    expect(outcome.issue.map((i) => i.code)).toEqual(['informational', 'suppressed']);
+
+    const event = await t.db.auditEvent.findFirstOrThrow({
+      where: { action: 'export', resourceType: 'clinical_record', patientId: c.patientId },
+    });
+    expect(event).toMatchObject({ outcome: 'allowed', actorUserId: c.doctor.id });
+  });
+
+  it('nega sem reautenticação, a secretária, o administrador e o médico sem vínculo; 404 sem paciente', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    await signedRecord(c);
+    t.clock.advance(10 * 60_000);
+    const stale = await c.as.doctor.get(`/patients/${c.patientId}/clinical-copy/fhir`);
+    expect(stale.status).toBe(403);
+    expect(errorCode(stale.body)).toBe('REAUTH_REQUIRED');
+    await c.as.otherDoctor.reauth(c.otherDoctor, t.clock);
+    expect((await c.as.otherDoctor.get(`/patients/${c.patientId}/clinical-copy/fhir`)).status).toBe(
+      403,
+    );
+    for (const who of ['secretary', 'admin'] as const) {
+      const res = await c.as[who].get(`/patients/${c.patientId}/clinical-copy/fhir`);
+      expect(res.status, who).toBe(403);
+    }
+    await c.as.doctor.reauth(c.doctor, t.clock);
+    const missing = await c.as.doctor.get(
+      '/patients/00000000-0000-4000-8000-000000000000/clinical-copy/fhir',
+    );
+    expect(missing.status).toBe(404);
+  });
+});
