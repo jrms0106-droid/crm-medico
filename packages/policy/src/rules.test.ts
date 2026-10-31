@@ -36,6 +36,7 @@ const EXPECTED: Record<ResourceType, Record<Role, string>> = {
   price_item: { doctor: '', secretary: 'v', admin: 'vce' },
   charge: { doctor: '', secretary: 'vce', admin: 'vr' },
   financial_report: { doctor: '', secretary: 'v', admin: 'v' },
+  patient_rights: { doctor: '', secretary: 'vcex', admin: '' },
 };
 
 const LETTER: Record<Action, string> = {
@@ -89,10 +90,11 @@ describe('matriz papel × recurso × ação (mesma organização, mesma unidade,
 });
 
 describe('regras de atributo', () => {
-  it('ninguém compartilha nada; exportar, só o PDF de documento médico', () => {
+  it('ninguém compartilha nada; exportar, só o PDF de documento e os dados a pedido do titular', () => {
+    const exportable: string[] = ['medical_document', 'patient_rights'];
     for (const type of RESOURCE_TYPES) {
       for (const action of ['export', 'share'] as const) {
-        const allowed = action === 'export' && type === 'medical_document';
+        const allowed = action === 'export' && exportable.includes(type);
         expect(decide(request(['doctor', 'secretary', 'admin'], action, type), RULES).allowed).toBe(
           allowed,
         );

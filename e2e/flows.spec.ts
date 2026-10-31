@@ -154,7 +154,7 @@ test.describe.serial('fluxos por perfil', () => {
     page,
   }) => {
     // Os códigos de duas etapas não se repetem: pode ser preciso esperar a próxima janela.
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
     await login(page, 'admin');
     await menu(page).getByRole('link', { name: 'Configurações' }).click();
 
@@ -191,7 +191,8 @@ test.describe.serial('fluxos por perfil', () => {
   test('financeiro: administrador cria o preço, secretária cobra e recebe, administrador estorna', async ({
     page,
   }) => {
-    test.setTimeout(180_000);
+    // Quatro códigos de MFA novos (cada um pode esperar até 30 s pela próxima janela) e o fluxo.
+    test.setTimeout(300_000);
     await login(page, 'admin');
     await menu(page).getByRole('link', { name: 'Configurações' }).click();
     const item = page.getByRole('form', { name: 'Novo item da tabela' });

@@ -11,7 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records", "documents", "billing"]
+  schemas  = ["org", "identity", "audit", "patients", "scheduling", "care", "records", "documents", "billing", "privacy"]
 }
 
 /// Organização (pessoa jurídica controladora dos dados).
@@ -215,6 +215,7 @@ model AuditEvent {
   @@index([organizationId, chainSeq])
   @@index([organizationId, occurredAt])
   @@index([actorUserId, occurredAt])
+  @@index([patientId, occurredAt])
   @@map("events")
   @@schema("audit")
 }
@@ -267,6 +268,7 @@ model Patient {
   clinicalRecords      ClinicalRecord[]
   medicalDocuments     MedicalDocument[]
   charges              Charge[]
+  subjectRequests      SubjectRequest[]
 
   @@unique([organizationId, cpfHash])
   @@index([organizationId, birthDate])
@@ -800,4 +802,47 @@ model Payment {
   @@index([organizationId, paidAt])
   @@map("payments")
   @@schema("billing")
+}
+
+enum SubjectRequestKind {
+  access
+  access_report
+  correction
+  portability
+  deletion
+  sharing_info
+  other
+
+  @@schema("privacy")
+}
+
+enum SubjectRequestStatus {
+  open
+  completed
+  denied
+
+  @@schema("privacy")
+}
+
+/// Pedido do titular dos dados (LGPD art. 18). Não é apagado; a resposta é gravada uma vez
+/// (docs/api/direitos-do-titular.md).
+model SubjectRequest {
+  id               String               @id @default(uuid(7)) @db.Uuid
+  organizationId   String               @map("organization_id") @db.Uuid
+  patientId        String               @map("patient_id") @db.Uuid
+  patient          Patient              @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  kind             SubjectRequestKind
+  details          String?              @db.VarChar(1000)
+  status           SubjectRequestStatus @default(open)
+  dueOn            DateTime             @map("due_on") @db.Date
+  createdByUserId  String               @map("created_by_user_id") @db.Uuid
+  createdAt        DateTime             @map("created_at") @db.Timestamptz(3)
+  resolvedByUserId String?              @map("resolved_by_user_id") @db.Uuid
+  resolvedAt       DateTime?            @map("resolved_at") @db.Timestamptz(3)
+  resolution       String?              @db.VarChar(1000)
+
+  @@index([organizationId, status, dueOn])
+  @@index([patientId])
+  @@map("subject_requests")
+  @@schema("privacy")
 }

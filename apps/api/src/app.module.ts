@@ -23,6 +23,8 @@ import { UserAdminService } from './identity/user-admin.service.js';
 import { OrgService } from './org/org.service.js';
 import { PatientsController } from './patients/patients.controller.js';
 import { PatientsService } from './patients/patients.service.js';
+import { PrivacyController } from './privacy/privacy.controller.js';
+import { PrivacyService } from './privacy/privacy.service.js';
 import { RecordsController } from './records/records.controller.js';
 import { RecordsService } from './records/records.service.js';
 import {
@@ -62,6 +64,7 @@ export class AppModule {
         RecordsController,
         DocumentsController,
         BillingController,
+        PrivacyController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
@@ -79,6 +82,7 @@ export class AppModule {
         RecordsService,
         DocumentsService,
         BillingService,
+        PrivacyService,
         { provide: APP_GUARD, useClass: AuthGuard },
       ],
     };

@@ -119,6 +119,13 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
     unitScope: 'except_admin',
     grants: { secretary: ['view'], admin: ['view'] },
   },
+  // Pedidos do titular, relatório de acessos e exportação (docs/api/direitos-do-titular.md).
+  // Exportar é `export`. O administrador não vê pacientes, então não atende pedidos.
+  patient_rights: {
+    dataClass: 'personal',
+    unitScope: 'none',
+    grants: { secretary: ['view', 'create', 'edit', 'export'] },
+  },
 };
 
 export function dataClassOf(type: ResourceType): DataClass {
