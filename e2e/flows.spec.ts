@@ -1,4 +1,5 @@
 import { type Page, expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { E2E_PASSWORD, E2E_TOTP_SECRET, USERS, type UserKey } from './fixtures.js';
 import { currentStep, totpAt } from './totp.js';
 
@@ -60,6 +61,7 @@ test.describe.serial('fluxos por perfil', () => {
       'Pacientes',
       'Agenda',
       'Financeiro',
+      'Direitos do paciente',
       'Profissionais',
     ]);
     await page.goto('/#/auditoria');
@@ -261,5 +263,68 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(menu(page).getByRole('link', { name: 'Financeiro' })).toHaveCount(0);
     await page.goto('/#/financeiro');
     await expect(page.getByText('Esta área não faz parte do seu perfil.')).toBeVisible();
+    await page.goto('/#/direitos');
+    await expect(page.getByText('Esta área não faz parte do seu perfil.')).toBeVisible();
+  });
+
+  test('direitos do paciente: secretária registra o pedido, vê os acessos, exporta e responde', async ({
+    page,
+  }) => {
+    await login(page, 'secretary');
+    await menu(page).getByRole('link', { name: 'Pacientes' }).click();
+    await page.getByLabel('Buscar por nome, CPF ou telefone').fill(PATIENT);
+    await page.getByRole('button', { name: 'Buscar' }).click();
+    await page.getByRole('link', { name: PATIENT }).click();
+    await page.getByRole('link', { name: 'Registrar pedido' }).click();
+
+    const nova = page.getByRole('form', { name: 'Novo pedido do paciente' });
+    await nova
+      .getByLabel('O que o paciente pediu')
+      .selectOption({ label: 'Relatório de quem acessou' });
+    await nova.getByLabel('Detalhes (opcional)').fill('Pediu na recepção, por escrito.');
+    await nova.getByRole('button', { name: 'Registrar pedido' }).click();
+    const row = page.getByRole('row', { name: new RegExp(PATIENT) }).first();
+    await expect(row).toContainText('Relatório de quem acessou');
+    await expect(row).toContainText('Aberto');
+
+    // Na ficha: o relatório mostra quem acessou (o médico atendeu no teste anterior), sem conteúdo.
+    await row.getByRole('link', { name: PATIENT }).click();
+    await page.getByRole('button', { name: 'Relatório de acessos' }).click();
+    const acessos = page.getByRole('table', { name: 'Acessos aos dados do paciente' });
+    await expect(acessos).toContainText(USERS.secretary.name);
+    await expect(acessos).toContainText(USERS.doctor.name);
+    await expect(acessos).toContainText('Registro do prontuário');
+    await snap(page, '10-relatorio-de-acessos');
+
+    // Exportar exige a senha de novo; o arquivo é JSON, sem a parte clínica.
+    const downloading = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Exportar dados' }).click();
+    const dialog = page.getByRole('form', { name: 'Confirmar identidade' });
+    await dialog.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await dialog.getByRole('button', { name: 'Confirmar' }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toMatch(/^dados-do-paciente-\d{4}-\d{2}-\d{2}\.json$/);
+    const file = await download.path();
+    const exported = JSON.parse(await readFile(file, 'utf8')) as {
+      patient: { fullName: string };
+      subjectRequests: unknown[];
+      clinical: { included: boolean };
+    };
+    expect(exported.patient.fullName).toBe(PATIENT);
+    expect(exported.subjectRequests).toHaveLength(1);
+    expect(exported.clinical.included).toBe(false);
+    await expect(page.getByRole('status')).toContainText('Arquivo gerado.');
+
+    // A resposta é registrada uma vez e não pode ser desfeita.
+    await page.getByRole('button', { name: 'Responder' }).click();
+    const resposta = page.getByRole('form', { name: 'Responder pedido' });
+    await resposta.getByLabel('Resposta dada ao paciente').fill('Relatório entregue impresso.');
+    page.once('dialog', (d) => void d.accept());
+    await resposta.getByRole('button', { name: 'Registrar resposta' }).click();
+    const panel = page.getByRole('table', { name: 'Pedidos do paciente' });
+    await expect(panel).toContainText('Atendido');
+    await expect(panel).toContainText('Relatório entregue impresso.');
+    await expect(page.getByRole('button', { name: 'Responder' })).toHaveCount(0);
+    await snap(page, '11-direitos-na-ficha');
   });
 });
