@@ -26,6 +26,7 @@ import { PatientsService } from './patients/patients.service.js';
 import { PrivacyController } from './privacy/privacy.controller.js';
 import { PrivacyService } from './privacy/privacy.service.js';
 import { RecordsController } from './records/records.controller.js';
+import { ClinicalCopyService } from './records/clinical-copy.service.js';
 import { RecordsService } from './records/records.service.js';
 import {
   AppointmentsController,
@@ -80,6 +81,7 @@ export class AppModule {
         SchedulingService,
         CareService,
         RecordsService,
+        ClinicalCopyService,
         DocumentsService,
         BillingService,
         PrivacyService,

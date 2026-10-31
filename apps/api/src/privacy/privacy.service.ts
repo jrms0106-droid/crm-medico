@@ -226,8 +226,8 @@ export class PrivacyService {
       clinical: {
         included: false,
         reason:
-          'A cópia do prontuário e dos documentos médicos é pedida ao médico responsável e ' +
-          'entregue à parte.',
+          'A cópia do prontuário e dos documentos médicos é gerada pelo médico que acompanha o ' +
+          'paciente, em arquivo separado.',
       },
     };
   }
