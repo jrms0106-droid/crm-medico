@@ -46,7 +46,7 @@ const uuid = new ParseUUIDPipe();
  * Carrega a agenda da organização (404 auditado se não existir) e confere a permissão na
  * unidade dela. Compartilhado pelos controllers abaixo.
  */
-async function loadSchedule(
+export async function loadSchedule(
   authz: AuthorizationService,
   scheduling: SchedulingService,
   ctx: AuthContext,

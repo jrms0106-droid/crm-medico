@@ -1,13 +1,27 @@
 import { z } from 'zod';
 
 /** IA nível 1, administrativa (docs/api/ia-nivel-1.md). */
-export const AI_FEATURES = ['message_draft', 'request_triage'] as const;
+export const AI_FEATURES = [
+  'message_draft',
+  'request_triage',
+  'schedule_suggestions',
+  'admin_report',
+] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 
 export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
   message_draft: 'Rascunho de mensagem ao paciente',
   request_triage: 'Classificação de pedidos dos pacientes',
+  schedule_suggestions: 'Organização da agenda',
+  admin_report: 'Relatório administrativo assistido',
 };
+
+/** Funcionalidades da recepção (`ai_assist`) e do administrador (`ai_report`). */
+export const AI_RECEPTION_FEATURES: readonly AiFeature[] = [
+  'message_draft',
+  'request_triage',
+  'schedule_suggestions',
+];
 
 export const AI_SIMULATED_NOTICE =
   'Sugestão do modelo simulado: nenhum serviço de IA está contratado e nenhum dado sai do sistema. ' +
@@ -86,6 +100,120 @@ export const triageOutputSchema = z.strictObject({
   suggestedReply: z.string().trim().min(1).max(1000),
 });
 export type TriageOutput = z.infer<typeof triageOutputSchema>;
+
+// ---- Organização da agenda ----
+
+export const scheduleSuggestionsSchema = z.strictObject({
+  scheduleId: z.uuid('Agenda inválida.'),
+  date: z.iso.date('Data inválida: use AAAA-MM-DD.'),
+});
+
+export const SCHEDULE_SUGGESTIONS_MAX = 10;
+
+/** Formato fixo da saída do modelo: só códigos (`H1`, `E1`, `C1`), nunca nomes. */
+export const scheduleSuggestionsOutputSchema = z.strictObject({
+  suggestions: z
+    .array(
+      z.discriminatedUnion('kind', [
+        z.strictObject({
+          kind: z.literal('fill_slot'),
+          slot: z.string().regex(/^H\d{1,3}$/),
+          waitlist: z.string().regex(/^E\d{1,3}$/),
+          reason: z.string().trim().min(1).max(200),
+        }),
+        z.strictObject({
+          kind: z.literal('confirm'),
+          appointment: z.string().regex(/^C\d{1,3}$/),
+          reason: z.string().trim().min(1).max(200),
+        }),
+      ]),
+    )
+    .max(SCHEDULE_SUGGESTIONS_MAX),
+});
+export type ScheduleSuggestionsOutput = z.infer<typeof scheduleSuggestionsOutputSchema>;
+
+export type ScheduleSuggestionDto =
+  | {
+      kind: 'fill_slot';
+      startsAt: string;
+      endsAt: string;
+      waitlistEntryId: string;
+      patientName: string;
+      preference: string | null;
+      reason: string;
+    }
+  | {
+      kind: 'confirm';
+      appointmentId: string;
+      startsAt: string;
+      patientName: string;
+      reason: string;
+    };
+
+export interface ScheduleSuggestionsDto {
+  requestId: string;
+  scheduleId: string;
+  date: string;
+  /** Fatos calculados pelo sistema, para conferência. */
+  facts: { freeSlots: number; unconfirmed: number; waiting: number };
+  suggestions: ScheduleSuggestionDto[];
+  model: AiModelInfoDto;
+  notice: string;
+}
+
+// ---- Relatório assistido ----
+
+export const ADMIN_REPORT_MAX_DAYS = 92;
+
+export const adminReportSchema = z.strictObject({
+  from: z.iso.date('Data inválida: use AAAA-MM-DD.'),
+  to: z.iso.date('Data inválida: use AAAA-MM-DD.'),
+  unitId: z.uuid('Unidade inválida.').optional(),
+});
+
+export const adminReportOutputSchema = z.strictObject({
+  highlights: z.array(z.string().trim().min(1).max(300)).min(1).max(6),
+});
+
+/** Números agregados do período, calculados pelo sistema. Nenhum dado de paciente. */
+export interface AdminReportMetrics {
+  appointments: {
+    total: number;
+    scheduled: number;
+    confirmed: number;
+    arrived: number;
+    cancelled: number;
+    noShow: number;
+    rescheduled: number;
+    fitIn: number;
+  };
+  /** Faltas sobre (comparecimentos + faltas), em %, uma casa decimal; `null` sem base. */
+  noShowRate: number | null;
+  newPatients: number;
+  waiting: number;
+  reminders: { sent: number; failed: number };
+  billing: { netCents: number; receivedCents: number; openCents: number };
+}
+
+export interface AdminReportDto {
+  requestId: string;
+  from: string;
+  to: string;
+  unitId: string | null;
+  metrics: AdminReportMetrics;
+  highlights: string[];
+  model: AiModelInfoDto;
+  notice: string;
+}
+
+/** Número inteiro no padrão brasileiro: 1234 → "1.234". */
+export const formatCount = (n: number) => n.toLocaleString('pt-BR');
+
+/** Percentual com uma casa: 12.5 → "12,5". */
+export const formatPercent = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+
+/** Números escritos num texto ("1.234,56", "12,5", "30"). */
+export const numbersIn = (text: string): string[] => text.match(/\d(?:[\d.,]*\d)?/g) ?? [];
 
 export interface AiFeatureDto {
   feature: AiFeature;

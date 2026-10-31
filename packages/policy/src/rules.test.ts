@@ -41,6 +41,7 @@ const EXPECTED: Record<ResourceType, Record<Role, string>> = {
   patient_import: { doctor: '', secretary: 'c', admin: '' },
   ai_assist: { doctor: '', secretary: 'vce', admin: 'v' },
   ai_settings: { doctor: '', secretary: 'v', admin: 've' },
+  ai_report: { doctor: '', secretary: '', admin: 'ce' },
 };
 
 const LETTER: Record<Action, string> = {

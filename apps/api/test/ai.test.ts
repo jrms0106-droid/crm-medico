@@ -106,7 +106,17 @@ async function setupClinic() {
     expect(res.status).toBe(200);
     return res;
   };
-  return { as, users, appointmentId: appt.body.id as string, doctorName, enable };
+  return {
+    as,
+    users,
+    appointmentId: appt.body.id as string,
+    patientId: patient.body.id as string,
+    doctorName,
+    enable,
+    unitId: unit.id,
+    scheduleId: schedule.id,
+    professionalId: professional.id,
+  };
 }
 
 describe('interruptores da IA', () => {
@@ -117,6 +127,8 @@ describe('interruptores da IA', () => {
     expect(list.body).toEqual([
       expect.objectContaining({ feature: 'message_draft', enabled: false }),
       expect.objectContaining({ feature: 'request_triage', enabled: false }),
+      expect.objectContaining({ feature: 'schedule_suggestions', enabled: false }),
+      expect.objectContaining({ feature: 'admin_report', enabled: false }),
     ]);
     const res = await c.as.secretary.post('/ai/request-triage', { text: 'Quero remarcar.' });
     expect(res.status).toBe(403);
@@ -335,5 +347,200 @@ describe('revisão humana e registro de uso', () => {
       ).toBe(403);
     }
     expect(model.requests).toHaveLength(0);
+  });
+});
+
+describe('organização da agenda', () => {
+  async function withWaitlist() {
+    const c = await setupClinic();
+    const other = await c.as.secretary.post('/patients', {
+      fullName: 'João Fictício Pereira',
+      birthDate: '1975-01-10',
+      phones: [{ number: '(11) 91234-5678', whatsapp: true }],
+    });
+    expect(other.status).toBe(201);
+    // Mais antigo, qualquer médico, prefere tarde.
+    const anyDoctor = await c.as.secretary.post(`/units/${c.unitId}/waitlist`, {
+      patientId: other.body.id,
+      preference: 'prefere tarde',
+    });
+    expect(anyDoctor.status).toBe(201);
+    t.clock.advance(60_000);
+    // Mais novo, mas pediu este médico.
+    const sameDoctor = await c.as.secretary.post(`/units/${c.unitId}/waitlist`, {
+      patientId: c.patientId,
+      professionalId: c.professionalId,
+    });
+    expect(sameDoctor.status).toBe(201);
+    return { ...c, anyDoctorId: anyDoctor.body.id as string, sameDoctorId: sameDoctor.body.id };
+  }
+
+  it('sugere horários livres reais para a lista de espera e o que confirmar, sem mandar nomes ao modelo', async () => {
+    const c = await withWaitlist();
+    const body = { scheduleId: c.scheduleId, date: '2026-03-03' };
+    const off = await c.as.secretary.post('/ai/schedule-suggestions', body);
+    expect(off.status).toBe(403);
+    expect(errorCode(off.body)).toBe('AI_FEATURE_DISABLED');
+    await c.enable('schedule_suggestions');
+
+    const res = await c.as.secretary.post('/ai/schedule-suggestions', body);
+    expect(res.status).toBe(200);
+    expect(res.body.facts).toEqual({ freeSlots: 19, unconfirmed: 1, waiting: 2 });
+    const [first, second, third] = res.body.suggestions;
+    // Primeiro quem pediu este médico, no primeiro horário (08:00 em São Paulo).
+    expect(first).toMatchObject({
+      kind: 'fill_slot',
+      waitlistEntryId: c.sameDoctorId,
+      startsAt: '2026-03-03T11:00:00.000Z',
+      patientName: 'Maria Fictícia da Silva',
+    });
+    // Quem prefere tarde fica com o primeiro horário da tarde (12:00).
+    expect(second).toMatchObject({
+      kind: 'fill_slot',
+      waitlistEntryId: c.anyDoctorId,
+      startsAt: '2026-03-03T15:00:00.000Z',
+      preference: 'prefere tarde',
+    });
+    expect(third).toMatchObject({ kind: 'confirm', appointmentId: c.appointmentId });
+    expect(res.body.suggestions).toHaveLength(3);
+    expect(res.body.notice).toMatch(/modelo simulado/);
+
+    // O modelo só recebeu códigos e horários.
+    const sent = JSON.stringify(model.requests);
+    for (const secret of ['Maria', 'João', 'Fictício', '529', '98765', '91234', c.patientId]) {
+      expect(sent).not.toContain(secret);
+    }
+    const row = await t.db.aiRequest.findUniqueOrThrow({ where: { id: res.body.requestId } });
+    expect(row.feature).toBe('schedule_suggestions');
+    expect(row.output).not.toMatch(/Maria|João/);
+    // Nada foi marcado.
+    expect(await t.db.appointment.count()).toBe(1);
+  });
+
+  it('código inventado ou repetido descarta a resposta inteira (502)', async () => {
+    const c = await withWaitlist();
+    await c.enable('schedule_suggestions');
+    const body = { scheduleId: c.scheduleId, date: '2026-03-03' };
+    const bad = [
+      { kind: 'fill_slot', slot: 'H99', waitlist: 'E1', reason: 'inventado' },
+      { kind: 'confirm', appointment: 'C7', reason: 'inventado' },
+    ];
+    for (const s of bad) {
+      model.forced = JSON.stringify({ suggestions: [s] });
+      const res = await c.as.secretary.post('/ai/schedule-suggestions', body);
+      expect(res.status).toBe(502);
+      expect(errorCode(res.body)).toBe('AI_INVALID_OUTPUT');
+    }
+    model.forced = JSON.stringify({
+      suggestions: [
+        { kind: 'fill_slot', slot: 'H1', waitlist: 'E1', reason: 'a' },
+        { kind: 'fill_slot', slot: 'H1', waitlist: 'E2', reason: 'b' },
+      ],
+    });
+    expect((await c.as.secretary.post('/ai/schedule-suggestions', body)).status).toBe(502);
+    model.forced = 'Marque a Maria às 9h';
+    expect((await c.as.secretary.post('/ai/schedule-suggestions', body)).status).toBe(502);
+    expect(await t.db.aiRequest.count()).toBe(0);
+  });
+
+  it('nega agenda de outra unidade, agenda inexistente, médico e administrador', async () => {
+    const c = await setupClinic();
+    await c.enable('schedule_suggestions');
+    const body = { scheduleId: c.scheduleId, date: '2026-03-03' };
+    expect((await c.as.otherSecretary.post('/ai/schedule-suggestions', body)).status).toBe(403);
+    expect((await c.as.doctor.post('/ai/schedule-suggestions', body)).status).toBe(403);
+    expect((await c.as.admin.post('/ai/schedule-suggestions', body)).status).toBe(403);
+    const missing = { scheduleId: '00000000-0000-7000-8000-000000000000', date: '2026-03-03' };
+    expect((await c.as.secretary.post('/ai/schedule-suggestions', missing)).status).toBe(404);
+    expect(model.requests).toHaveLength(0);
+  });
+});
+
+describe('relatório assistido', () => {
+  const period = { from: '2026-03-01', to: '2026-03-31' };
+
+  it('o administrador recebe destaques só com os números calculados pelo sistema', async () => {
+    const c = await setupClinic();
+    const off = await c.as.admin.post('/ai/admin-reports', period);
+    expect(off.status).toBe(403);
+    expect(errorCode(off.body)).toBe('AI_FEATURE_DISABLED');
+    await c.enable('admin_report');
+    // O cadastro grava a hora do banco; traz para dentro do período do relógio de teste.
+    await t.db.patient.update({ where: { id: c.patientId }, data: { createdAt: new Date(NOW) } });
+
+    const res = await c.as.admin.post('/ai/admin-reports', period);
+    expect(res.status).toBe(200);
+    expect(res.body.metrics.appointments).toMatchObject({ total: 1, scheduled: 1, noShow: 0 });
+    expect(res.body.metrics.noShowRate).toBeNull();
+    expect(res.body.metrics.newPatients).toBe(1);
+    expect(res.body.highlights[0]).toMatch(/01\/03\/2026 a 31\/03\/2026 foram 1 consultas/);
+    expect(res.body.highlights.join(' ')).toMatch(/R\$\s0,00 cobrados/);
+
+    // Nenhum dado de paciente vai ao modelo.
+    const sent = JSON.stringify(model.requests);
+    for (const secret of ['Maria', '529', '98765', c.patientId]) expect(sent).not.toContain(secret);
+
+    // Número que o sistema não calculou descarta a resposta.
+    model.forced = JSON.stringify({ highlights: ['Foram 57 consultas no período.'] });
+    const invented = await c.as.admin.post('/ai/admin-reports', period);
+    expect(invented.status).toBe(502);
+    expect(errorCode(invented.body)).toBe('AI_INVALID_OUTPUT');
+    model.forced = JSON.stringify({ highlights: ['Foi 1 consulta no período.'] });
+    expect((await c.as.admin.post('/ai/admin-reports', period)).status).toBe(200);
+    expect(await t.db.aiRequest.count()).toBe(2);
+  });
+
+  it('confere período e unidade; secretária e médico não usam', async () => {
+    const c = await setupClinic();
+    await c.enable('admin_report');
+    const long = await c.as.admin.post('/ai/admin-reports', {
+      from: '2026-01-01',
+      to: '2026-06-30',
+    });
+    expect(long.status).toBe(422);
+    const reversed = await c.as.admin.post('/ai/admin-reports', {
+      from: '2026-03-31',
+      to: '2026-03-01',
+    });
+    expect(reversed.status).toBe(422);
+    const missing = await c.as.admin.post('/ai/admin-reports', {
+      ...period,
+      unitId: '00000000-0000-7000-8000-000000000000',
+    });
+    expect(missing.status).toBe(404);
+    const byUnit = await c.as.admin.post('/ai/admin-reports', { ...period, unitId: c.unitId });
+    expect(byUnit.status).toBe(200);
+    expect(byUnit.body.unitId).toBe(c.unitId);
+    expect((await c.as.secretary.post('/ai/admin-reports', period)).status).toBe(403);
+    expect((await c.as.doctor.post('/ai/admin-reports', period)).status).toBe(403);
+  });
+
+  it('o administrador registra a decisão sobre o próprio relatório e vê o texto só dos seus', async () => {
+    const c = await setupClinic();
+    await c.enable('admin_report');
+    await c.enable('request_triage');
+    const report = await c.as.admin.post('/ai/admin-reports', period);
+    await c.as.secretary.post('/ai/request-triage', { text: 'Quero remarcar' });
+    const decided = await c.as.admin.post(`/ai/requests/${report.body.requestId}/decision`, {
+      decision: 'accepted',
+      edited: false,
+    });
+    expect(decided.status).toBe(200);
+    expect(decided.body.decision).toBe('accepted');
+    const all = await c.as.admin.get('/ai/requests');
+    const mine = all.body.find((r: { feature: string }) => r.feature === 'admin_report');
+    const theirs = all.body.find((r: { feature: string }) => r.feature === 'request_triage');
+    expect(mine.output).toMatch(/highlights/);
+    expect(theirs.output).toBeNull();
+    // A secretária não decide sobre o relatório do administrador.
+    const other = await c.as.secretary.post(`/ai/requests/${report.body.requestId}/decision`, {
+      decision: 'discarded',
+    });
+    expect(other.status).toBe(404);
+    // O médico nem chega a procurar.
+    const doctor = await c.as.doctor.post(`/ai/requests/${report.body.requestId}/decision`, {
+      decision: 'discarded',
+    });
+    expect(doctor.status).toBe(403);
   });
 });

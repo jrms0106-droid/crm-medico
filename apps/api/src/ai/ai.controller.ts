@@ -11,16 +11,21 @@ import {
 } from '@nestjs/common';
 import {
   AI_FEATURES,
+  AI_RECEPTION_FEATURES,
+  type AdminReportDto,
   type AiFeature,
   type AiFeatureDto,
   type AiRequestDto,
   ErrorCode,
   type MessageDraftDto,
   type RequestTriageDto,
+  type ScheduleSuggestionsDto,
+  adminReportSchema,
   aiDecisionSchema,
   aiFeatureToggleSchema,
   messageDraftSchema,
   requestTriageSchema,
+  scheduleSuggestionsSchema,
 } from '@crm/shared';
 import { AuditService } from '../audit/audit.service.js';
 import { AuthorizationService } from '../authz/authorization.service.js';
@@ -28,7 +33,9 @@ import { AppError } from '../common/app-error.js';
 import { parseBody } from '../common/validation.js';
 import { Auth } from '../identity/auth.decorators.js';
 import type { AuthContext } from '../identity/session.service.js';
+import { loadSchedule } from '../scheduling/scheduling.controller.js';
 import { SchedulingService } from '../scheduling/scheduling.service.js';
+import { AiInsightsService } from './ai-insights.service.js';
 import { AiService } from './ai.service.js';
 
 /** IA nível 1, administrativa (docs/api/ia-nivel-1.md). Acesso sempre pela política. */
@@ -39,6 +46,7 @@ export class AiController {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(AiService) private readonly ai: AiService,
     @Inject(SchedulingService) private readonly scheduling: SchedulingService,
+    @Inject(AiInsightsService) private readonly insights: AiInsightsService,
   ) {}
 
   @Get('features')
@@ -109,6 +117,42 @@ export class AiController {
     return this.ai.triage(ctx, text);
   }
 
+  @Post('schedule-suggestions')
+  @HttpCode(200)
+  async scheduleSuggestions(
+    @Auth() ctx: AuthContext,
+    @Body() body: unknown,
+  ): Promise<ScheduleSuggestionsDto> {
+    await this.authz.authorize(ctx, 'create', { type: 'ai_assist', id: 'schedule_suggestions' });
+    const input = parseBody(scheduleSuggestionsSchema, body);
+    // A agenda passa pela mesma política das consultas: outra unidade dá 403; outra org, 404.
+    const schedule = await loadSchedule(
+      this.authz,
+      this.scheduling,
+      ctx,
+      'view',
+      input.scheduleId,
+      'appointment',
+    );
+    return this.insights.scheduleSuggestions(ctx, schedule, input.date);
+  }
+
+  @Post('admin-reports')
+  @HttpCode(200)
+  async adminReport(@Auth() ctx: AuthContext, @Body() body: unknown): Promise<AdminReportDto> {
+    await this.authz.authorize(ctx, 'create', { type: 'ai_report' });
+    const input = parseBody(adminReportSchema, body);
+    let timezone: string | null = null;
+    if (input.unitId) {
+      const unit = await this.scheduling.findUnit(ctx.user.organizationId, input.unitId);
+      if (!unit) {
+        return this.authz.notFound(ctx, 'view', 'unit', input.unitId, 'Unidade não encontrada.');
+      }
+      timezone = unit.timezone;
+    }
+    return this.insights.adminReport(ctx, input, timezone);
+  }
+
   @Post('requests/:id/decision')
   @HttpCode(200)
   async decide(
@@ -116,12 +160,17 @@ export class AiController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() body: unknown,
   ): Promise<AiRequestDto> {
-    await this.authz.authorize(ctx, 'edit', { type: 'ai_assist', id });
+    // Primeiro a política: quem não usa nenhuma funcionalidade nem chega a procurar o registro.
+    const canAssist = this.authz.check(ctx, 'edit', { type: 'ai_assist' }).allowed;
+    const gate = canAssist ? 'ai_assist' : 'ai_report';
+    await this.authz.authorize(ctx, 'edit', { type: gate, id });
     const row = await this.ai.find(ctx.user.organizationId, id);
     // Só quem pediu registra a decisão; de outra pessoa ou inexistente é 404.
     if (!row || row.userId !== ctx.user.id) {
-      return this.authz.notFound(ctx, 'edit', 'ai_assist', id, 'Sugestão não encontrada.');
+      return this.authz.notFound(ctx, 'edit', gate, id, 'Sugestão não encontrada.');
     }
+    const type = AI_RECEPTION_FEATURES.includes(row.feature) ? 'ai_assist' : 'ai_report';
+    if (type !== gate) await this.authz.authorize(ctx, 'edit', { type, id });
     return this.ai.decide(ctx, row, parseBody(aiDecisionSchema, body));
   }
 

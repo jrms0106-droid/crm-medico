@@ -1,9 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import {
+  type AdminReportMetrics,
   type AiFeature,
   type MessagePurpose,
+  SCHEDULE_SUGGESTIONS_MAX,
+  type ScheduleSuggestionsOutput,
   type TriageCategory,
   type TriageOutput,
+  formatCents,
+  formatCount,
+  formatPercent,
   normalizeSearch,
 } from '@crm/shared';
 
@@ -133,6 +139,98 @@ export function simulatedDraft(f: Readonly<Record<string, string>>): string {
   }
 }
 
+/** Fatos da agenda que o gateway manda ao modelo: códigos no lugar das pessoas. */
+export interface ScheduleFacts {
+  date: string;
+  slots: { code: string; time: string; period: 'manhã' | 'tarde' | 'noite' }[];
+  waitlist: {
+    code: string;
+    sameDoctor: boolean;
+    waitingDays: number;
+    preference: string | null;
+  }[];
+  unconfirmed: { code: string; time: string }[];
+}
+
+const PERIOD_WORDS: Record<ScheduleFacts['slots'][number]['period'], string> = {
+  manhã: 'manha',
+  tarde: 'tarde',
+  noite: 'noite',
+};
+
+/** A preferência escrita na lista de espera aceita o período do horário? */
+function prefers(preference: string | null, period: ScheduleFacts['slots'][number]['period']) {
+  const p = normalizeSearch(preference ?? '');
+  const named = Object.values(PERIOD_WORDS).filter((w) => p.includes(w));
+  return named.length === 0 || named.includes(PERIOD_WORDS[period]);
+}
+
+/**
+ * Sugestões por regra fixa: cada horário livre vai para quem espera há mais tempo, primeiro quem
+ * pediu este médico, respeitando o período preferido; depois, as consultas a confirmar.
+ */
+export function simulatedSchedule(facts: ScheduleFacts): ScheduleSuggestionsOutput {
+  const queue = [...facts.waitlist].sort(
+    (a, b) => Number(b.sameDoctor) - Number(a.sameDoctor) || b.waitingDays - a.waitingDays,
+  );
+  const used = new Set<string>();
+  const suggestions: ScheduleSuggestionsOutput['suggestions'] = [];
+  for (const slot of facts.slots) {
+    const entry = queue.find((e) => !used.has(e.code) && prefers(e.preference, slot.period));
+    if (!entry) continue;
+    used.add(entry.code);
+    const who = entry.sameDoctor ? 'pediu este médico' : 'aceita qualquer médico';
+    const pref = entry.preference ? ` e prefere: ${entry.preference}` : '';
+    suggestions.push({
+      kind: 'fill_slot',
+      slot: slot.code,
+      waitlist: entry.code,
+      reason:
+        `Horário livre (${slot.period}); a pessoa ${who}, espera há ${entry.waitingDays} dias${pref}`.slice(
+          0,
+          200,
+        ),
+    });
+  }
+  for (const a of facts.unconfirmed) {
+    suggestions.push({
+      kind: 'confirm',
+      appointment: a.code,
+      reason: 'Consulta ainda não confirmada: vale pedir a confirmação.',
+    });
+  }
+  return { suggestions: suggestions.slice(0, SCHEDULE_SUGGESTIONS_MAX) };
+}
+
+/** Destaques por modelo de texto, usando só os números recebidos. */
+export function simulatedReport(
+  period: { from: string; to: string },
+  m: AdminReportMetrics,
+): string[] {
+  const a = m.appointments;
+  const n = formatCount;
+  const out = [
+    `De ${period.from} a ${period.to} foram ${n(a.total)} consultas na agenda: ` +
+      `${n(a.arrived)} com o paciente presente, ${n(a.noShow)} faltas e ${n(a.cancelled)} cancelamentos.`,
+  ];
+  if (m.noShowRate !== null) {
+    out.push(
+      `A taxa de faltas foi de ${formatPercent(m.noShowRate)}%.` +
+        (m.noShowRate >= 15 ? ' Vale reforçar a confirmação na véspera.' : ''),
+    );
+  }
+  if (a.scheduled > 0) {
+    out.push(`${n(a.scheduled)} consultas ainda estão sem confirmação.`);
+  }
+  out.push(
+    `Lembretes: ${n(m.reminders.sent)} enviados e ${n(m.reminders.failed)} com falha.`,
+    `Entraram ${n(m.newPatients)} pacientes novos e há ${n(m.waiting)} pessoas na lista de espera.`,
+    `Financeiro particular: ${formatCents(m.billing.netCents)} cobrados, ` +
+      `${formatCents(m.billing.receivedCents)} recebidos e ${formatCents(m.billing.openCents)} em aberto.`,
+  );
+  return out;
+}
+
 /**
  * Modelo simulado: regras fixas dentro da API, sem enviar nada para fora. Único adaptador até
  * haver um fornecedor autorizado (docs/api/ia-nivel-1.md).
@@ -144,6 +242,15 @@ export class SimulatedModel extends LanguageModel {
   complete(request: ModelRequest): Promise<string> {
     if (request.feature === 'request_triage') {
       return Promise.resolve(JSON.stringify(simulatedTriage(request.fields['message'] ?? '')));
+    }
+    if (request.feature === 'schedule_suggestions') {
+      const facts = JSON.parse(request.fields['facts'] ?? '{}') as ScheduleFacts;
+      return Promise.resolve(JSON.stringify(simulatedSchedule(facts)));
+    }
+    if (request.feature === 'admin_report') {
+      const metrics = JSON.parse(request.fields['metrics'] ?? '{}') as AdminReportMetrics;
+      const period = { from: request.fields['from'] ?? '', to: request.fields['to'] ?? '' };
+      return Promise.resolve(JSON.stringify({ highlights: simulatedReport(period, metrics) }));
     }
     return Promise.resolve(simulatedDraft(request.fields));
   }
