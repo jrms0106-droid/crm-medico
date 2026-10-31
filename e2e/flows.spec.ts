@@ -142,6 +142,20 @@ test.describe.serial('fluxos por perfil', () => {
 
     await page.getByRole('button', { name: 'Encerrar atendimento' }).click();
     await expect(page.getByText('Vínculo: Atendimento encerrado')).toBeVisible();
+
+    // Cópia pedida pelo paciente: a senha acabou de ser confirmada na assinatura, então não pede
+    // de novo; o arquivo traz o registro e a receita assinados.
+    const downloading = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Cópia do prontuário' }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toMatch(/^copia-do-prontuario-\d{4}-\d{2}-\d{2}\.json$/);
+    const copy = JSON.parse(await readFile(await download.path(), 'utf8')) as {
+      records: { status: string }[];
+      documents: { kind: string }[];
+    };
+    expect(copy.records.map((r) => r.status)).toEqual(['signed']);
+    expect(copy.documents.map((d) => d.kind)).toEqual(['prescription']);
+    await expect(page.getByRole('status')).toContainText('Cópia gerada com 1 registro(s)');
   });
 
   test('administrador verifica a trilha de auditoria', async ({ page }) => {

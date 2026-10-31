@@ -13,6 +13,7 @@ import {
 import { ApiError, api, query } from '../api';
 import { ReauthDialog } from '../reauth';
 import { DocumentsPanel } from './documents';
+import { ClinicalCopyButton } from './privacy';
 import {
   Alert,
   Badge,
@@ -107,6 +108,9 @@ export function RecordPage({
             <button type="button" onClick={() => void create()} disabled={action.busy}>
               Novo registro
             </button>
+          )}
+          {access.data?.state && ['started', 'follow_up', 'closed'].includes(access.data.state) && (
+            <ClinicalCopyButton session={session} patientId={patientId} />
           )}
           {encounterId && access.data?.state === 'started' && (
             <button type="button" className="secondary" onClick={() => void closeEncounter()}>

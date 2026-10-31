@@ -3,6 +3,7 @@ import {
   ACCESS_REPORT_ACTION_LABELS,
   ACCESS_REPORT_RESOURCE_LABELS,
   type AccessReportDto,
+  type ClinicalCopyDto,
   type PatientDto,
   type PatientExportDto,
   type PatientSummaryDto,
@@ -380,13 +381,7 @@ function ExportButton({ session, patient }: { session: SessionInfo; patient: Pat
     setDone(false);
     void action.run(async () => {
       const data = await guarded(() => api.get<PatientExportDto>(`/patients/${patient.id}/export`));
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `dados-do-paciente-${todayLocal()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadJson(data, `dados-do-paciente-${todayLocal()}.json`);
       setDone(true);
     });
   };
@@ -495,5 +490,61 @@ function AccessReport({ patientId }: { patientId: string }) {
         </>
       )}
     </section>
+  );
+}
+
+/** Salva a resposta da API como arquivo JSON no aparelho de quem pediu. */
+function downloadJson(data: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * No prontuário, para o médico com vínculo: a cópia pedida pelo paciente, com os registros e
+ * documentos assinados que ele pode ler. Exige a senha (e o código) de novo.
+ */
+export function ClinicalCopyButton({
+  session,
+  patientId,
+}: {
+  session: SessionInfo;
+  patientId: string;
+}) {
+  const { guarded, dialog } = useReauth(
+    session,
+    'A cópia traz o prontuário do paciente, então gerar exige a senha de novo.',
+  );
+  const action = useAction();
+  const [result, setResult] = useState<ClinicalCopyDto | null>(null);
+  const generate = () => {
+    setResult(null);
+    void action.run(async () => {
+      const data = await guarded(() =>
+        api.get<ClinicalCopyDto>(`/patients/${patientId}/clinical-copy`),
+      );
+      downloadJson(data, `copia-do-prontuario-${todayLocal()}.json`);
+      setResult(data);
+    });
+  };
+  return (
+    <>
+      <button type="button" className="secondary" onClick={generate} disabled={action.busy}>
+        Cópia do prontuário
+      </button>
+      {dialog}
+      <Alert message={action.error} />
+      {result && (
+        <p role="status" className="muted">
+          Cópia gerada com {result.records.length} registro(s) e {result.documents.length}{' '}
+          documento(s) assinados. Entregue só ao paciente ou ao representante legal.
+          {result.withheld.reason && ` ${result.withheld.reason}`}
+        </p>
+      )}
+    </>
   );
 }

@@ -50,20 +50,42 @@ auditoria.
 - cobranças e pagamentos;
 - pedidos do titular já registrados.
 
-A parte clínica (prontuário e documentos) depende de quem pode gerá-la, pergunta feita ao
-responsável. Até a resposta, o arquivo traz o aviso de que a cópia do prontuário é pedida ao
-médico.
+A parte clínica não vai nesse arquivo: o aviso diz que a cópia do prontuário é gerada pelo médico
+que acompanha o paciente, em arquivo separado.
+
+## Cópia do prontuário
+
+Decisão (2026-10-31, opção recomendada enquanto o responsável não escolhe outra): **quem gera é o
+médico com vínculo valendo** com o paciente, sem criar perfil novo com acesso a todo o
+prontuário ([ADR 0022](../adr/0022-copia-do-prontuario-pelo-medico-com-vinculo.md)).
+
+`GET /patients/:id/clinical-copy`:
+
+- só médico, com vínculo `started`, `follow_up` ou `closed`. Agendamento, vínculo expirado e
+  acesso emergencial **não** geram a cópia, nem para os próprios registros;
+- exige **reautenticação recente** e fica na auditoria como `export` de `clinical_record`;
+- devolve um arquivo JSON (`crm-medico/copia-do-prontuario`, versão 1) com os **registros
+  assinados** (inclusive os retificados, com o vínculo para a retificação) e os **documentos
+  assinados ou cancelados**, cada um com o conteúdo, o autor, a data, o hash e a verificação de
+  integridade;
+- leva só o que esse médico lê **sem justificativa**: registros sensíveis de outros autores ficam
+  de fora, e o arquivo diz quantos ficaram de fora e que devem ser pedidos ao autor ou ao diretor
+  técnico. Rascunhos e registros não assinados nunca entram.
+
+A secretária registra o pedido e responde quando a cópia for entregue; ela não gera nem vê a
+cópia.
 
 ## Quem pode o quê
 
 Recurso `patient_rights`, sem escopo de unidade (o paciente é da organização):
 
-| Ação                                          | Médico | Secretária | Administrador |
-| --------------------------------------------- | ------ | ---------- | ------------- |
-| Ver pedidos e o relatório de acessos (`view`) | —      | sim        | —             |
-| Registrar pedido (`create`)                   | —      | sim        | —             |
-| Concluir ou negar pedido (`edit`)             | —      | sim        | —             |
-| Exportar os dados do paciente (`export`)      | —      | sim        | —             |
+| Ação                                          | Médico              | Secretária | Administrador |
+| --------------------------------------------- | ------------------- | ---------- | ------------- |
+| Ver pedidos e o relatório de acessos (`view`) | —                   | sim        | —             |
+| Registrar pedido (`create`)                   | —                   | sim        | —             |
+| Concluir ou negar pedido (`edit`)             | —                   | sim        | —             |
+| Exportar os dados do paciente (`export`)      | —                   | sim        | —             |
+| Gerar a cópia do prontuário                   | com vínculo valendo | —          | —             |
 
 - O administrador não vê pacientes, então não atende pedidos; ele continua vendo a auditoria.
 - A secretária já vê cadastro, agenda e financeiro; o relatório de acessos não mostra conteúdo
@@ -78,5 +100,6 @@ Recurso `patient_rights`, sem escopo de unidade (o paciente é da organização)
 | `POST /privacy/requests/:id/resolve` | conclui ou nega `{ status, resolution }`      |
 | `GET /patients/:id/access-report`    | relatório de acessos (`from`, `to` opcionais) |
 | `GET /patients/:id/export`           | arquivo JSON com os dados do paciente         |
+| `GET /patients/:id/clinical-copy`    | cópia do prontuário (médico com vínculo)      |
 
 Toda rota tem teste de acesso permitido e negado (`apps/api/test/privacy.test.ts`).

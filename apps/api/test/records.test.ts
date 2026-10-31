@@ -520,3 +520,91 @@ describe('sensibilidade, arquivamento e linha do tempo', () => {
     expect(all.body.map((r: { id: string }) => r.id)).toEqual([signed.id, draft.body.id]);
   });
 });
+
+describe('cópia do prontuário pedida pelo paciente', () => {
+  const PRESCRIPTION = {
+    kind: 'prescription',
+    content: {
+      items: [
+        {
+          medication: 'Dipirona 500 mg (dado fictício)',
+          instructions: 'Tomar 1 comprimido se dor.',
+          quantity: '1 caixa',
+        },
+      ],
+    },
+  };
+
+  it('o médico com vínculo gera a cópia do que pode ler, sem sensíveis de outros nem rascunhos', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'otherDoctor', '10:00');
+    const othersNormal = await signedRecord(c, 'otherDoctor');
+    const othersSensitive = await signedRecord(c, 'otherDoctor', { sensitivity: 'elevated' });
+    await startEncounter(c, 'doctor', '09:00');
+    const own = await signedRecord(c, 'doctor', { sensitivity: 'elevated' });
+    const draft = await c.as.doctor.post(`/patients/${c.patientId}/records`, { content: CONTENT });
+    expect(draft.status).toBe(201);
+    const doc = await c.as.doctor.post(`/patients/${c.patientId}/documents`, PRESCRIPTION);
+    expect(doc.status).toBe(201);
+    const signedDoc = await c.as.doctor.post(`/documents/${doc.body.id}/sign`, {
+      version: doc.body.version,
+    });
+    expect(signedDoc.status).toBe(200);
+
+    await c.as.doctor.reauth(c.doctor, t.clock);
+    const res = await c.as.doctor.get(`/patients/${c.patientId}/clinical-copy`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toMatch(
+      /^attachment; filename="copia-do-prontuario-\d{4}-\d{2}-\d{2}\.json"$/,
+    );
+    expect(res.body).toMatchObject({
+      format: 'crm-medico/copia-do-prontuario',
+      version: 1,
+      generatedBy: { id: c.doctor.id },
+      organization: { name: 'Clínica Fictícia' },
+      patient: { id: c.patientId },
+      withheld: { records: 1, documents: 0 },
+    });
+    const ids = (res.body.records as { id: string }[]).map((r) => r.id).sort();
+    expect(ids).toEqual([othersNormal.id, own.id].sort());
+    expect(ids).not.toContain(othersSensitive.id);
+    expect(ids).not.toContain(draft.body.id);
+    expect(res.body.records[0]).toMatchObject({ status: 'signed', integrity: 'valid' });
+    expect((res.body.documents as { id: string }[]).map((d) => d.id)).toEqual([doc.body.id]);
+    expect(res.body.withheld.reason).toMatch(/sensíveis de outros profissionais/);
+
+    const event = await t.db.auditEvent.findFirstOrThrow({
+      where: { action: 'export', resourceType: 'clinical_record', patientId: c.patientId },
+    });
+    expect(event).toMatchObject({ outcome: 'allowed', actorUserId: c.doctor.id });
+  });
+
+  it('exige reautenticação recente', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    await signedRecord(c);
+    t.clock.advance(10 * 60_000);
+    const res = await c.as.doctor.get(`/patients/${c.patientId}/clinical-copy`);
+    expect(res.status).toBe(403);
+    expect(errorCode(res.body)).toBe('REAUTH_REQUIRED');
+  });
+
+  it('nega a secretária, o administrador e o médico sem vínculo; paciente inexistente é 404', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    await signedRecord(c);
+    await c.as.otherDoctor.reauth(c.otherDoctor, t.clock);
+    const denied = await c.as.otherDoctor.get(`/patients/${c.patientId}/clinical-copy`);
+    expect(denied.status).toBe(403);
+    expect(errorCode(denied.body)).toBe('FORBIDDEN');
+    for (const who of ['secretary', 'admin'] as const) {
+      const res = await c.as[who].get(`/patients/${c.patientId}/clinical-copy`);
+      expect(res.status, who).toBe(403);
+    }
+    await c.as.doctor.reauth(c.doctor, t.clock);
+    const missing = await c.as.doctor.get(
+      '/patients/00000000-0000-4000-8000-000000000000/clinical-copy',
+    );
+    expect(missing.status).toBe(404);
+  });
+});

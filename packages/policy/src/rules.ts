@@ -77,10 +77,11 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
     unitScope: 'none',
     grants: { doctor: ['view'] },
   },
+  // Gerar a cópia do prontuário para o paciente é `export` (docs/api/direitos-do-titular.md).
   clinical_record: {
     dataClass: 'clinical',
     unitScope: 'none',
-    grants: { doctor: ['view', 'create', 'edit', 'correct', 'sign'] },
+    grants: { doctor: ['view', 'create', 'edit', 'correct', 'sign', 'export'] },
   },
   medical_document: {
     dataClass: 'clinical',
@@ -139,6 +140,8 @@ type CareGrants = Partial<Record<ClinicalType, readonly Action[]>>;
 const RECORD_WORK: readonly Action[] = ['view', 'create', 'edit', 'correct', 'sign'];
 /** Documento médico: cancelar o assinado conta como `correct`; gerar o PDF, como `export`. */
 const DOCUMENT_WORK: readonly Action[] = [...RECORD_WORK, 'export'];
+/** Com o vínculo valendo, o médico também gera a cópia do prontuário pedida pelo paciente. */
+const RECORD_WITH_COPY: readonly Action[] = [...RECORD_WORK, 'export'];
 
 /**
  * O que cada estado do vínculo libera (docs/api/atendimento-e-vinculo.md). Proposta técnica,
@@ -149,19 +152,19 @@ export const CARE_MATRIX: Readonly<Record<CareRelationshipState, CareGrants>> = 
   confirmed: { clinical_summary: ['view'], encounter: ['create'] },
   started: {
     clinical_summary: ['view'],
-    clinical_record: RECORD_WORK,
+    clinical_record: RECORD_WITH_COPY,
     medical_document: DOCUMENT_WORK,
     encounter: ['view', 'edit'],
   },
   follow_up: {
     clinical_summary: ['view'],
-    clinical_record: RECORD_WORK,
+    clinical_record: RECORD_WITH_COPY,
     medical_document: DOCUMENT_WORK,
     encounter: ['view'],
   },
   closed: {
     clinical_summary: ['view'],
-    clinical_record: ['view', 'edit', 'correct', 'sign'],
+    clinical_record: ['view', 'edit', 'correct', 'sign', 'export'],
     medical_document: ['view', 'edit', 'correct', 'sign', 'export'],
     encounter: ['view'],
   },

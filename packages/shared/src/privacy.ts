@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { ChargeDto } from './billing.js';
+import type { DocumentDto } from './documents.js';
 import type { PatientDto } from './patients.js';
+import type { RecordDto } from './records.js';
 
 /** Direitos do titular dos dados (docs/api/direitos-do-titular.md). */
 export const SUBJECT_REQUEST_KINDS = [
@@ -144,4 +146,21 @@ export interface PatientExportDto {
   charges: ChargeDto[];
   subjectRequests: SubjectRequestDto[];
   clinical: { included: false; reason: string };
+}
+
+/**
+ * Cópia do prontuário pedida pelo paciente, gerada pelo médico com vínculo
+ * (docs/api/direitos-do-titular.md). Só traz o que esse médico pode ler sem justificativa.
+ */
+export interface ClinicalCopyDto {
+  format: 'crm-medico/copia-do-prontuario';
+  version: 1;
+  generatedAt: string;
+  generatedBy: { id: string; name: string };
+  organization: { name: string };
+  patient: { id: string; name: string; birthDate: string };
+  notice: string;
+  records: RecordDto[];
+  documents: DocumentDto[];
+  withheld: { records: number; documents: number; reason: string | null };
 }

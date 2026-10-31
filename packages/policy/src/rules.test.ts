@@ -28,7 +28,7 @@ const EXPECTED: Record<ResourceType, Record<Role, string>> = {
   appointment: { doctor: '', secretary: 'vce', admin: '' },
   encounter: { doctor: 've', secretary: '', admin: '' },
   clinical_summary: { doctor: 'v', secretary: '', admin: '' },
-  clinical_record: { doctor: 'vcers', secretary: '', admin: '' },
+  clinical_record: { doctor: 'vcersx', secretary: '', admin: '' },
   medical_document: { doctor: 'vcersx', secretary: '', admin: '' },
   emergency_access: { doctor: 'c', secretary: '', admin: '' },
   emergency_review: { doctor: '', secretary: '', admin: 've' },
@@ -90,8 +90,8 @@ describe('matriz papel × recurso × ação (mesma organização, mesma unidade,
 });
 
 describe('regras de atributo', () => {
-  it('ninguém compartilha nada; exportar, só o PDF de documento e os dados a pedido do titular', () => {
-    const exportable: string[] = ['medical_document', 'patient_rights'];
+  it('ninguém compartilha nada; exportar, só o PDF de documento, a cópia do prontuário e os dados a pedido do titular', () => {
+    const exportable: string[] = ['clinical_record', 'medical_document', 'patient_rights'];
     for (const type of RESOURCE_TYPES) {
       for (const action of ['export', 'share'] as const) {
         const allowed = action === 'export' && exportable.includes(type);
@@ -238,6 +238,25 @@ describe('o que o médico vê e faz em cada estado do vínculo', () => {
       }
     });
   }
+
+  it('cópia do prontuário: só com o vínculo valendo, nunca pelo acesso emergencial', () => {
+    const copy = (context: AccessRequest['context']) =>
+      decide(clinical('export', 'clinical_record', context), RULES).allowed;
+    for (const state of ['started', 'follow_up', 'closed'] as const) {
+      expect(copy({ careRelationship: state }), state).toBe(true);
+    }
+    for (const state of ['scheduled', 'confirmed', 'expired'] as const) {
+      expect(copy({ careRelationship: state }), state).toBe(false);
+    }
+    expect(copy({ emergencyAccess: true })).toBe(false);
+    expect(copy({})).toBe(false);
+    // Nem o autor gera a cópia depois que o vínculo expira.
+    const own = { authorUserId: 'u1' };
+    expect(
+      decide(clinical('export', 'clinical_record', { careRelationship: 'expired' }, own), RULES)
+        .allowed,
+    ).toBe(false);
+  });
 
   it('agendamento não libera o histórico completo', () => {
     for (const state of ['scheduled', 'confirmed'] as const) {

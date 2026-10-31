@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
 } from '@nestjs/common';
 import type { AccessContext, Action } from '@crm/policy';
 import {
@@ -32,6 +33,7 @@ import { CareService } from '../care/care.service.js';
 import type { ClinicalRecord } from '../generated/prisma/client.js';
 import { Auth } from '../identity/auth.decorators.js';
 import type { AuthContext } from '../identity/session.service.js';
+import { ClinicalCopyService } from './clinical-copy.service.js';
 import { type RecordEventDto, RecordsService } from './records.service.js';
 
 const uuid = new ParseUUIDPipe();
@@ -53,6 +55,7 @@ export class RecordsController {
     @Inject(AuditService) private readonly audit: AuditService,
     @Inject(CareService) private readonly care: CareService,
     @Inject(RecordsService) private readonly records: RecordsService,
+    @Inject(ClinicalCopyService) private readonly copies: ClinicalCopyService,
   ) {}
 
   @Post('patients/:id/records')
@@ -110,6 +113,32 @@ export class RecordsController {
       return [];
     });
     return this.records.summaries(visible);
+  }
+
+  /**
+   * Cópia do prontuário pedida pelo paciente (docs/api/direitos-do-titular.md): só o médico com
+   * vínculo valendo, com reautenticação recente. Arquivo JSON para entregar ao paciente.
+   */
+  @Get('patients/:id/clinical-copy')
+  async clinicalCopy(
+    @Auth() ctx: AuthContext,
+    @Param('id', uuid) patientId: string,
+  ): Promise<StreamableFile> {
+    await this.requirePatient(ctx, 'export', patientId);
+    const context = await this.context(ctx, patientId);
+    await this.authz.authorize(
+      ctx,
+      'export',
+      { type: 'clinical_record', patientId },
+      { ...context, emergencyAccess: false },
+    );
+    this.authz.requireRecentReauth(ctx);
+    const data = await this.copies.build(ctx, patientId, context);
+    const day = data.generatedAt.slice(0, 10);
+    return new StreamableFile(Buffer.from(JSON.stringify(data, null, 2), 'utf8'), {
+      type: 'application/json; charset=utf-8',
+      disposition: `attachment; filename="copia-do-prontuario-${day}.json"`,
+    });
   }
 
   @Get('records/:id')
