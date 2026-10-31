@@ -473,3 +473,8 @@ fieldset {
   margin: 0;
   font-size: 1rem;
 }
+
+ul.plain {
+  margin: 0;
+  padding-left: 1.1rem;
+}

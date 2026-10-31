@@ -133,6 +133,13 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
     unitScope: 'none',
     grants: { secretary: ['view', 'edit'] },
   },
+  // Importação de pacientes por planilha (docs/api/integracoes.md): só a recepção. Conferir e
+  // importar são `create`; cada paciente criado ainda passa pelas regras do cadastro.
+  patient_import: {
+    dataClass: 'personal',
+    unitScope: 'none',
+    grants: { secretary: ['create'] },
+  },
 };
 
 export function dataClassOf(type: ResourceType): DataClass {

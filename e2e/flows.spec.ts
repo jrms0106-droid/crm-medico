@@ -63,6 +63,7 @@ test.describe.serial('fluxos por perfil', () => {
       'Financeiro',
       'Lembretes',
       'Direitos do paciente',
+      'Importar pacientes',
       'Profissionais',
     ]);
     await page.goto('/#/auditoria');
@@ -73,7 +74,7 @@ test.describe.serial('fluxos por perfil', () => {
     page,
   }) => {
     await login(page, 'secretary');
-    await menu(page).getByRole('link', { name: 'Pacientes' }).click();
+    await menu(page).getByRole('link', { name: 'Pacientes', exact: true }).click();
     await page.getByRole('button', { name: 'Novo paciente' }).click();
     await page.getByLabel('Nome completo').fill(PATIENT);
     await page.getByLabel('Data de nascimento').fill('1985-04-12');
@@ -158,6 +159,23 @@ test.describe.serial('fluxos por perfil', () => {
     expect(copy.records.map((r) => r.status)).toEqual(['signed']);
     expect(copy.documents.map((d) => d.kind)).toEqual(['prescription']);
     await expect(page.getByRole('status')).toContainText('Cópia gerada com 1 registro(s)');
+
+    // A mesma cópia no padrão FHIR (docs/api/integracoes.md).
+    const downloadingFhir = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Cópia no padrão FHIR' }).click();
+    const fhirFile = await downloadingFhir;
+    expect(fhirFile.suggestedFilename()).toMatch(
+      /^copia-do-prontuario-fhir-\d{4}-\d{2}-\d{2}\.json$/,
+    );
+    const bundle = JSON.parse(await readFile(await fhirFile.path(), 'utf8')) as {
+      resourceType: string;
+      entry: { resource: { resourceType: string } }[];
+    };
+    expect(bundle.resourceType).toBe('Bundle');
+    const types = bundle.entry.map((e) => e.resource.resourceType);
+    expect(types.filter((x) => x === 'Composition')).toHaveLength(1);
+    expect(types.filter((x) => x === 'DocumentReference')).toHaveLength(1);
+    await expect(page.getByRole('status')).toContainText('Cópia no padrão FHIR gerada');
   });
 
   test('administrador verifica a trilha de auditoria', async ({ page }) => {
@@ -289,7 +307,7 @@ test.describe.serial('fluxos por perfil', () => {
     page,
   }) => {
     await login(page, 'secretary');
-    await menu(page).getByRole('link', { name: 'Pacientes' }).click();
+    await menu(page).getByRole('link', { name: 'Pacientes', exact: true }).click();
     await page.getByLabel('Buscar por nome, CPF ou telefone').fill(PATIENT);
     await page.getByRole('button', { name: 'Buscar' }).click();
     await page.getByRole('link', { name: PATIENT }).click();
@@ -348,7 +366,7 @@ test.describe.serial('fluxos por perfil', () => {
 
   test('lembretes: secretária registra a autorização do paciente e vê a fila', async ({ page }) => {
     await login(page, 'secretary');
-    await menu(page).getByRole('link', { name: 'Pacientes' }).click();
+    await menu(page).getByRole('link', { name: 'Pacientes', exact: true }).click();
     await page.getByLabel('Buscar por nome, CPF ou telefone').fill(PATIENT);
     await page.getByRole('button', { name: 'Buscar' }).click();
     await page.getByRole('link', { name: PATIENT }).click();
@@ -367,5 +385,31 @@ test.describe.serial('fluxos por perfil', () => {
     await menu(page).getByRole('link', { name: 'Lembretes' }).click();
     await expect(page.getByRole('heading', { name: 'Lembretes' })).toBeVisible();
     await expect(page.getByText(/Envio simulado/)).toBeVisible();
+  });
+
+  test('importação: secretária confere a planilha e importa só a linha boa', async ({ page }) => {
+    const name = `Importada Fictícia ${Date.now()}`;
+    // Telefone aleatório para não parecer duplicidade de execuções anteriores.
+    const phone = `119${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`;
+    const csv =
+      'nome;data_nascimento;telefone;telefone_whatsapp\n' +
+      `${name};07/08/1977;${phone};sim\n` +
+      'Sem Data Fictícia;;11900000000;não\n';
+    await login(page, 'secretary');
+    await menu(page).getByRole('link', { name: 'Importar pacientes' }).click();
+    await page.getByLabel('Planilha (CSV)').setInputFiles({
+      name: 'pacientes.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(csv, 'utf8'),
+    });
+    await page.getByRole('button', { name: 'Conferir planilha' }).click();
+    const lines = page.getByRole('table', { name: 'Linhas da planilha' });
+    await expect(page.getByRole('status')).toContainText('1 linha(s) pronta(s) para entrar');
+    await expect(lines).toContainText('data_nascimento: use DD/MM/AAAA.');
+    await snap(page, '13-importacao-conferida');
+    await page.getByRole('button', { name: 'Importar 1 paciente(s)' }).click();
+    await expect(page.getByRole('status')).toContainText('1 paciente(s) cadastrado(s)');
+    await lines.getByRole('link', { name }).click();
+    await expect(page.getByRole('heading', { name })).toBeVisible();
   });
 });

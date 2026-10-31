@@ -93,13 +93,14 @@ Recurso `patient_rights`, sem escopo de unidade (o paciente é da organização)
 
 ## Endpoints (`/api/v1`, sessão `active`)
 
-| Método e rota                        | O que faz                                     |
-| ------------------------------------ | --------------------------------------------- |
-| `GET /privacy/requests`              | lista (`status`, `patientId` opcionais)       |
-| `POST /privacy/requests`             | registra `{ patientId, kind, details? }`      |
-| `POST /privacy/requests/:id/resolve` | conclui ou nega `{ status, resolution }`      |
-| `GET /patients/:id/access-report`    | relatório de acessos (`from`, `to` opcionais) |
-| `GET /patients/:id/export`           | arquivo JSON com os dados do paciente         |
-| `GET /patients/:id/clinical-copy`    | cópia do prontuário (médico com vínculo)      |
+| Método e rota                          | O que faz                                                          |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| `GET /privacy/requests`                | lista (`status`, `patientId` opcionais)                            |
+| `POST /privacy/requests`               | registra `{ patientId, kind, details? }`                           |
+| `POST /privacy/requests/:id/resolve`   | conclui ou nega `{ status, resolution }`                           |
+| `GET /patients/:id/access-report`      | relatório de acessos (`from`, `to` opcionais)                      |
+| `GET /patients/:id/export`             | arquivo JSON com os dados do paciente                              |
+| `GET /patients/:id/clinical-copy`      | cópia do prontuário (médico com vínculo)                           |
+| `GET /patients/:id/clinical-copy/fhir` | a mesma cópia no padrão FHIR R4 ([integracoes.md](integracoes.md)) |
 
 Toda rota tem teste de acesso permitido e negado (`apps/api/test/privacy.test.ts`).

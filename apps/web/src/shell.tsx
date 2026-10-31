@@ -3,6 +3,7 @@ import { AuditPage } from './pages/admin';
 import { AgendaPage } from './pages/agenda';
 import { BillingPage } from './pages/billing';
 import { HomePage } from './pages/home';
+import { ImportPage } from './pages/import';
 import { PatientPage, PatientsPage } from './pages/patients';
 import { PrivacyPage } from './pages/privacy';
 import { RemindersPage } from './pages/crm';
@@ -28,6 +29,7 @@ export const NAV: NavItem[] = [
   { path: 'financeiro', label: 'Financeiro', roles: ['admin', 'secretary'] },
   { path: 'lembretes', label: 'Lembretes', roles: ['secretary'] },
   { path: 'direitos', label: 'Direitos do paciente', roles: ['secretary'] },
+  { path: 'importar', label: 'Importar pacientes', roles: ['secretary'] },
   { path: 'profissionais', label: 'Profissionais', roles: ['admin', 'doctor', 'secretary'] },
   { path: 'auditoria', label: 'Auditoria', roles: ['admin'] },
   { path: 'configuracoes', label: 'Configurações', roles: ['admin'] },
@@ -107,6 +109,8 @@ function Section({
       return <RemindersPage />;
     case 'direitos':
       return <PrivacyPage />;
+    case 'importar':
+      return <ImportPage />;
     case 'profissionais':
       return <ProfessionalsPage />;
     case 'auditoria':

@@ -45,6 +45,7 @@ export const RESOURCE_TYPES = [
   'financial_report',
   'patient_rights',
   'communication',
+  'patient_import',
 ] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 

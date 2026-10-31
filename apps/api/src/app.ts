@@ -20,6 +20,8 @@ export async function createApp(
       logger: config.NODE_ENV === 'test' ? false : ['error', 'warn', 'log'],
     },
   );
+  // A importação de pacientes manda a planilha (até 256 KB) no JSON; o padrão do Express é 100 KB.
+  app.useBodyParser('json', { limit: '1mb' });
   app.use(requestIdMiddleware);
   app.use(helmet());
   app.use(cookieParser());

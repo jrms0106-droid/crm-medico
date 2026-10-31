@@ -33,6 +33,7 @@ import { CareService } from '../care/care.service.js';
 import type { ClinicalRecord } from '../generated/prisma/client.js';
 import { Auth } from '../identity/auth.decorators.js';
 import type { AuthContext } from '../identity/session.service.js';
+import { FhirCopyService } from '../integrations/fhir-copy.service.js';
 import { ClinicalCopyService } from './clinical-copy.service.js';
 import { type RecordEventDto, RecordsService } from './records.service.js';
 
@@ -56,6 +57,7 @@ export class RecordsController {
     @Inject(CareService) private readonly care: CareService,
     @Inject(RecordsService) private readonly records: RecordsService,
     @Inject(ClinicalCopyService) private readonly copies: ClinicalCopyService,
+    @Inject(FhirCopyService) private readonly fhirCopies: FhirCopyService,
   ) {}
 
   @Post('patients/:id/records')
@@ -138,6 +140,29 @@ export class RecordsController {
     return new StreamableFile(Buffer.from(JSON.stringify(data, null, 2), 'utf8'), {
       type: 'application/json; charset=utf-8',
       disposition: `attachment; filename="copia-do-prontuario-${day}.json"`,
+    });
+  }
+
+  /** A mesma cópia, no padrão FHIR R4 (docs/api/integracoes.md). Mesmas regras de acesso. */
+  @Get('patients/:id/clinical-copy/fhir')
+  async clinicalCopyFhir(
+    @Auth() ctx: AuthContext,
+    @Param('id', uuid) patientId: string,
+  ): Promise<StreamableFile> {
+    await this.requirePatient(ctx, 'export', patientId);
+    const context = await this.context(ctx, patientId);
+    await this.authz.authorize(
+      ctx,
+      'export',
+      { type: 'clinical_record', patientId },
+      { ...context, emergencyAccess: false },
+    );
+    this.authz.requireRecentReauth(ctx);
+    const bundle = await this.fhirCopies.build(ctx, patientId, context);
+    const day = (bundle.timestamp ?? '').slice(0, 10);
+    return new StreamableFile(Buffer.from(JSON.stringify(bundle, null, 2), 'utf8'), {
+      type: 'application/fhir+json; charset=utf-8',
+      disposition: `attachment; filename="copia-do-prontuario-fhir-${day}.json"`,
     });
   }
 

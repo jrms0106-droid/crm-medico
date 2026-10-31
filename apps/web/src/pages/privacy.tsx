@@ -521,8 +521,10 @@ export function ClinicalCopyButton({
   );
   const action = useAction();
   const [result, setResult] = useState<ClinicalCopyDto | null>(null);
+  const [fhirCount, setFhirCount] = useState<number | null>(null);
   const generate = () => {
     setResult(null);
+    setFhirCount(null);
     void action.run(async () => {
       const data = await guarded(() =>
         api.get<ClinicalCopyDto>(`/patients/${patientId}/clinical-copy`),
@@ -531,13 +533,34 @@ export function ClinicalCopyButton({
       setResult(data);
     });
   };
+  // Mesmo conteúdo, no padrão FHIR R4, para levar a outro serviço (docs/api/integracoes.md).
+  const generateFhir = () => {
+    setResult(null);
+    setFhirCount(null);
+    void action.run(async () => {
+      const bundle = await guarded(() =>
+        api.get<{ entry?: unknown[] }>(`/patients/${patientId}/clinical-copy/fhir`),
+      );
+      downloadJson(bundle, `copia-do-prontuario-fhir-${todayLocal()}.json`);
+      setFhirCount(bundle.entry?.length ?? 0);
+    });
+  };
   return (
     <>
       <button type="button" className="secondary" onClick={generate} disabled={action.busy}>
         Cópia do prontuário
       </button>
+      <button type="button" className="secondary" onClick={generateFhir} disabled={action.busy}>
+        Cópia no padrão FHIR
+      </button>
       {dialog}
       <Alert message={action.error} />
+      {fhirCount !== null && (
+        <p role="status" className="muted">
+          Cópia no padrão FHIR gerada com {fhirCount} item(ns). Entregue só ao paciente ou ao
+          representante legal.
+        </p>
+      )}
       {result && (
         <p role="status" className="muted">
           Cópia gerada com {result.records.length} registro(s) e {result.documents.length}{' '}
