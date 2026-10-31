@@ -11,3 +11,4 @@ export * from './records.js';
 export * from './documents.js';
 export * from './billing.js';
 export * from './privacy.js';
+export * from './crm.js';

@@ -127,6 +127,12 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
     unitScope: 'none',
     grants: { secretary: ['view', 'create', 'edit', 'export'] },
   },
+  // Lembretes ao paciente (docs/api/crm-e-lembretes.md). Cancelar um lembrete na fila é `edit`.
+  communication: {
+    dataClass: 'personal',
+    unitScope: 'none',
+    grants: { secretary: ['view', 'edit'] },
+  },
 };
 
 export function dataClassOf(type: ResourceType): DataClass {

@@ -170,7 +170,7 @@ export class PrivacyService {
     const organizationId = ctx.user.organizationId;
     const patient = await this.patients.find(organizationId, patientId);
     if (!patient) throw new AppError(404, ErrorCode.NOT_FOUND, 'Paciente não encontrado.');
-    const [org, appointments, charges, requests] = await Promise.all([
+    const [org, appointments, charges, requests, messages] = await Promise.all([
       this.prisma.organization.findUniqueOrThrow({
         where: { id: organizationId },
         select: { name: true },
@@ -201,6 +201,18 @@ export class PrivacyService {
         where: { organizationId, patientId },
         orderBy: { createdAt: 'asc' },
       }),
+      this.prisma.outboundMessage.findMany({
+        where: { organizationId, patientId },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          kind: true,
+          channel: true,
+          body: true,
+          status: true,
+          sentAt: true,
+          createdAt: true,
+        },
+      }),
     ]);
     return {
       format: 'crm-medico/exportacao-do-titular',
@@ -223,6 +235,11 @@ export class PrivacyService {
       })),
       charges: await this.billing.chargeDtos(charges),
       subjectRequests: await this.requestDtos(requests),
+      messages: messages.map((m) => ({
+        ...m,
+        sentAt: m.sentAt?.toISOString() ?? null,
+        createdAt: m.createdAt.toISOString(),
+      })),
       clinical: {
         included: false,
         reason:

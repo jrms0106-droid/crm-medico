@@ -96,6 +96,7 @@ export const ACCESS_REPORT_RESOURCE_LABELS: Record<string, string> = {
   emergency_access: 'Acesso emergencial',
   charge: 'Cobrança',
   patient_rights: 'Direitos do titular',
+  communication: 'Lembretes ao paciente',
 };
 
 export const ACCESS_REPORT_ACTION_LABELS: Record<string, string> = {
@@ -145,6 +146,15 @@ export interface PatientExportDto {
   }[];
   charges: ChargeDto[];
   subjectRequests: SubjectRequestDto[];
+  /** Lembretes gerados para o paciente, com o texto como foi enviado. */
+  messages: {
+    kind: string;
+    channel: string;
+    body: string;
+    status: string;
+    sentAt: string | null;
+    createdAt: string;
+  }[];
   clinical: { included: false; reason: string };
 }
 

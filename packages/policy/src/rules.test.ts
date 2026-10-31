@@ -37,6 +37,7 @@ const EXPECTED: Record<ResourceType, Record<Role, string>> = {
   charge: { doctor: '', secretary: 'vce', admin: 'vr' },
   financial_report: { doctor: '', secretary: 'v', admin: 'v' },
   patient_rights: { doctor: '', secretary: 'vcex', admin: '' },
+  communication: { doctor: '', secretary: 've', admin: '' },
 };
 
 const LETTER: Record<Action, string> = {

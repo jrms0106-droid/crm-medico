@@ -39,6 +39,8 @@ const envSchema = z
     // Prazos do vínculo assistencial (docs/api/atendimento-e-vinculo.md), pendentes de validação médica.
     CARE_COURTESY_DAYS: z.coerce.number().int().min(0).max(365).default(30),
     EMERGENCY_ACCESS_HOURS: z.coerce.number().int().min(1).max(24).default(4),
+    // Lembretes (docs/api/crm-e-lembretes.md). 0 desliga a rotina; o envio é sempre simulado.
+    REMINDERS_INTERVAL_SECONDS: z.coerce.number().int().min(0).max(3600).default(0),
     COOKIE_SECURE: booleanFromEnv,
     TRUST_PROXY: booleanFromEnv,
   })

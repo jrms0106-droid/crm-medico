@@ -61,6 +61,7 @@ test.describe.serial('fluxos por perfil', () => {
       'Pacientes',
       'Agenda',
       'Financeiro',
+      'Lembretes',
       'Direitos do paciente',
       'Profissionais',
     ]);
@@ -77,6 +78,7 @@ test.describe.serial('fluxos por perfil', () => {
     await page.getByLabel('Nome completo').fill(PATIENT);
     await page.getByLabel('Data de nascimento').fill('1985-04-12');
     await page.getByLabel('Telefone com DDD').fill('11987654321');
+    await page.getByLabel('Este telefone tem WhatsApp').check();
     await page.getByRole('button', { name: 'Cadastrar' }).click();
     await expect(page.getByRole('heading', { name: PATIENT })).toBeVisible();
 
@@ -279,6 +281,8 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(page.getByText('Esta área não faz parte do seu perfil.')).toBeVisible();
     await page.goto('/#/direitos');
     await expect(page.getByText('Esta área não faz parte do seu perfil.')).toBeVisible();
+    await page.goto('/#/lembretes');
+    await expect(page.getByText('Esta área não faz parte do seu perfil.')).toBeVisible();
   });
 
   test('direitos do paciente: secretária registra o pedido, vê os acessos, exporta e responde', async ({
@@ -340,5 +344,28 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(panel).toContainText('Relatório entregue impresso.');
     await expect(page.getByRole('button', { name: 'Responder' })).toHaveCount(0);
     await snap(page, '11-direitos-na-ficha');
+  });
+
+  test('lembretes: secretária registra a autorização do paciente e vê a fila', async ({ page }) => {
+    await login(page, 'secretary');
+    await menu(page).getByRole('link', { name: 'Pacientes' }).click();
+    await page.getByLabel('Buscar por nome, CPF ou telefone').fill(PATIENT);
+    await page.getByRole('button', { name: 'Buscar' }).click();
+    await page.getByRole('link', { name: PATIENT }).click();
+    const panel = page.locator('.panel', {
+      has: page.getByRole('heading', { name: 'Lembretes por WhatsApp' }),
+    });
+    await expect(panel).toContainText('Não autorizado');
+    await panel.getByRole('button', { name: 'Registrar autorização' }).click();
+    await expect(panel).toContainText('Autorizado');
+    await expect(panel).toContainText('O paciente recebe lembrete antes das consultas.');
+    await snap(page, '12-lembretes-na-ficha');
+    // A autorização fica no cadastro: recarregar mostra o mesmo estado.
+    await page.reload();
+    await expect(panel).toContainText('O paciente recebe lembrete antes das consultas.');
+
+    await menu(page).getByRole('link', { name: 'Lembretes' }).click();
+    await expect(page.getByRole('heading', { name: 'Lembretes' })).toBeVisible();
+    await expect(page.getByText(/Envio simulado/)).toBeVisible();
   });
 });

@@ -3,6 +3,7 @@ import type { RoleName } from '@crm/shared';
 import { PrismaPg } from '@prisma/adapter-pg';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
+import type { AppOverrides } from '../src/app.module.js';
 import { Clock } from '../src/common/clock.js';
 import { loadConfig } from '../src/config.js';
 import { PrismaClient } from '../src/generated/prisma/client.js';
@@ -36,7 +37,10 @@ export interface TestApp {
   close(): Promise<void>;
 }
 
-export async function startTestApp(env: Record<string, string> = {}): Promise<TestApp> {
+export async function startTestApp(
+  env: Record<string, string> = {},
+  overrides: Omit<AppOverrides, 'clock'> = {},
+): Promise<TestApp> {
   const url = process.env['DATABASE_URL_TEST'];
   const config = loadConfig({
     MFA_ENCRYPTION_KEY: TEST_MFA_KEY,
@@ -49,7 +53,7 @@ export async function startTestApp(env: Record<string, string> = {}): Promise<Te
     ...env,
   });
   const clock = new TestClock();
-  const app = await createApp(config, { clock });
+  const app = await createApp(config, { ...overrides, clock });
   await app.init();
   const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url ?? '' }) });
   return {
@@ -66,7 +70,7 @@ export async function startTestApp(env: Record<string, string> = {}): Promise<Te
 /** Apaga os dados entre testes (ordem respeita as chaves estrangeiras). */
 export async function resetData(db: PrismaClient): Promise<void> {
   await db.$executeRawUnsafe(
-    `TRUNCATE privacy.subject_requests, billing.payments, billing.charges, billing.price_items, documents.document_events, documents.medical_documents, records.access_justifications, records.record_events, records.record_versions, records.clinical_records,
+    `TRUNCATE crm.messages, privacy.subject_requests, billing.payments, billing.charges, billing.price_items, documents.document_events, documents.medical_documents, records.access_justifications, records.record_events, records.record_versions, records.clinical_records,
       care.emergency_accesses, care.encounters, scheduling.appointment_events, scheduling.waitlist_entries, scheduling.appointments, scheduling.schedule_blocks, scheduling.schedule_rules, scheduling.schedules,
       patients.versions, patients.contacts, patients.phones, patients.patients, audit.events, org.professional_specialties, org.professionals, org.specialties,
       org.unit_memberships, identity.sessions, identity.users, org.units, org.organizations CASCADE`,
