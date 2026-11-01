@@ -300,6 +300,8 @@ const FEATURE_SHORT: Record<AiFeature, string> = {
   request_triage: 'Classificação',
   schedule_suggestions: 'Agenda',
   admin_report: 'Relatório',
+  record_draft: 'Anotações (prontuário)',
+  record_summary: 'Resumo (prontuário)',
 };
 
 function HistoryTable({ rows, showOutput }: { rows: AiRequestDto[]; showOutput: boolean }) {
@@ -327,7 +329,15 @@ function HistoryTable({ rows, showOutput }: { rows: AiRequestDto[]; showOutput: 
             <td className="small">
               {r.model.provider}/{r.model.model} v{r.model.version}
             </td>
-            {showOutput && <td className="small">{r.output}</td>}
+            {showOutput && (
+              <td className="small">
+                {r.output === '' ? (
+                  <span className="muted">Conteúdo clínico não guardado.</span>
+                ) : (
+                  r.output
+                )}
+              </td>
+            )}
             <td>
               <Badge
                 tone={
@@ -383,7 +393,7 @@ export function AiSettingsSection({ guarded }: { guarded: Guarded }) {
 }
 
 /** Marca a sugestão como útil ou descartada, uma vez (sem texto para editar). */
-function DecisionButtons({ requestId }: { requestId: string }) {
+export function DecisionButtons({ requestId }: { requestId: string }) {
   const [decided, setDecided] = useState<string | null>(null);
   const action = useAction();
   const decide = (decision: 'accepted' | 'discarded') =>

@@ -2,7 +2,8 @@
 
 Regras definidas antes da implementação (seções 14 e 15 da especificação). O nível 1 é **só
 administrativo**: ajuda a recepção a escrever mensagens e a separar os pedidos que chegam dos
-pacientes. Não lê prontuário, não sugere diagnóstico nem conduta e não age sozinha.
+pacientes. Não lê prontuário, não sugere diagnóstico nem conduta e não age sozinha. O
+assistente do médico, que trabalha com o prontuário, é o nível 2 ([ia-nivel-2.md](ia-nivel-2.md)).
 
 ## Modelo simulado
 
@@ -121,12 +122,15 @@ avaliação jurídica (matriz de conformidade).
 | ----------------------------------------- | ---------- | ------ | -------------------------------- |
 | Usar rascunho, classificação e agenda     | sim        | não    | não                              |
 | Usar o relatório assistido                | não        | não    | sim                              |
-| Ver o próprio histórico de uso, com texto | sim        | não    | sim                              |
+| Ver o próprio histórico de uso, com texto | sim        | sim¹   | sim                              |
 | Ver o uso de todos (sem o texto da saída) | não        | não    | sim                              |
-| Ver e mudar os interruptores              | ver        | não    | ver e mudar (com reautenticação) |
+| Ver e mudar os interruptores              | ver        | ver¹   | ver e mudar (com reautenticação) |
+
+¹ Desde o nível 2: o médico vê o próprio histórico do assistente clínico (sem texto clínico) e
+os interruptores, para a tela saber se mostra os botões.
 
 Recursos de autorização: `ai_assist` (secretária: visualizar, criar, editar a própria decisão) e
-`ai_settings` (secretária: visualizar; administrador: visualizar e editar) e `ai_report`
+`ai_settings` (secretária e médico: visualizar; administrador: visualizar e editar) e `ai_report`
 (administrador: criar e editar a própria decisão). Negação por padrão. A organização da agenda
 também passa pela permissão de ver as consultas daquela agenda (unidade da secretária).
 

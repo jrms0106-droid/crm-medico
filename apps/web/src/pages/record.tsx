@@ -13,6 +13,7 @@ import {
 import { ApiError, api, query } from '../api';
 import { ReauthDialog } from '../reauth';
 import { DocumentsPanel } from './documents';
+import { type InsertedField, NotesOrganizer, RecordSummaryPanel } from './clinical-assistant';
 import { ClinicalCopyButton } from './privacy';
 import {
   Alert,
@@ -141,6 +142,9 @@ export function RecordPage({
           onOpen={setOpenId}
           onClose={() => setOpenId(null)}
         />
+      )}
+      {can?.viewHistory && (
+        <RecordSummaryPanel session={session} patientId={patientId} onOpen={setOpenId} />
       )}
       <Panel title="Linha do tempo">
         <label className="check">
@@ -491,6 +495,19 @@ function DraftEditor({
     setDirty(true);
   };
 
+  /** Texto aceito do assistente: vai para o fim de cada campo, sem apagar o que já existe. */
+  const insert = (fields: InsertedField[]) => {
+    setContent((c) => {
+      const next = { ...c };
+      for (const { field, text } of fields) {
+        const current = next[field]?.trim();
+        next[field] = current ? `${current}\n${text}` : text;
+      }
+      return next;
+    });
+    setDirty(true);
+  };
+
   const finalize = () =>
     action.run(async () => {
       window.clearTimeout(timer.current);
@@ -526,6 +543,7 @@ function DraftEditor({
         {session.user.name}
         {initial.justification && <> · justificativa: {initial.justification}</>}
       </p>
+      <NotesOrganizer session={session} patientId={initial.patientId} onInsert={insert} />
       {TEXT_FIELDS.map((f) => (
         <label key={f.name} className="field">
           <span>{f.label}</span>

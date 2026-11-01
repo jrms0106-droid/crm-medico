@@ -9,7 +9,9 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
+import type { ResourceType } from '@crm/policy';
 import {
+  AI_CLINICAL_FEATURES,
   AI_FEATURES,
   AI_RECEPTION_FEATURES,
   type AdminReportDto,
@@ -18,27 +20,47 @@ import {
   type AiRequestDto,
   ErrorCode,
   type MessageDraftDto,
+  type RecordDraftSuggestionDto,
+  type RecordSummarySuggestionDto,
   type RequestTriageDto,
   type ScheduleSuggestionsDto,
   adminReportSchema,
   aiDecisionSchema,
   aiFeatureToggleSchema,
   messageDraftSchema,
+  recordDraftSuggestionSchema,
+  recordSummarySuggestionSchema,
   requestTriageSchema,
   scheduleSuggestionsSchema,
 } from '@crm/shared';
 import { AuditService } from '../audit/audit.service.js';
 import { AuthorizationService } from '../authz/authorization.service.js';
+import { CareService } from '../care/care.service.js';
 import { AppError } from '../common/app-error.js';
 import { parseBody } from '../common/validation.js';
 import { Auth } from '../identity/auth.decorators.js';
 import type { AuthContext } from '../identity/session.service.js';
+import { RecordsService } from '../records/records.service.js';
 import { loadSchedule } from '../scheduling/scheduling.controller.js';
 import { SchedulingService } from '../scheduling/scheduling.service.js';
+import { AiClinicalService } from './ai-clinical.service.js';
 import { AiInsightsService } from './ai-insights.service.js';
 import { AiService } from './ai.service.js';
 
-/** IA nível 1, administrativa (docs/api/ia-nivel-1.md). Acesso sempre pela política. */
+/** Quem usa cada funcionalidade, pela política (docs/api/ia-nivel-1.md e ia-nivel-2.md). */
+function resourceOf(feature: AiFeature): ResourceType {
+  if (AI_RECEPTION_FEATURES.includes(feature)) return 'ai_assist';
+  if (AI_CLINICAL_FEATURES.includes(feature)) return 'ai_clinical';
+  return 'ai_report';
+}
+
+/** Os três grupos de uso da IA, na ordem em que a decisão e o histórico os procuram. */
+const AI_USE_RESOURCES: readonly ResourceType[] = ['ai_assist', 'ai_clinical', 'ai_report'];
+
+/**
+ * IA nível 1, administrativa (docs/api/ia-nivel-1.md), e nível 2, documental
+ * (docs/api/ia-nivel-2.md). Acesso sempre pela política.
+ */
 @Controller('ai')
 export class AiController {
   constructor(
@@ -47,6 +69,9 @@ export class AiController {
     @Inject(AiService) private readonly ai: AiService,
     @Inject(SchedulingService) private readonly scheduling: SchedulingService,
     @Inject(AiInsightsService) private readonly insights: AiInsightsService,
+    @Inject(AiClinicalService) private readonly clinical: AiClinicalService,
+    @Inject(CareService) private readonly care: CareService,
+    @Inject(RecordsService) private readonly records: RecordsService,
   ) {}
 
   @Get('features')
@@ -153,6 +178,70 @@ export class AiController {
     return this.insights.adminReport(ctx, input, timezone);
   }
 
+  /**
+   * Organizar anotações no registro: só o médico que pode criar registro para o paciente
+   * (vínculo em atendimento iniciado ou acompanhamento).
+   */
+  @Post('clinical/record-draft')
+  @HttpCode(200)
+  async recordDraft(
+    @Auth() ctx: AuthContext,
+    @Body() body: unknown,
+  ): Promise<RecordDraftSuggestionDto> {
+    await this.authz.authorize(ctx, 'create', { type: 'ai_clinical', id: 'record_draft' });
+    const input = parseBody(recordDraftSuggestionSchema, body);
+    await this.requirePatient(ctx, 'create', input.patientId);
+    await this.authz.authorize(
+      ctx,
+      'create',
+      { type: 'clinical_record', patientId: input.patientId },
+      await this.care.accessContext(ctx.user.organizationId, ctx.user.id, input.patientId),
+    );
+    return this.clinical.recordDraft(ctx, input.patientId, input.notes);
+  }
+
+  /**
+   * Resumo do prontuário com fontes: exige vínculo que permita ver o prontuário. Entram só os
+   * registros assinados que o médico pode ler sem justificativa; os sensíveis de outro médico são
+   * contados.
+   */
+  @Post('clinical/record-summary')
+  @HttpCode(200)
+  async recordSummary(
+    @Auth() ctx: AuthContext,
+    @Body() body: unknown,
+  ): Promise<RecordSummarySuggestionDto> {
+    await this.authz.authorize(ctx, 'create', { type: 'ai_clinical', id: 'record_summary' });
+    const { patientId } = parseBody(recordSummarySuggestionSchema, body);
+    await this.requirePatient(ctx, 'view', patientId);
+    const context = await this.care.accessContext(ctx.user.organizationId, ctx.user.id, patientId);
+    // Mais estrito que a linha do tempo: sem vínculo valendo, nem os próprios registros vão à IA.
+    await this.authz.authorize(ctx, 'view', { type: 'clinical_record', patientId }, context);
+    const candidates = await this.records.timelineCandidates(
+      ctx.user.organizationId,
+      patientId,
+      ctx.user.id,
+      false,
+    );
+    let sensitiveHidden = 0;
+    const readable = candidates.filter((record) => {
+      if (record.status !== 'signed') return false;
+      const ref = {
+        type: 'clinical_record' as const,
+        id: record.id,
+        patientId,
+        authorUserId: record.authorUserId,
+        sensitivity: record.sensitivity,
+      };
+      if (this.authz.check(ctx, 'view', ref, context).allowed) return true;
+      if (this.authz.check(ctx, 'view', ref, { ...context, justified: true }).allowed) {
+        sensitiveHidden += 1;
+      }
+      return false;
+    });
+    return this.clinical.recordSummary(ctx, patientId, readable, sensitiveHidden);
+  }
+
   @Post('requests/:id/decision')
   @HttpCode(200)
   async decide(
@@ -161,22 +250,41 @@ export class AiController {
     @Body() body: unknown,
   ): Promise<AiRequestDto> {
     // Primeiro a política: quem não usa nenhuma funcionalidade nem chega a procurar o registro.
-    const canAssist = this.authz.check(ctx, 'edit', { type: 'ai_assist' }).allowed;
-    const gate = canAssist ? 'ai_assist' : 'ai_report';
+    const gate = this.useResource(ctx, 'edit');
     await this.authz.authorize(ctx, 'edit', { type: gate, id });
     const row = await this.ai.find(ctx.user.organizationId, id);
     // Só quem pediu registra a decisão; de outra pessoa ou inexistente é 404.
     if (!row || row.userId !== ctx.user.id) {
       return this.authz.notFound(ctx, 'edit', gate, id, 'Sugestão não encontrada.');
     }
-    const type = AI_RECEPTION_FEATURES.includes(row.feature) ? 'ai_assist' : 'ai_report';
+    const type = resourceOf(row.feature);
     if (type !== gate) await this.authz.authorize(ctx, 'edit', { type, id });
     return this.ai.decide(ctx, row, parseBody(aiDecisionSchema, body));
   }
 
   @Get('requests')
   async list(@Auth() ctx: AuthContext): Promise<AiRequestDto[]> {
-    await this.authz.authorize(ctx, 'view', { type: 'ai_assist' });
+    await this.authz.authorize(ctx, 'view', { type: this.useResource(ctx, 'view') });
     return this.ai.list(ctx, ctx.user.roles.includes('admin'));
+  }
+
+  /** O grupo de uso da IA que a pessoa tem; sem nenhum, o primeiro, para a negação ser auditada. */
+  private useResource(ctx: AuthContext, action: 'view' | 'edit'): ResourceType {
+    return (
+      AI_USE_RESOURCES.find((type) => this.authz.check(ctx, action, { type }).allowed) ??
+      'ai_assist'
+    );
+  }
+
+  private async requirePatient(ctx: AuthContext, action: 'view' | 'create', patientId: string) {
+    if (!(await this.records.patientExists(ctx.user.organizationId, patientId))) {
+      await this.authz.notFound(
+        ctx,
+        action,
+        'clinical_record',
+        patientId,
+        'Paciente não encontrado.',
+      );
+    }
   }
 }

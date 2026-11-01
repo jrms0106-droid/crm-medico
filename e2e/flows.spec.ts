@@ -514,6 +514,100 @@ test.describe.serial('fluxos por perfil', () => {
     await report.getByRole('button', { name: 'Copiar e marcar como usado' }).click();
     await expect(report.getByText('Texto copiado e marcado como usado.')).toBeVisible();
   });
+  test('assistente clínico: médico resume o prontuário e organiza anotações no rascunho', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await login(page, 'admin');
+    await menu(page).getByRole('link', { name: 'Configurações' }).click();
+    const ai = page.locator('.panel', {
+      has: page.getByRole('heading', { name: /Assistente de IA/ }),
+    });
+    const draftSwitch = ai.getByRole('listitem').filter({ hasText: 'Organizar anotações' });
+    await draftSwitch.getByRole('button', { name: 'Ligar' }).click();
+    const dialog = page.getByRole('form', { name: 'Confirmar identidade' });
+    await dialog.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await dialog.getByLabel('Código de 6 dígitos').fill(await nextCode('admin'));
+    await dialog.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(draftSwitch).toContainText('Ligado');
+    const summarySwitch = ai.getByRole('listitem').filter({ hasText: 'Resumo do prontuário' });
+    await summarySwitch.getByRole('button', { name: 'Ligar' }).click();
+    await expect(summarySwitch).toContainText('Ligado');
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    // Nova consulta da mesma paciente, para o médico ter um atendimento iniciado.
+    await login(page, 'secretary');
+    await menu(page).getByRole('link', { name: 'Pacientes', exact: true }).click();
+    await page.getByLabel('Buscar por nome, CPF ou telefone').fill(PATIENT);
+    await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+    await page.getByRole('link', { name: PATIENT }).first().click();
+    await page.getByRole('link', { name: 'Agendar consulta' }).click();
+    await page.locator('.slot').first().click();
+    await page.getByRole('button', { name: 'Agendar' }).click();
+    await expect(page.getByRole('status')).toContainText('Consulta marcada');
+    const booked = page
+      .getByRole('row', { name: new RegExp(PATIENT) })
+      .filter({ hasText: 'Agendada' });
+    await booked.getByRole('button', { name: 'Registrar chegada' }).click();
+    await expect(booked).toHaveCount(0);
+    await page.getByRole('button', { name: 'Sair' }).click();
+
+    await login(page, 'doctor');
+    await menu(page).getByRole('link', { name: 'Agenda' }).click();
+    await page
+      .getByRole('row', { name: new RegExp(PATIENT) })
+      .filter({ hasText: 'Paciente chegou' })
+      .last()
+      .getByRole('button', { name: 'Iniciar atendimento' })
+      .click();
+    await expect(page.getByText('Vínculo: Atendimento iniciado')).toBeVisible();
+
+    // Resumo: só trechos dos registros assinados, cada um com a fonte.
+    const summary = page.locator('.panel', {
+      has: page.getByRole('heading', { name: 'Resumo com fontes (IA)' }),
+    });
+    await summary.getByRole('button', { name: 'Gerar resumo' }).click();
+    await expect(summary.getByText('Dor de cabeça há dois dias (fictício).')).toBeVisible();
+    await expect(summary.getByText(/Fonte: Consulta de/).first()).toBeVisible();
+    await expect(summary.getByText(/não é guardado/)).toBeVisible();
+    await snap(page, '17-assistente-resumo-prontuario');
+    await summary.getByRole('button', { name: 'Marcar como útil' }).click();
+    await expect(summary.getByText('Marcado como útil.')).toBeVisible();
+    await summary.getByRole('button', { name: 'Abrir registro' }).first().click();
+    await expect(page.getByText('Conteúdo íntegro.')).toBeVisible();
+
+    // Organização das anotações: as frases do médico, sem mudar uma letra, no rascunho.
+    await page.getByRole('button', { name: 'Novo registro' }).click();
+    await page.getByRole('button', { name: 'Organizar anotações nos campos' }).click();
+    await page
+      .getByLabel('Suas anotações da consulta')
+      .fill(
+        'Queixa de cansaço leve (fictício). Ao exame, afebril. Oriento manter hidratação. ' +
+          'Dorme bem.',
+      );
+    await page.getByRole('button', { name: 'Organizar', exact: true }).click();
+    const suggestion = page.getByLabel('Sugestão de organização');
+    await expect(suggestion.getByText(/não preenche hipóteses nem CID/)).toBeVisible();
+    await snap(page, '18-assistente-anotacoes');
+    await suggestion.getByRole('button', { name: 'Inserir no registro' }).click();
+    await expect(page.getByText(/Texto inserido no rascunho/)).toBeVisible();
+    await expect(page.getByLabel('Motivo da consulta')).toHaveValue(
+      'Queixa de cansaço leve (fictício).',
+    );
+    await expect(page.getByLabel('Exame físico')).toHaveValue('Ao exame, afebril.');
+    await expect(page.getByLabel('Conduta')).toHaveValue('Oriento manter hidratação.');
+    await expect(page.getByLabel('Anamnese')).toHaveValue('Dorme bem.');
+
+    // Limpeza: descarta o rascunho e encerra o atendimento.
+    page.once('dialog', (d) => void d.accept());
+    await page
+      .getByRole('form', { name: 'Editar rascunho' })
+      .getByRole('button', { name: 'Descartar', exact: true })
+      .click();
+    await page.getByRole('button', { name: 'Encerrar atendimento' }).click();
+    await expect(page.getByText('Vínculo: Atendimento encerrado')).toBeVisible();
+  });
+
   test('acessibilidade: telas de cada perfil sem violações WCAG 2.1 A/AA (axe)', async ({
     page,
   }) => {

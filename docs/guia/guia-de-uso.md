@@ -183,6 +183,25 @@ O menu do médico tem: Início, Pacientes, Agenda e Profissionais. A agenda most
 Regras: [prontuario.md](../api/prontuario.md) e
 [atendimento-e-vinculo.md](../api/atendimento-e-vinculo.md).
 
+### Assistente clínico (IA)
+
+![Rascunho do registro com as anotações organizadas pelo assistente e o resumo com fontes](imagens/assistente-clinico.png)
+
+Só aparece quando o administrador liga a função em Configurações. Ele **não escreve texto
+clínico**: só reorganiza as suas frases ou as de registros assinados, sem mudar uma letra, e
+nunca preenche hipóteses nem CID. Por enquanto usa um modelo simulado.
+
+- **Organizar anotações (IA)**, dentro do rascunho: escreva ou cole as anotações livres da
+  consulta e aperte **Organizar**. Confira em que campo cada frase foi parar e as frases que
+  ficaram de fora. **Inserir no registro** acrescenta o texto ao fim de cada campo; revise antes
+  de finalizar e assinar, como sempre.
+- **Resumo com fontes (IA)**, acima da linha do tempo: aperte **Gerar resumo**. Cada trecho
+  mostra a data, o tipo e o autor do registro de onde veio, e **Abrir registro** leva até ele.
+  Rascunhos e registros sensíveis de outro médico ficam de fora (a tela diz quantos). O resumo
+  não é guardado.
+
+Regras: [ia-nivel-2.md](../api/ia-nivel-2.md).
+
 ### Receitas, atestados e outros documentos
 
 1. Na área **Documentos** do prontuário, escolha **Receita simples**, **Atestado**, **Pedido de

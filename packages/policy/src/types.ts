@@ -49,6 +49,7 @@ export const RESOURCE_TYPES = [
   'ai_assist',
   'ai_settings',
   'ai_report',
+  'ai_clinical',
 ] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 

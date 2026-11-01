@@ -1,7 +1,15 @@
 import { type AdminReportMetrics, numbersIn } from '@crm/shared';
 import { describe, expect, it } from 'vitest';
 import { allowedNumbers } from './ai-insights.service.js';
-import { type ScheduleFacts, simulatedReport, simulatedSchedule } from './language-model.js';
+import {
+  type RecordNotesFacts,
+  type RecordSummaryFacts,
+  type ScheduleFacts,
+  simulatedRecordDraft,
+  simulatedRecordSummary,
+  simulatedReport,
+  simulatedSchedule,
+} from './language-model.js';
 
 const metrics = (over: Partial<AdminReportMetrics> = {}): AdminReportMetrics => ({
   appointments: {
@@ -79,5 +87,58 @@ describe('agenda simulada', () => {
       unconfirmed: Array.from({ length: 15 }, (_, i) => ({ code: `C${i + 1}`, time: '10:00' })),
     };
     expect(simulatedSchedule(many).suggestions).toHaveLength(10);
+  });
+});
+
+describe('organização simulada das anotações', () => {
+  const facts = (texts: string[]): RecordNotesFacts => ({
+    sentences: texts.map((text, i) => ({ code: `S${i + 1}`, text })),
+  });
+
+  it('conduta, exame e motivo vão para o campo certo; o resto vai para a anamnese', () => {
+    const out = simulatedRecordDraft(
+      facts([
+        'Nega febre.',
+        'Queixa de dor de garganta há três dias.',
+        'Ao exame, orofaringe hiperemiada.',
+        'Oriento hidratação e retorno se piorar.',
+        'Mora com a filha.',
+      ]),
+    );
+    expect(out.fields).toEqual({
+      chiefComplaint: ['S2'],
+      anamnesis: ['S1', 'S5'],
+      physicalExam: ['S3'],
+      plan: ['S4'],
+    });
+  });
+
+  it('sem palavra de motivo, a primeira frase restante vira o motivo', () => {
+    const out = simulatedRecordDraft(facts(['Dor lombar.', 'Piora ao sentar.']));
+    expect(out.fields.chiefComplaint).toEqual(['S1']);
+    expect(out.fields.anamnesis).toEqual(['S2']);
+  });
+});
+
+describe('resumo simulado do prontuário', () => {
+  it('pega o primeiro motivo e a primeira conduta de cada registro, até 12 itens', () => {
+    const record = (r: number): RecordSummaryFacts['records'][number] => ({
+      code: `R${r}`,
+      fields: {
+        chiefComplaint: [{ code: `R${r}.S1`, text: 'Motivo.' }],
+        anamnesis: [{ code: `R${r}.S2`, text: 'História.' }],
+        plan: [
+          { code: `R${r}.S3`, text: 'Conduta.' },
+          { code: `R${r}.S4`, text: 'Outra.' },
+        ],
+      },
+    });
+    const one = simulatedRecordSummary({ records: [record(1)] });
+    expect(one.items).toEqual([
+      { field: 'chiefComplaint', refs: ['R1.S1'] },
+      { field: 'plan', refs: ['R1.S3'] },
+    ]);
+    const many = simulatedRecordSummary({ records: [1, 2, 3, 4, 5, 6, 7].map(record) });
+    expect(many.items).toHaveLength(12);
   });
 });

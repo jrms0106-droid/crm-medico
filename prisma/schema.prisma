@@ -923,6 +923,8 @@ enum AiFeature {
   request_triage
   schedule_suggestions
   admin_report
+  record_draft
+  record_summary
 
   @@schema("ai")
 }
