@@ -69,7 +69,7 @@ jobs:
             scripts/ops/ensaio-de-restauracao.sh
       - name: Rastros dos testes ponta a ponta que falharam
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-rastros
           path: test-results/
