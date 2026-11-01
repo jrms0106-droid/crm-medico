@@ -1,0 +1,10 @@
+# ADR 0029: avisos das ferramentas de build e registro de erros sem dados
+
+- **Status:** aceito (2026-11-01, pendências 3 e 4 da revisão geral)
+- **Decisão 1 (build do PWA):** O `package.json` da raiz ganha `overrides` que sobem três dependências indiretas para versões corrigidas: `glob` 14 (usado pelo `workbox-build`), `minimatch` 11 (usado pelo `glob` e pelo ESLint) e `@trickfilm400/rollup-plugin-off-main-thread` 4 (troca o `ejs` 3, que puxava `jake`/`filelist`/`minimatch` 5, pelo `ejs` 7). O `vite-plugin-pwa` continua na 2.0.0.
+- **Decisão 2 (registro de erros):** Erro inesperado (status 500 ou mais) vai para o registro só com o tipo do erro, o código (P2xxx do Prisma ou SQLSTATE, quando tem formato simples) e até 12 linhas da pilha. A mensagem do erro é descartada inteira (`apps/api/src/common/safe-error.ts`).
+- **Motivo:** A correção que o `npm audit` sugeria voltava o plugin do PWA para uma versão antiga. Os `overrides` corrigem sem voltar versão. A mensagem de um erro do banco pode trazer valores da consulta (nome, CPF, texto clínico), e o registro não deve guardar dado de paciente.
+- **O que sobrou:** `deepmerge` 4.3.1 (aviso de gravidade baixa, usado pelo `@rollup/plugin-node-resolve` dentro do `workbox-build`) não tem versão corrigida. Ele só roda no build e só junta a configuração do próprio projeto, então não recebe entrada de usuário. Nada disso vai para o servidor nem para o navegador: `npm audit --omit=dev` mostra 0.
+- **Alternativas descartadas:** `npm audit fix --force` (volta o `vite-plugin-pwa` para 1.1.0); tirar o PWA (é requisito); guardar a mensagem e mascarar CPF por expressão regular (não pega nome nem texto livre).
+- **Consequências:** Para investigar um erro 500 fica o `requestId`, o tipo, o código e o lugar no código, mas não o valor que causou o erro; quem investiga reproduz com dados fictícios. Os `overrides` precisam ser revistos quando o `workbox-build` atualizar as próprias dependências.
+- **Revisar quando:** Sair `workbox-build` novo (remover os `overrides` que ficarem desnecessários) ou a hospedagem trouxer um serviço de registro com controle de acesso próprio.

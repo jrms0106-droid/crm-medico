@@ -9,6 +9,7 @@ import {
 import { ErrorCode, type ErrorResponse } from '@crm/shared';
 import type { Response } from 'express';
 import { AppError } from './app-error.js';
+import { safeErrorSummary } from './safe-error.js';
 
 const CODE_BY_STATUS: Record<number, { code: ErrorCode; message: string }> = {
   400: { code: ErrorCode.VALIDATION_FAILED, message: 'Dados inválidos.' },
@@ -66,10 +67,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const mapped = CODE_BY_STATUS[status] ?? INTERNAL;
 
     if (status >= 500) {
-      this.logger.error(
-        `requestId=${requestId}`,
-        exception instanceof Error ? exception.stack : undefined,
-      );
+      // Só o tipo, o código e onde ocorreu: a mensagem pode conter dados (ver safe-error.ts).
+      this.logger.error(`requestId=${requestId}`, safeErrorSummary(exception));
     }
 
     const body: ErrorResponse = {
