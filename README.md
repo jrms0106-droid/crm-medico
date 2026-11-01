@@ -4,6 +4,8 @@ Sistema de gestão de clínica multiespecialidades com prontuário eletrônico, 
 
 > **Em desenvolvimento. Não apto a uso clínico real.** Use somente dados fictícios. O sistema só poderá atender pacientes após as validações técnicas, clínicas, jurídicas e regulatórias descritas em [docs/planejamento](docs/planejamento).
 
+Para aprender a usar as telas (secretária, médico e administrador), veja o [guia de uso](docs/guia/guia-de-uso.md).
+
 ## O que existe hoje
 
 - Monorepo TypeScript com API (NestJS), aplicativo web instalável (React + Vite, PWA) e pacotes compartilhados.
