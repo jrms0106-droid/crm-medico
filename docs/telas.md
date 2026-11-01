@@ -1,6 +1,6 @@
 # Telas do sistema (Etapa 7)
 
-Interface web/PWA das etapas anteriores. Toda regra de acesso continua no backend: o menu só esconde o que o perfil não usa, e a API nega por padrão mesmo que alguém digite o endereço.
+Interface web/PWA das etapas anteriores. Passo a passo para quem usa: [guia de uso](guia/guia-de-uso.md). Toda regra de acesso continua no backend: o menu só esconde o que o perfil não usa, e a API nega por padrão mesmo que alguém digite o endereço.
 
 > **Não apto a uso clínico real.** O formulário do prontuário é genérico e a assinatura é interna, ambos pendentes de validação médica e jurídica. A faixa amarela no topo lembra que o ambiente é de dados fictícios.
 
