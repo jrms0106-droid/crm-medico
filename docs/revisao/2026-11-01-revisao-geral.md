@@ -31,11 +31,10 @@ tela e com pessoas que usam tecnologia assistiva.
 
 ## Pendências para decidir (não corrigidas aqui)
 
-1. **Limite de tentativas do login fica na memória do servidor.** Com mais de uma instância da
-   API, cada uma conta separado. Antes de produção com várias instâncias, guardar no banco.
-   Hoje o bloqueio por conta (no banco) já segura o ataque a uma conta específica.
-2. **Relatório financeiro soma as cobranças em aberto desde sempre.** Com anos de dados, fica
-   lento. Trocar por soma no banco quando houver volume real.
+1. ~~**Limite de tentativas do login fica na memória do servidor.**~~ Resolvido em 2026-11-01:
+   a contagem foi para o banco e vale entre instâncias (ADR 0028).
+2. ~~**Relatório financeiro soma as cobranças em aberto desde sempre.**~~ Resolvido em
+   2026-11-01: o saldo em aberto é somado no próprio banco, sem carregar as cobranças.
 3. **Avisos do `npm audit` nas ferramentas de build do PWA** (`vite-plugin-pwa` → `workbox-build`
    → `glob`/`minimatch`/`deepmerge`). Não vão para o servidor nem para o navegador; a correção
    sugerida volta o plugin para uma versão antiga. Acompanhar uma versão nova do plugin.

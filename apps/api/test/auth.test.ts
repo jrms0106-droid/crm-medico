@@ -104,6 +104,34 @@ describe('login com senha', () => {
       await limited.db.$disconnect();
     }
   });
+
+  it('o limite é contado no banco: vale entre instâncias, vence com a janela e não guarda o IP', async () => {
+    const a = await startTestApp({ LOGIN_RATE_LIMIT_PER_MINUTE: '3' });
+    const b = await startTestApp({ LOGIN_RATE_LIMIT_PER_MINUTE: '3' });
+    try {
+      const statuses: number[] = [];
+      for (const app of [a, b, a, b]) {
+        const res = await new Client(app.app).login('x@clinica-ficticia.test', 'senha-errada');
+        statuses.push(res.status);
+      }
+      // Duas "instâncias" da API somam as tentativas da mesma origem.
+      expect(statuses).toEqual([401, 401, 401, 429]);
+      const rows = await a.db.loginRateLimit.findMany();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.keyHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(rows[0]!.keyHash).not.toContain('127.0.0.1');
+
+      // Passada a janela de um minuto, a contagem recomeça.
+      a.clock.advance(61_000);
+      const again = await new Client(a.app).login('x@clinica-ficticia.test', 'senha-errada');
+      expect(again.status).toBe(401);
+    } finally {
+      for (const app of [a, b]) {
+        await app.app.close();
+        await app.db.$disconnect();
+      }
+    }
+  });
 });
 
 describe('acesso sem autenticação', () => {

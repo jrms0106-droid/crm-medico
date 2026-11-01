@@ -22,7 +22,7 @@ MFA é obrigatório para os papéis configurados em `MFA_REQUIRED_ROLES` (padrã
 
 - Senha: 12 a 128 caracteres, não pode conter o próprio e-mail. Verificação contra bases de senhas vazadas fica para antes da produção (exige serviço externo).
 - Login com e-mail inexistente e com senha errada dão **a mesma resposta** (401 `INVALID_CREDENTIALS`) e levam tempo semelhante.
-- 5 falhas seguidas bloqueiam a conta por 15 minutos (423 `ACCOUNT_LOCKED`). Bloqueio também por IP: 20 tentativas de login por minuto (429).
+- 5 falhas seguidas bloqueiam a conta por 15 minutos (423 `ACCOUNT_LOCKED`). Bloqueio também por IP: 20 tentativas de login por minuto (429). A contagem fica no banco (`identity.login_rate_limits`, só o resumo SHA-256 do IP), então vale para várias instâncias da API ao mesmo tempo (ADR 0028).
 - Sessão expira após 30 min sem uso (`SESSION_IDLE_MINUTES`) e após 12 h no total (`SESSION_ABSOLUTE_HOURS`).
 - Desativar um usuário ou redefinir o acesso dele revoga **na hora** todas as sessões.
 - Toda requisição que altera dados (POST, PUT, PATCH, DELETE) com sessão exige o cabeçalho `x-csrf-token` igual ao da sessão (403 `CSRF_FAILED`). Cookie `SameSite=Strict` e `HttpOnly`.

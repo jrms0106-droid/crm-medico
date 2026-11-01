@@ -9,7 +9,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Session, User } from '../generated/prisma/client.js';
 import { SecretBox } from './crypto.js';
 import { burnPasswordCheck, hashPassword, temporaryPassword, verifyPassword } from './password.js';
-import { FixedWindowRateLimiter } from './rate-limiter.js';
+import { DbRateLimiter } from './rate-limiter.js';
 import { type AuthContext, SessionService } from './session.service.js';
 import { generateTotpSecret, otpauthUri, verifyTotp } from './totp.js';
 
@@ -24,7 +24,7 @@ const invalidMfaCode = () =>
 @Injectable()
 export class AuthService {
   private readonly secretBox: SecretBox;
-  private readonly loginLimiter: FixedWindowRateLimiter;
+  private readonly loginLimiter: DbRateLimiter;
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -33,7 +33,7 @@ export class AuthService {
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {
     this.secretBox = new SecretBox(config.MFA_ENCRYPTION_KEY);
-    this.loginLimiter = new FixedWindowRateLimiter(config.LOGIN_RATE_LIMIT_PER_MINUTE, MINUTE);
+    this.loginLimiter = new DbRateLimiter(prisma, config.LOGIN_RATE_LIMIT_PER_MINUTE, MINUTE);
   }
 
   async login(
@@ -42,7 +42,7 @@ export class AuthService {
     meta: { ip?: string | undefined; userAgent?: string | undefined },
   ): Promise<{ token: string; user: User; session: Session }> {
     const now = this.clock.now();
-    if (!this.loginLimiter.consume(meta.ip ?? 'desconhecido', now.getTime())) {
+    if (!(await this.loginLimiter.consume(`login:${meta.ip ?? 'desconhecido'}`, now))) {
       throw new AppError(
         429,
         ErrorCode.RATE_LIMITED,
