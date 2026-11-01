@@ -129,6 +129,8 @@ describe('interruptores da IA', () => {
       expect.objectContaining({ feature: 'request_triage', enabled: false }),
       expect.objectContaining({ feature: 'schedule_suggestions', enabled: false }),
       expect.objectContaining({ feature: 'admin_report', enabled: false }),
+      expect.objectContaining({ feature: 'record_draft', enabled: false }),
+      expect.objectContaining({ feature: 'record_summary', enabled: false }),
     ]);
     const res = await c.as.secretary.post('/ai/request-triage', { text: 'Quero remarcar.' });
     expect(res.status).toBe(403);
@@ -161,7 +163,8 @@ describe('interruptores da IA', () => {
     expect(errorCode(stale.body)).toBe('REAUTH_REQUIRED');
     await c.as.admin.reauth(c.users.admin, t.clock);
     expect((await c.as.admin.put('/ai/features/inventada', { enabled: true })).status).toBe(404);
-    expect((await c.as.doctor.get('/ai/features')).status).toBe(403);
+    // O médico vê os interruptores (para a tela saber se mostra o assistente clínico).
+    expect((await c.as.doctor.get('/ai/features')).status).toBe(200);
   });
 });
 
@@ -328,7 +331,10 @@ describe('revisão humana e registro de uso', () => {
     const all = await c.as.admin.get('/ai/requests');
     expect(all.body).toHaveLength(2);
     expect(all.body.every((r: { output: unknown }) => r.output === null)).toBe(true);
-    expect((await c.as.doctor.get('/ai/requests')).status).toBe(403);
+    // O médico só vê o próprio histórico (aqui, vazio).
+    const doctorList = await c.as.doctor.get('/ai/requests');
+    expect(doctorList.status).toBe(200);
+    expect(doctorList.body).toEqual([]);
   });
 
   it('médico e administrador não usam as funcionalidades', async () => {
@@ -537,10 +543,10 @@ describe('relatório assistido', () => {
       decision: 'discarded',
     });
     expect(other.status).toBe(404);
-    // O médico nem chega a procurar.
+    // O médico também não: o pedido não é dele.
     const doctor = await c.as.doctor.post(`/ai/requests/${report.body.requestId}/decision`, {
       decision: 'discarded',
     });
-    expect(doctor.status).toBe(403);
+    expect(doctor.status).toBe(404);
   });
 });

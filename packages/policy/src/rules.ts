@@ -148,10 +148,19 @@ export const RESOURCE_CATALOG: Readonly<Record<ResourceType, ResourceSpec>> = {
     unitScope: 'none',
     grants: { admin: ['create', 'edit'] },
   },
+  // IA nível 2, documental (docs/api/ia-nivel-2.md): só o médico. Usar é `create`; a decisão
+  // sobre o próprio uso é `edit`. O prontuário do paciente passa, além disso, pela regra do
+  // vínculo em `clinical_record`, conferida em cada rota.
+  ai_clinical: {
+    dataClass: 'ai',
+    unitScope: 'none',
+    grants: { doctor: ['view', 'create', 'edit'] },
+  },
+  // O médico vê os interruptores (para a tela saber o que mostrar); só o administrador muda.
   ai_settings: {
     dataClass: 'administrative',
     unitScope: 'none',
-    grants: { secretary: ['view'], admin: ['view', 'edit'] },
+    grants: { doctor: ['view'], secretary: ['view'], admin: ['view', 'edit'] },
   },
   patient_import: {
     dataClass: 'personal',

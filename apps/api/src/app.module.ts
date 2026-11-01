@@ -1,5 +1,6 @@
 import { type DynamicModule, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { AiClinicalService } from './ai/ai-clinical.service.js';
 import { AiInsightsService } from './ai/ai-insights.service.js';
 import { AiController } from './ai/ai.controller.js';
 import { AiService } from './ai/ai.service.js';
@@ -99,6 +100,7 @@ export class AppModule {
         FhirCopyService,
         AiService,
         AiInsightsService,
+        AiClinicalService,
         { provide: LanguageModel, useValue: overrides.languageModel ?? new SimulatedModel() },
         PatientImportService,
         DocumentsService,

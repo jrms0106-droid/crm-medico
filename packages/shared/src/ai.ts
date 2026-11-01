@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { RecordKind } from './records.js';
 
 /** IA nível 1, administrativa (docs/api/ia-nivel-1.md). */
 export const AI_FEATURES = [
@@ -6,6 +7,8 @@ export const AI_FEATURES = [
   'request_triage',
   'schedule_suggestions',
   'admin_report',
+  'record_draft',
+  'record_summary',
 ] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 
@@ -14,6 +17,8 @@ export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
   request_triage: 'Classificação de pedidos dos pacientes',
   schedule_suggestions: 'Organização da agenda',
   admin_report: 'Relatório administrativo assistido',
+  record_draft: 'Organizar anotações no registro (médico)',
+  record_summary: 'Resumo do prontuário com fontes (médico)',
 };
 
 /** Funcionalidades da recepção (`ai_assist`) e do administrador (`ai_report`). */
@@ -22,6 +27,9 @@ export const AI_RECEPTION_FEATURES: readonly AiFeature[] = [
   'request_triage',
   'schedule_suggestions',
 ];
+
+/** IA nível 2, documental: só o médico (`ai_clinical`). */
+export const AI_CLINICAL_FEATURES: readonly AiFeature[] = ['record_draft', 'record_summary'];
 
 export const AI_SIMULATED_NOTICE =
   'Sugestão do modelo simulado: nenhum serviço de IA está contratado e nenhum dado sai do sistema. ' +
@@ -257,4 +265,114 @@ export interface AiRequestDto {
   edited: boolean | null;
   decidedAt: string | null;
   createdAt: string;
+}
+
+// ---- IA nível 2, documental (docs/api/ia-nivel-2.md) ----
+
+export const AI_CLINICAL_NOTICE =
+  'Rascunho do modelo simulado: o assistente só reorganiza frases que já existem, sem mudar uma ' +
+  'letra, e não preenche hipóteses nem CID. Revise; nada entra no prontuário sem você salvar e ' +
+  'assinar.';
+
+export const RECORD_NOTES_MAX_CHARS = 8000;
+export const RECORD_NOTES_MAX_SENTENCES = 60;
+export const RECORD_SUMMARY_MAX_RECORDS = 10;
+export const RECORD_SUMMARY_MAX_ITEMS = 12;
+
+/** Campos de texto do registro que a IA pode organizar. Hipóteses e CID nunca. */
+export const AI_RECORD_FIELDS = ['chiefComplaint', 'anamnesis', 'physicalExam', 'plan'] as const;
+export type AiRecordField = (typeof AI_RECORD_FIELDS)[number];
+
+export const AI_RECORD_FIELD_LABELS: Record<AiRecordField, string> = {
+  chiefComplaint: 'Motivo da consulta',
+  anamnesis: 'Anamnese',
+  physicalExam: 'Exame físico',
+  plan: 'Conduta',
+};
+
+/**
+ * Divide um texto em frases: ponto final, interrogação, exclamação e ponto e vírgula seguidos de
+ * espaço, e quebras de linha. Pontos dentro de números ("37.8", "1.000") não cortam.
+ */
+export function splitSentences(text: string): string[] {
+  return text
+    .split(/\r?\n+|(?<=[.!?;])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+export const recordDraftSuggestionSchema = z.strictObject({
+  patientId: z.uuid('Paciente inválido.'),
+  notes: z
+    .string()
+    .trim()
+    .min(3, 'Escreva as anotações da consulta.')
+    .max(RECORD_NOTES_MAX_CHARS, 'Máximo de 8.000 caracteres.'),
+});
+
+export const recordSummarySuggestionSchema = z.strictObject({
+  patientId: z.uuid('Paciente inválido.'),
+});
+
+const sentenceCode = z.string().regex(/^S\d{1,2}$/);
+
+/** Saída do modelo: só códigos de frase por campo. */
+export const recordDraftOutputSchema = z.strictObject({
+  fields: z.strictObject({
+    chiefComplaint: z.array(sentenceCode).max(RECORD_NOTES_MAX_SENTENCES),
+    anamnesis: z.array(sentenceCode).max(RECORD_NOTES_MAX_SENTENCES),
+    physicalExam: z.array(sentenceCode).max(RECORD_NOTES_MAX_SENTENCES),
+    plan: z.array(sentenceCode).max(RECORD_NOTES_MAX_SENTENCES),
+  }),
+});
+export type RecordDraftOutput = z.infer<typeof recordDraftOutputSchema>;
+
+/** Saída do modelo: itens com o campo e os códigos `R<n>.S<m>` das frases. */
+export const recordSummaryOutputSchema = z.strictObject({
+  items: z
+    .array(
+      z.strictObject({
+        field: z.enum(AI_RECORD_FIELDS),
+        refs: z
+          .array(z.string().regex(/^R\d{1,2}\.S\d{1,3}$/))
+          .min(1)
+          .max(5),
+      }),
+    )
+    .max(RECORD_SUMMARY_MAX_ITEMS),
+});
+export type RecordSummaryOutput = z.infer<typeof recordSummaryOutputSchema>;
+
+export interface RecordDraftSuggestionDto {
+  requestId: string;
+  /** Texto de cada campo, montado com as frases originais, e os números das frases usadas. */
+  fields: { field: AiRecordField; label: string; text: string; sentences: number[] }[];
+  /** Frases que o modelo não colocou em nenhum campo, para nada se perder. */
+  unassigned: { number: number; text: string }[];
+  model: AiModelInfoDto;
+  notice: string;
+}
+
+export interface RecordSummaryItemDto {
+  field: AiRecordField;
+  label: string;
+  /** Frases originais, sem alteração. */
+  text: string;
+  source: {
+    recordId: string;
+    clinicalDate: string;
+    kind: RecordKind;
+    authorName: string;
+  };
+}
+
+export interface RecordSummarySuggestionDto {
+  requestId: string;
+  items: RecordSummaryItemDto[];
+  /** Registros assinados usados como fonte. */
+  recordsUsed: number;
+  /** Registros sensíveis de outro médico que ficaram de fora (abrir exige justificativa). */
+  sensitiveHidden: number;
+  model: AiModelInfoDto;
+  notice: string;
 }

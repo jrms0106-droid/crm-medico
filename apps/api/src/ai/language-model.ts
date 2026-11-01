@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import {
   type AdminReportMetrics,
   type AiFeature,
+  type AiRecordField,
   type MessagePurpose,
+  RECORD_SUMMARY_MAX_ITEMS,
+  type RecordDraftOutput,
+  type RecordSummaryOutput,
   SCHEDULE_SUGGESTIONS_MAX,
   type ScheduleSuggestionsOutput,
   type TriageCategory,
@@ -231,6 +235,107 @@ export function simulatedReport(
   return out;
 }
 
+// ---- IA nível 2, documental (docs/api/ia-nivel-2.md) ----
+
+/** Frases numeradas das anotações do médico. */
+export interface RecordNotesFacts {
+  sentences: { code: string; text: string }[];
+}
+
+/** Frases numeradas dos registros assinados, do mais recente (`R1`) para o mais antigo. */
+export interface RecordSummaryFacts {
+  records: {
+    code: string;
+    fields: Partial<Record<AiRecordField, { code: string; text: string }[]>>;
+  }[];
+}
+
+const EXAM_WORDS = [
+  'ao exame',
+  'exame fisico',
+  'pressao arterial',
+  'pa ',
+  'fc ',
+  'fr ',
+  'spo2',
+  'saturacao',
+  'temperatura',
+  'ausculta',
+  'abdome',
+  'bpm',
+  'mmhg',
+  'irpm',
+  'orofaringe',
+  'otoscopia',
+  'palpacao',
+  'afebril',
+  'corado',
+  'hidratado',
+  'eupneic',
+];
+const PLAN_WORDS = [
+  'prescrevo',
+  'prescrito',
+  'receito',
+  'oriento',
+  'orientad',
+  'solicito',
+  'solicitad',
+  'peco ',
+  'encaminh',
+  'retorno',
+  'retornar',
+  'conduta',
+  'manter ',
+  'suspender',
+  'suspendo',
+  'repouso',
+];
+const REASON_WORDS = ['queixa', 'motivo', 'vem a consulta', 'vem por', 'procura atendimento'];
+
+const mentions = (text: string, words: string[]) => {
+  const t = ` ${normalizeSearch(text)} `;
+  return words.some((w) => t.includes(w));
+};
+
+/**
+ * Organização por palavras-chave: exame físico e conduta pelas palavras típicas; o motivo é a
+ * frase que fala em queixa ou motivo (ou, sem ela, a primeira frase que sobrar); o resto vai
+ * para a anamnese. Só devolve códigos.
+ */
+export function simulatedRecordDraft(facts: RecordNotesFacts): RecordDraftOutput {
+  const fields: RecordDraftOutput['fields'] = {
+    chiefComplaint: [],
+    anamnesis: [],
+    physicalExam: [],
+    plan: [],
+  };
+  const rest: { code: string; text: string }[] = [];
+  for (const s of facts.sentences) {
+    if (mentions(s.text, PLAN_WORDS)) fields.plan.push(s.code);
+    else if (mentions(s.text, EXAM_WORDS)) fields.physicalExam.push(s.code);
+    else rest.push(s);
+  }
+  const reason = rest.find((s) => mentions(s.text, REASON_WORDS)) ?? rest[0];
+  for (const s of rest) {
+    if (s === reason) fields.chiefComplaint.push(s.code);
+    else fields.anamnesis.push(s.code);
+  }
+  return { fields };
+}
+
+/** Resumo extrativo: de cada registro, a primeira frase do motivo e a primeira da conduta. */
+export function simulatedRecordSummary(facts: RecordSummaryFacts): RecordSummaryOutput {
+  const items: RecordSummaryOutput['items'] = [];
+  for (const r of facts.records) {
+    for (const field of ['chiefComplaint', 'plan'] as const) {
+      const first = r.fields[field]?.[0];
+      if (first) items.push({ field, refs: [first.code] });
+    }
+  }
+  return { items: items.slice(0, RECORD_SUMMARY_MAX_ITEMS) };
+}
+
 /**
  * Modelo simulado: regras fixas dentro da API, sem enviar nada para fora. Único adaptador até
  * haver um fornecedor autorizado (docs/api/ia-nivel-1.md).
@@ -246,6 +351,14 @@ export class SimulatedModel extends LanguageModel {
     if (request.feature === 'schedule_suggestions') {
       const facts = JSON.parse(request.fields['facts'] ?? '{}') as ScheduleFacts;
       return Promise.resolve(JSON.stringify(simulatedSchedule(facts)));
+    }
+    if (request.feature === 'record_draft') {
+      const facts = JSON.parse(request.fields['facts'] ?? '{}') as RecordNotesFacts;
+      return Promise.resolve(JSON.stringify(simulatedRecordDraft(facts)));
+    }
+    if (request.feature === 'record_summary') {
+      const facts = JSON.parse(request.fields['facts'] ?? '{}') as RecordSummaryFacts;
+      return Promise.resolve(JSON.stringify(simulatedRecordSummary(facts)));
     }
     if (request.feature === 'admin_report') {
       const metrics = JSON.parse(request.fields['metrics'] ?? '{}') as AdminReportMetrics;
