@@ -35,11 +35,12 @@ tela e com pessoas que usam tecnologia assistiva.
    a contagem foi para o banco e vale entre instâncias (ADR 0028).
 2. ~~**Relatório financeiro soma as cobranças em aberto desde sempre.**~~ Resolvido em
    2026-11-01: o saldo em aberto é somado no próprio banco, sem carregar as cobranças.
-3. **Avisos do `npm audit` nas ferramentas de build do PWA** (`vite-plugin-pwa` → `workbox-build`
-   → `glob`/`minimatch`/`deepmerge`). Não vão para o servidor nem para o navegador; a correção
-   sugerida volta o plugin para uma versão antiga. Acompanhar uma versão nova do plugin.
-4. **Registro de erro inesperado guarda a pilha do erro.** Um erro do banco pode trazer valores da
-   consulta. Em produção, os registros precisam do mesmo cuidado de acesso e prazo que os dados.
+3. ~~**Avisos do `npm audit` nas ferramentas de build do PWA.**~~ Resolvido em 2026-11-01:
+   `overrides` sobem `glob`, `minimatch` e o plugin que puxava `ejs` 3. Sobrou só `deepmerge`
+   (gravidade baixa, sem versão corrigida, só no build), registrado no ADR 0029.
+4. ~~**Registro de erro inesperado guarda a pilha do erro.**~~ Resolvido em 2026-11-01: o
+   registro guarda só tipo, código e linhas da pilha, sem a mensagem (ADR 0029). Em produção,
+   os registros ainda precisam de acesso restrito e prazo de guarda.
 5. **Testes que só pessoas fazem:** leitor de tela (NVDA, VoiceOver), uso só pelo teclado nas
    telas longas (prontuário, financeiro) e contraste com as cores reais da clínica.
 6. **Validação independente** antes de uso real: teste de invasão, avaliação jurídica (LGPD,

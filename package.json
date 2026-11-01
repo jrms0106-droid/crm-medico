@@ -42,5 +42,10 @@
     "typescript-eslint": "^8.71.2",
     "vitest": "^5.0.5"
   },
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "@trickfilm400/rollup-plugin-off-main-thread": "^4.0.0",
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1"
+  }
 }
