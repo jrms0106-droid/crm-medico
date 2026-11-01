@@ -42,6 +42,27 @@ const menu = (page: Page) => page.getByRole('navigation', { name: 'Menu principa
 const PATIENT = `Paciente Fictícia E2E ${Date.now()}`;
 
 test.describe.serial('fluxos por perfil', () => {
+  // O site é servido com a política de conteúdo (CSP) da produção; qualquer bloqueio reprova.
+  let blocked: string[] = [];
+  test.beforeEach(({ page }) => {
+    blocked = [];
+    page.on('console', (msg) => {
+      if (/Content Security Policy/i.test(msg.text())) blocked.push(msg.text());
+    });
+  });
+  test.afterEach(() => {
+    expect(blocked, 'violações da política de conteúdo (CSP)').toEqual([]);
+  });
+
+  test('o site vem com os cabeçalhos de segurança', async ({ page }) => {
+    const res = await page.goto('/');
+    const headers = res?.headers() ?? {};
+    expect(headers['content-security-policy']).toContain("script-src 'self'");
+    expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
+    expect(headers['x-content-type-options']).toBe('nosniff');
+    expect(headers['referrer-policy']).toBe('no-referrer');
+  });
+
   test('menus mudam conforme o perfil', async ({ page }) => {
     await login(page, 'admin');
     await expect(menu(page).getByRole('link')).toHaveText([

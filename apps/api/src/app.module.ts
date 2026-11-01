@@ -1,5 +1,5 @@
 import { type DynamicModule, Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AiClinicalService } from './ai/ai-clinical.service.js';
 import { AiInsightsService } from './ai/ai-insights.service.js';
 import { AiController } from './ai/ai.controller.js';
@@ -21,6 +21,7 @@ import { DocumentsService } from './documents/documents.service.js';
 import { HealthController } from './health/health.controller.js';
 import { AdminUsersController } from './identity/admin-users.controller.js';
 import { AuthController } from './identity/auth.controller.js';
+import { AuthorizationEnforcedInterceptor } from './authz/authz-enforcement.js';
 import { AuthGuard } from './identity/auth.guard.js';
 import { AuthService } from './identity/auth.service.js';
 import { SessionService } from './identity/session.service.js';
@@ -110,6 +111,7 @@ export class AppModule {
         RemindersRunner,
         { provide: MessageSender, useValue: overrides.messageSender ?? new SimulatedSender() },
         { provide: APP_GUARD, useClass: AuthGuard },
+        { provide: APP_INTERCEPTOR, useClass: AuthorizationEnforcedInterceptor },
       ],
     };
   }

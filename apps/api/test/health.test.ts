@@ -24,6 +24,13 @@ describe('API: saúde e formato de erro (integração com PostgreSQL real)', () 
     expect(body).toMatchObject({ status: 'ok', database: 'ok', clinicalUseApproved: false });
   });
 
+  it('respostas da API pedem para não guardar cópia (Cache-Control: no-store)', async () => {
+    const res = await request(app.getHttpServer()).get('/api/v1/health').expect(200);
+    expect(res.headers['cache-control']).toBe('no-store');
+    const denied = await request(app.getHttpServer()).get('/api/v1/patients').expect(401);
+    expect(denied.headers['cache-control']).toBe('no-store');
+  });
+
   it('rota inexistente devolve 404 no formato padrão, com requestId', async () => {
     const res = await request(app.getHttpServer()).get('/api/v1/nao-existe').expect(404);
     const body = errorResponseSchema.parse(res.body);

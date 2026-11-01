@@ -14,6 +14,20 @@ describe('loadConfig', () => {
     expect(config.COOKIE_SECURE).toBe(false);
     expect(config.CARE_COURTESY_DAYS).toBe(30);
     expect(config.EMERGENCY_ACCESS_HOURS).toBe(4);
+    expect(config.TRUST_PROXY).toBe(0);
+  });
+
+  it('TRUST_PROXY conta proxies: true vale 1, false vale 0, e só aceita 0 a 5', () => {
+    const base = {
+      DATABASE_URL: 'postgresql://x@localhost/db',
+      MFA_ENCRYPTION_KEY: Buffer.alloc(32).toString('base64'),
+      PII_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
+    };
+    expect(loadConfig({ ...base, TRUST_PROXY: 'true' }).TRUST_PROXY).toBe(1);
+    expect(loadConfig({ ...base, TRUST_PROXY: 'false' }).TRUST_PROXY).toBe(0);
+    expect(loadConfig({ ...base, TRUST_PROXY: '2' }).TRUST_PROXY).toBe(2);
+    expect(() => loadConfig({ ...base, TRUST_PROXY: 'sim' })).toThrow(/TRUST_PROXY/);
+    expect(() => loadConfig({ ...base, TRUST_PROXY: '9' })).toThrow(/TRUST_PROXY/);
   });
 
   it('em produção exige cookie seguro e chave de MFA válida', () => {

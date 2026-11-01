@@ -105,6 +105,28 @@ describe('login com senha', () => {
     }
   });
 
+  it('atrás de um proxy, trocar o X-Forwarded-For não escapa do limite por IP', async () => {
+    const limited = await startTestApp({ LOGIN_RATE_LIMIT_PER_MINUTE: '3', TRUST_PROXY: '1' });
+    try {
+      const server = limited.app.getHttpServer();
+      const attempt = (forwarded: string) =>
+        request(server)
+          .post('/api/v1/auth/login')
+          .set('X-Forwarded-For', forwarded)
+          .send({ email: 'x@clinica-ficticia.test', password: 'senha-errada' });
+      // O cliente inventa o primeiro IP a cada tentativa; o proxy acrescenta o IP real no fim.
+      const statuses: number[] = [];
+      for (let i = 1; i <= 4; i++)
+        statuses.push((await attempt(`10.0.0.${i}, 203.0.113.7`)).status);
+      expect(statuses).toEqual([401, 401, 401, 429]);
+      // Outro cliente real (outro IP visto pelo proxy) não é afetado.
+      expect((await attempt('10.0.0.1, 203.0.113.8')).status).toBe(401);
+    } finally {
+      await limited.app.close();
+      await limited.db.$disconnect();
+    }
+  });
+
   it('o limite é contado no banco: vale entre instâncias, vence com a janela e não guarda o IP', async () => {
     const a = await startTestApp({ LOGIN_RATE_LIMIT_PER_MINUTE: '3' });
     const b = await startTestApp({ LOGIN_RATE_LIMIT_PER_MINUTE: '3' });

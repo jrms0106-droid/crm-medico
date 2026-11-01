@@ -2,6 +2,32 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+/**
+ * Cabeçalhos de segurança do site. O `vite preview` (usado no teste ponta a ponta) já serve
+ * com eles, para provar que o app funciona assim; a hospedagem deve repetir os mesmos
+ * (docs/operacao/requisitos-de-hospedagem.md).
+ */
+export const SECURITY_HEADERS: Record<string, string> = {
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self'",
+    "img-src 'self' data:",
+    "connect-src 'self'",
+    "font-src 'self'",
+    "worker-src 'self'",
+    "manifest-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '),
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+};
+
 export default defineConfig({
   plugins: [
     react(),
@@ -32,4 +58,5 @@ export default defineConfig({
     // Em testes ponta a ponta, a API roda em outra porta (playwright.config.ts).
     proxy: { '/api': process.env['API_URL'] ?? 'http://localhost:3000' },
   },
+  preview: { headers: SECURITY_HEADERS },
 });

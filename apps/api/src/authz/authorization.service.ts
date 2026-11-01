@@ -14,6 +14,7 @@ import { ErrorCode } from '@crm/shared';
 import { AuditService } from '../audit/audit.service.js';
 import { AppError } from '../common/app-error.js';
 import { SessionService } from '../identity/session.service.js';
+import { markAuthorizationChecked } from './authz-enforcement.js';
 import type { AuthContext } from '../identity/session.service.js';
 
 export interface ResourceRef {
@@ -48,6 +49,7 @@ export class AuthorizationService {
     resource: ResourceRef,
     context: AccessContext = {},
   ): Promise<void> {
+    markAuthorizationChecked(ctx);
     const decision = this.check(ctx, action, resource, context);
     await this.audit.record(ctx, {
       action,
@@ -106,6 +108,7 @@ export class AuthorizationService {
     id: string,
     message = 'Não encontrado.',
   ): Promise<never> {
+    markAuthorizationChecked(ctx);
     await this.audit.record(ctx, {
       action,
       resourceType: type,
