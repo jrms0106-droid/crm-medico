@@ -11,6 +11,7 @@ import type { Request, Response } from 'express';
 import { parseBody } from '../common/validation.js';
 import { APP_CONFIG } from '../config.tokens.js';
 import type { AppConfig } from '../config.js';
+import { SelfService } from '../authz/authz-enforcement.js';
 import { AllowStates, Auth, Public } from './auth.decorators.js';
 import { AuthService } from './auth.service.js';
 import { clearSessionCookie, setSessionCookie } from './cookies.js';
@@ -46,6 +47,7 @@ export class AuthController {
     return this.sessions.toInfo(result);
   }
 
+  @SelfService()
   @AllowStates('pending_mfa', 'password_change_required', 'active')
   @Post('logout')
   @HttpCode(204)
@@ -54,12 +56,14 @@ export class AuthController {
     clearSessionCookie(res, this.config);
   }
 
+  @SelfService()
   @AllowStates('pending_mfa', 'password_change_required', 'active')
   @Get('me')
   me(@Auth() ctx: AuthContext): SessionInfo {
     return this.sessions.toInfo(ctx);
   }
 
+  @SelfService()
   @AllowStates('pending_mfa', 'active')
   @Post('mfa/setup')
   @HttpCode(200)
@@ -67,6 +71,7 @@ export class AuthController {
     return this.auth.setupMfa(ctx);
   }
 
+  @SelfService()
   @AllowStates('pending_mfa', 'active')
   @Post('mfa/activate')
   @HttpCode(200)
@@ -75,6 +80,7 @@ export class AuthController {
     return this.sessions.toInfo(await this.auth.activateMfa(ctx, code));
   }
 
+  @SelfService()
   @AllowStates('pending_mfa')
   @Post('mfa/verify')
   @HttpCode(200)
@@ -83,6 +89,7 @@ export class AuthController {
     return this.sessions.toInfo(await this.auth.verifyMfa(ctx, code));
   }
 
+  @SelfService()
   @AllowStates('password_change_required', 'active')
   @Post('password')
   @HttpCode(200)
@@ -91,6 +98,7 @@ export class AuthController {
     return this.sessions.toInfo(await this.auth.changePassword(ctx, currentPassword, newPassword));
   }
 
+  @SelfService()
   @Post('reauth')
   @HttpCode(204)
   async reauth(@Auth() ctx: AuthContext, @Body() body: unknown): Promise<void> {

@@ -42,13 +42,25 @@ const envSchema = z
     // Lembretes (docs/api/crm-e-lembretes.md). 0 desliga a rotina; o envio é sempre simulado.
     REMINDERS_INTERVAL_SECONDS: z.coerce.number().int().min(0).max(3600).default(0),
     COOKIE_SECURE: booleanFromEnv,
-    TRUST_PROXY: booleanFromEnv,
+    /**
+     * Quantos proxies reversos ficam na frente da API. O IP do cliente é o que o último proxy
+     * de confiança viu; um `X-Forwarded-For` montado pelo próprio cliente é ignorado. `true`
+     * vale 1 (um proxy), `false` vale 0.
+     */
+    TRUST_PROXY: z
+      .string()
+      .regex(
+        /^(true|false|[0-5])$/,
+        'TRUST_PROXY aceita true, false ou o número de proxies (0 a 5)',
+      )
+      .transform((v) => (v === 'true' ? 1 : v === 'false' ? 0 : Number(v)))
+      .optional(),
   })
   .transform((c) => ({
     ...c,
     // Fora de desenvolvimento/teste o cookie só trafega por HTTPS.
     COOKIE_SECURE: c.COOKIE_SECURE ?? c.NODE_ENV === 'production',
-    TRUST_PROXY: c.TRUST_PROXY ?? false,
+    TRUST_PROXY: c.TRUST_PROXY ?? 0,
   }));
 
 export type AppConfig = z.infer<typeof envSchema>;

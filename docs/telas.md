@@ -43,6 +43,7 @@ Nenhum dado de paciente é guardado no navegador: o token de proteção (CSRF) f
 
 `npm run e2e` sobe a API e o aplicativo compilados (`npm run build` antes) contra o banco de **teste**, recria dados fictícios (`e2e/seed.ts`) e roda no Chromium:
 
+0. o site vem com a política de conteúdo (CSP) e os cabeçalhos de segurança da produção, e qualquer bloqueio da política durante os fluxos reprova o teste;
 1. os menus mudam conforme o perfil, e o endereço de uma área de outro perfil não abre;
 2. a secretária cadastra um paciente, marca a consulta, confirma e registra a chegada;
 3. o médico inicia o atendimento, escreve o registro, finaliza, assina com senha e código e vê "Conteúdo íntegro"; depois emite uma receita simples, assina, confere que o PDF abre, encerra o atendimento e gera a cópia do prontuário (o arquivo traz o registro e a receita assinados) e a mesma cópia no padrão FHIR;

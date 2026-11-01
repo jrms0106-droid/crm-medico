@@ -1,0 +1,11 @@
+# ADR 0031: proxies contados, respostas sem cache e autorização obrigatória em toda rota
+
+- **Status:** aceito (2026-11-01, [revisão de segurança](../revisao/2026-11-01-revisao-de-seguranca.md))
+- **Decisão 1 (proxies):** `TRUST_PROXY` passa a ser o número de proxies reversos na frente da API (0 a 5). `true` vale 1 e `false` vale 0, para não quebrar configurações antigas. O Express conta os proxies da direita para a esquerda no `X-Forwarded-For`.
+- **Decisão 2 (cache):** Toda resposta da API leva `Cache-Control: no-store` e `Pragma: no-cache`.
+- **Decisão 3 (autorização obrigatória):** Um interceptor global confere, no fim de cada rota com login, se houve uma decisão da política (`authorize` ou `notFound`). Se não houve, a resposta vira 403 e o erro é registrado. Rotas que só mexem na própria sessão (sair, `me`, MFA, troca de senha, reautenticação) são marcadas com `@SelfService()`.
+- **Decisão 4 (site):** O site tem uma política de conteúdo (CSP) e cabeçalhos de segurança definidos em `apps/web/vite.config.ts`, servidos pelo `vite preview` no teste ponta a ponta, que reprova qualquer bloqueio.
+- **Motivo:** Com `true`, o Express confia em todos os saltos e usa o primeiro IP da lista, que o cliente escreve; o limite de login por IP deixava de valer. Dados de paciente não devem ficar em cache de navegador ou proxy. A negação por padrão precisa valer também para o esquecimento de quem escreve uma rota nova.
+- **Alternativas descartadas:** lista de IPs dos proxies (depende da hospedagem, que não foi escolhida; pode ser adotada depois); `no-store` só nas rotas clínicas (fácil de esquecer numa rota nova); conferir a autorização só por revisão de código (não pega esquecimento); exigir a decisão antes de executar a rota (a decisão depende de dados que a própria rota carrega).
+- **Consequências:** Quem configura a produção precisa informar quantos proxies existem. O interceptor confere depois da rota executar: uma rota que esquecesse a política e gravasse algo ainda gravaria, mas a resposta seria 403 e os testes reprovariam. Por isso a regra continua: toda rota nova tem teste de acesso permitido e negado. A hospedagem precisa repetir os cabeçalhos do site.
+- **Revisar quando:** A hospedagem for escolhida (número de proxies, cabeçalhos no servidor do site, registros sem query string) ou o site passar a carregar algo de outro domínio.
