@@ -428,9 +428,11 @@ describe('lista e relatório', () => {
     // Admin sem unidade: a organização toda. Secretária de outra unidade: nega.
     const org = await c.as.admin.get('/billing/report?from=2026-03-02&to=2026-03-02');
     expect(org.body.received.totalCents).toBe(30000);
+    expect(org.body).toMatchObject({ openCents: 25000, openCount: 1 });
     expect((await c.as.otherSecretary.get(`/billing/report?${q}`)).status).toBe(403);
     const own = await c.as.otherSecretary.get('/billing/report?from=2026-03-02&to=2026-03-02');
     expect(own.body.received.totalCents).toBe(0);
+    expect(own.body).toMatchObject({ openCents: 0, openCount: 0 });
     expect((await c.as.doctor.get(`/billing/report?${q}`)).status).toBe(403);
     // Outro dia: nada.
     const before = await c.as.secretary.get(

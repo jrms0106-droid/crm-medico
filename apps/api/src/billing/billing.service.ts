@@ -20,7 +20,7 @@ import type { z } from 'zod';
 import { AppError } from '../common/app-error.js';
 import { Clock } from '../common/clock.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Charge, Payment, Prisma } from '../generated/prisma/client.js';
+import { type Charge, type Payment, Prisma } from '../generated/prisma/client.js';
 import type { AuthContext } from '../identity/session.service.js';
 import { canonicalJson } from '../records/records.service.js';
 import { fromLocal } from '../scheduling/time.js';
@@ -387,10 +387,24 @@ export class BillingService {
       where: { organizationId, charge: unitFilter, reversedAt: { gte: start, lt: end } },
       select: { amountCents: true },
     });
-    const open = await this.prisma.charge.findMany({
-      where: { organizationId, ...unitFilter, cancelledAt: null, createdAt: { lt: end } },
-      include: { payments: true },
-    });
+    // Saldo em aberto calculado no banco (não carrega o histórico inteiro na memória). Mesma
+    // regra de `chargeTotals`: líquido menos os pagamentos não estornados.
+    const unitSql = units
+      ? units.length > 0
+        ? Prisma.sql`AND c.unit_id IN (${Prisma.join(units.map((u) => Prisma.sql`${u}::uuid`))})`
+        : Prisma.sql`AND false`
+      : Prisma.empty;
+    const [open] = await this.prisma.$queryRaw<{ cents: bigint; n: number }[]>`
+      SELECT COALESCE(SUM(x.balance), 0)::bigint AS cents, COUNT(*)::int AS n
+      FROM (
+        SELECT c.amount_cents - c.discount_cents - COALESCE(
+          (SELECT SUM(p.amount_cents) FROM billing.payments p
+           WHERE p.charge_id = c.id AND p.reversed_at IS NULL), 0) AS balance
+        FROM billing.charges c
+        WHERE c.organization_id = ${organizationId}::uuid AND c.cancelled_at IS NULL
+          AND c.created_at < ${end} ${unitSql}
+      ) x
+      WHERE x.balance > 0`;
 
     const byMethod = Object.fromEntries(PAYMENT_METHODS.map((m) => [m, 0])) as Record<
       PaymentMethod,
@@ -398,7 +412,6 @@ export class BillingService {
     >;
     for (const p of received) byMethod[p.method] += p.amountCents;
     const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
-    const balances = open.map((c) => chargeTotals(c).balanceCents).filter((b) => b > 0);
     const gross = sum(charged.map((c) => c.amountCents));
     const discount = sum(charged.map((c) => c.discountCents));
     return {
@@ -413,8 +426,8 @@ export class BillingService {
       },
       received: { totalCents: sum(received.map((p) => p.amountCents)), byMethod },
       reversedCents: sum(reversed.map((p) => p.amountCents)),
-      openCents: sum(balances),
-      openCount: balances.length,
+      openCents: Number(open?.cents ?? 0),
+      openCount: open?.n ?? 0,
     };
   }
 

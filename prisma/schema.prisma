@@ -115,6 +115,18 @@ model Session {
 }
 
 /// Vínculo de um usuário com uma unidade. Recursos operacionais da unidade exigem este vínculo.
+/// Limite de tentativas de login por origem (docs/api/identidade.md). Guarda o resumo SHA-256
+/// da chave (o IP), nunca o IP; vale para várias instâncias da API ao mesmo tempo.
+model LoginRateLimit {
+  keyHash     String   @id @map("key_hash") @db.Char(64)
+  windowStart DateTime @map("window_start") @db.Timestamptz(3)
+  count       Int
+
+  @@index([windowStart])
+  @@map("login_rate_limits")
+  @@schema("identity")
+}
+
 model UnitMembership {
   userId    String   @map("user_id") @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
