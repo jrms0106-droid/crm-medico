@@ -52,6 +52,7 @@ Nenhum dado de paciente é guardado no navegador: o token de proteção (CSRF) f
 8. a secretária registra na ficha a autorização de lembretes pelo WhatsApp (o paciente foi cadastrado com telefone de WhatsApp) e abre a tela de lembretes;
 9. a secretária confere uma planilha com uma linha boa e uma sem data de nascimento, importa e abre o paciente criado;
 10. o administrador liga as quatro funcionalidades do assistente de IA; a secretária classifica uma mensagem com sinal de alerta (vê o aviso fixo), marca a sugestão como usada e, na agenda, gera e descarta um rascunho de mensagem de falta e pede a organização do dia; o administrador gera o resumo assistido no Financeiro.
+11. o axe-core confere as regras WCAG 2.1 A e AA no login e em todas as telas do menu de secretária, médico e administrador; o atalho **Pular para o conteúdo** é o primeiro item do teclado e o foco vai para o conteúdo ao trocar de tela.
 
 No contêiner de desenvolvimento, use o Chromium já instalado: `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e`. Com `E2E_SCREENSHOTS=<pasta>`, o teste guarda imagens das telas.
 

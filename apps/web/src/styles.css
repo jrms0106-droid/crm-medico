@@ -485,3 +485,21 @@ ul.plain {
   gap: 0.5rem;
   margin: 0.5rem 0;
 }
+
+/* Atalho de teclado: aparece só quando recebe o foco. */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -3rem;
+  z-index: 10;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  color: #000;
+  border: 2px solid currentColor;
+}
+.skip-link:focus {
+  top: 0.5rem;
+}
+main.content:focus {
+  outline: none;
+}

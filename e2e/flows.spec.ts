@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { type Page, expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { E2E_PASSWORD, E2E_TOTP_SECRET, USERS, type UserKey } from './fixtures.js';
@@ -511,5 +512,47 @@ test.describe.serial('fluxos por perfil', () => {
     await snap(page, '16-assistente-relatorio');
     await report.getByRole('button', { name: 'Copiar e marcar como usado' }).click();
     await expect(report.getByText('Texto copiado e marcado como usado.')).toBeVisible();
+  });
+  test('acessibilidade: telas de cada perfil sem violações WCAG 2.1 A/AA (axe)', async ({
+    page,
+  }) => {
+    test.setTimeout(600_000);
+    const problems: string[] = [];
+    const scanned: string[] = [];
+    const scan = async (where: string) => {
+      scanned.push(where);
+      const result = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+      for (const v of result.violations) {
+        const targets = v.nodes.map((n) => n.target.join(' ')).slice(0, 3);
+        problems.push(`${where}: [${v.impact}] ${v.id} (${v.nodes.length}) ${targets.join(' | ')}`);
+      }
+    };
+    await page.goto('/');
+    await expect(page.getByLabel('E-mail')).toBeVisible();
+    await scan('login');
+    for (const user of ['secretary', 'doctor', 'admin'] as const) {
+      await login(page, user);
+      if (user === 'secretary') {
+        // Atalho de teclado para pular o menu, e título da aba conforme a tela.
+        await page.keyboard.press('Tab');
+        await expect(page.getByRole('link', { name: 'Pular para o conteúdo' })).toBeFocused();
+        await menu(page).getByRole('link', { name: 'Agenda', exact: true }).click();
+        await expect(page).toHaveTitle('Agenda · CRM Médico');
+        await expect(page.locator('main#conteudo')).toBeFocused();
+      }
+      const links = await menu(page).getByRole('link').allTextContents();
+      for (const name of links) {
+        await menu(page).getByRole('link', { name, exact: true }).click();
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+        await page.waitForLoadState('networkidle');
+        await scan(`${user} › ${name}`);
+      }
+      await page.getByRole('button', { name: 'Sair' }).click();
+    }
+    test.info().annotations.push({ type: 'axe', description: scanned.join(', ') });
+    expect(scanned.length).toBeGreaterThan(15);
+    expect(problems, problems.join('\n')).toEqual([]);
   });
 });
