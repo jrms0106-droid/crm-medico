@@ -42,7 +42,10 @@ tela e com pessoas que usam tecnologia assistiva.
    registro guarda só tipo, código e linhas da pilha, sem a mensagem (ADR 0029). Em produção,
    os registros ainda precisam de acesso restrito e prazo de guarda.
 5. **Testes que só pessoas fazem:** leitor de tela (NVDA, VoiceOver), uso só pelo teclado nas
-   telas longas (prontuário, financeiro) e contraste com as cores reais da clínica.
+   telas longas (prontuário, financeiro) e contraste com as cores reais da clínica. O
+   [roteiro de testes com pessoas](roteiro-testes-com-pessoas.md) diz como fazer e anotar; o
+   fluxo principal da secretária já tem teste automático só pelo teclado
+   (`e2e/keyboard.spec.ts`).
 6. **Validação independente** antes de uso real: teste de invasão, avaliação jurídica (LGPD,
    CFM) e revisão das regras clínicas por médicos. Já registrado na
    [matriz de conformidade](../conformidade/matriz-de-conformidade.md).

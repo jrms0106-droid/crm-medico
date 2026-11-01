@@ -458,7 +458,8 @@ test.describe.serial('fluxos por perfil', () => {
       .fill('Estou com dor no peito desde cedo, posso ir hoje?');
     await triage.getByRole('button', { name: 'Classificar' }).click();
     await expect(page.getByText('Dúvida de saúde (passar ao médico)')).toBeVisible();
-    await expect(page.getByText(/ligar 192/)).toBeVisible();
+    // O aviso de sinal de alerta é lido pelo leitor de tela assim que aparece (papel alert).
+    await expect(page.getByRole('alert').filter({ hasText: /ligar 192/ })).toBeVisible();
     await expect(page.getByText(/modelo simulado/).first()).toBeVisible();
     await snap(page, '14-assistente-classificacao');
     await page.getByRole('button', { name: 'Copiar e marcar como usado' }).click();

@@ -35,15 +35,21 @@ export function Panel({ title, children }: { title?: string; children?: ReactNod
   );
 }
 
+/**
+ * Aviso fixo na tela. Com `announce`, o leitor de tela lê o aviso assim que ele aparece (papel
+ * `alert`); sem isso, é só uma nota que a pessoa encontra ao percorrer a página.
+ */
 export function Notice({
   kind = 'info',
+  announce = false,
   children,
 }: {
   kind?: 'info' | 'warn';
+  announce?: boolean;
   children: ReactNode;
 }) {
   return (
-    <p className={`notice ${kind}`} role="note">
+    <p className={`notice ${kind}`} role={announce ? 'alert' : 'note'}>
       {children}
     </p>
   );

@@ -231,7 +231,11 @@ function TriagePanel({ enabled, onUsed }: { enabled: boolean; onUsed: () => void
           <p role="status">
             Categoria: <strong>{TRIAGE_CATEGORY_LABELS[result.category]}</strong>
           </p>
-          {result.urgent && <Notice kind="warn">{TRIAGE_URGENT_NOTICE}</Notice>}
+          {result.urgent && (
+            <Notice kind="warn" announce>
+              {TRIAGE_URGENT_NOTICE}
+            </Notice>
+          )}
           <DraftReview
             key={result.requestId}
             requestId={result.requestId}
