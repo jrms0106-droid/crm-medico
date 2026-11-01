@@ -11,6 +11,10 @@ export function Page({
   actions?: ReactNode;
   children?: ReactNode;
 }) {
+  // O título da aba diz em que tela a pessoa está (também lido pelo leitor de tela).
+  useEffect(() => {
+    document.title = `${title} · CRM Médico`;
+  }, [title]);
   return (
     <section className="page-body">
       <header className="page-header">

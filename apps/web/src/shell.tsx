@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { ROLE_LABELS, type RoleName, type SessionInfo } from '@crm/shared';
 import { AuditPage } from './pages/admin';
 import { AssistantPage } from './pages/assistant';
@@ -48,8 +49,24 @@ export function Shell({ session, onLogout }: { session: SessionInfo; onLogout: (
     items.some((i) => i.path === section) ||
     (section === 'prontuario' && canSee(session, ['doctor']));
 
+  // Ao trocar de tela, o foco vai para o conteúdo: leitor de tela anuncia a tela nova e o
+  // teclado não fica preso no menu. Na primeira tela, o foco fica onde o navegador deixou.
+  const main = useRef<HTMLElement>(null);
+  const where = route.path.join('/');
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    main.current?.focus();
+  }, [where]);
+
   return (
     <div className="shell">
+      <a className="skip-link" href="#conteudo">
+        Pular para o conteúdo
+      </a>
       <header className="topbar">
         <span className="brand">CRM Médico</span>
         <nav aria-label="Menu principal">
@@ -71,7 +88,7 @@ export function Shell({ session, onLogout }: { session: SessionInfo; onLogout: (
           Sair
         </button>
       </header>
-      <main className="content">
+      <main className="content" id="conteudo" tabIndex={-1} ref={main}>
         {allowed ? (
           <Section session={session} path={route.path} params={route.params} />
         ) : (
