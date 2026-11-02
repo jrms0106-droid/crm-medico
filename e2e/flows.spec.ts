@@ -218,12 +218,15 @@ test.describe.serial('fluxos por perfil', () => {
     );
     const bundle = JSON.parse(await readFile(await fhirFile.path(), 'utf8')) as {
       resourceType: string;
-      entry: { resource: { resourceType: string } }[];
+      entry: { resource: { resourceType: string; type?: { text?: string } } }[];
     };
     expect(bundle.resourceType).toBe('Bundle');
     const types = bundle.entry.map((e) => e.resource.resourceType);
     expect(types.filter((x) => x === 'Composition')).toHaveLength(1);
-    expect(types.filter((x) => x === 'DocumentReference')).toHaveLength(1);
+    // A receita assinada no CRM e o registro da receita de controle emitida no CFM.
+    const refs = bundle.entry.filter((e) => e.resource.resourceType === 'DocumentReference');
+    expect(refs.map((e) => e.resource.type?.text)).toContain('Receita de controle especial');
+    expect(refs).toHaveLength(2);
     await expect(page.getByRole('status')).toContainText('Cópia no padrão FHIR gerada');
   });
 

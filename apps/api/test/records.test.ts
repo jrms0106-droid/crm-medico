@@ -677,6 +677,23 @@ describe('cópia do prontuário no padrão FHIR', () => {
       (await c.as.doctor.post(`/documents/${doc.body.id}/sign`, { version: doc.body.version }))
         .status,
     ).toBe(200);
+    // Emitidos no CFM: o registrado entra como DocumentReference; o cancelado fica de fora.
+    const external = `/patients/${c.patientId}/external-documents`;
+    const cfm = await c.as.doctor.post(external, {
+      kind: 'controlled_prescription',
+      issuedOn: '2026-03-01',
+      summary: 'Receita de controle fictícia emitida no CFM.',
+      validationCode: 'CFM-FICTICIO-123',
+    });
+    expect(cfm.status).toBe(201);
+    const wrong = await c.as.doctor.post(external, {
+      kind: 'certificate',
+      issuedOn: '2026-03-01',
+      summary: 'Atestado registrado por engano.',
+    });
+    await c.as.doctor.post(`/external-documents/${wrong.body.id}/cancel`, {
+      reason: 'Registrado no paciente errado.',
+    });
 
     await c.as.doctor.reauth(c.doctor, t.clock);
     const res = await c.as.doctor.get(`/patients/${c.patientId}/clinical-copy/fhir`);
@@ -724,7 +741,26 @@ describe('cópia do prontuário no padrão FHIR', () => {
     ]);
 
     const refs = byType('DocumentReference');
-    expect(refs.map((e) => e.fullUrl)).toEqual([`urn:uuid:${doc.body.id}`]);
+    expect(refs.map((e) => e.fullUrl)).toEqual([
+      `urn:uuid:${doc.body.id}`,
+      `urn:uuid:${cfm.body.id}`,
+    ]);
+    expect(json).not.toContain(wrong.body.id);
+    expect(refs[1]!.resource).toMatchObject({
+      status: 'current',
+      identifier: [
+        { system: 'urn:crm-medico:documento-externo', value: cfm.body.id },
+        { system: 'urn:crm-medico:cfm:codigo-de-validacao', value: 'CFM-FICTICIO-123' },
+      ],
+      type: { text: 'Receita de controle especial' },
+      date: '2026-03-01T00:00:00Z',
+      author: [{ reference: `urn:uuid:${c.doctor.id}` }],
+    });
+    const summary = (refs[1]!.resource.content as { attachment: { data: string } }[])[0]!.attachment
+      .data;
+    expect(Buffer.from(summary, 'base64').toString('utf8')).toBe(
+      'Receita de controle fictícia emitida no CFM.',
+    );
     const attachment = (refs[0]!.resource.content as { attachment: { data: string } }[])[0]!
       .attachment;
     expect(JSON.parse(Buffer.from(attachment.data, 'base64').toString('utf8'))).toMatchObject({

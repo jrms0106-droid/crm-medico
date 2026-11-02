@@ -43,17 +43,18 @@ Resposta `application/fhir+json`, baixada como `copia-do-prontuario-fhir-AAAA-MM
 O arquivo é um `Bundle` do tipo `collection`. Cada recurso tem `fullUrl` `urn:uuid:<id>` e as
 referências entre eles apontam para esses endereços, então o arquivo se sustenta sozinho.
 
-| No CRM                              | No FHIR                                                                           |
-| ----------------------------------- | --------------------------------------------------------------------------------- |
-| Organização                         | `Organization` (nome)                                                             |
-| Paciente                            | `Patient` (nome usado, nome civil, data de nascimento)                            |
-| Autor de registro ou documento      | `Practitioner` (nome e CRM/UF, quando houver)                                     |
-| Registro assinado                   | `Composition` com status `final` (ou `amended` se retificado)                     |
-| Seções do registro                  | `Composition.section` com código LOINC e texto                                    |
-| Hipótese diagnóstica                | `Condition` provisória, com CID-10 quando informado                               |
-| Retificação / adendo                | `Composition.relatesTo` `replaces` / `appends`                                    |
-| Documento médico assinado/cancelado | `DocumentReference` (`current` / `entered-in-error`) com o conteúdo em anexo JSON |
-| Aviso e itens que ficaram de fora   | `OperationOutcome` com mensagens informativas                                     |
+| No CRM                              | No FHIR                                                                                                                          |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Organização                         | `Organization` (nome)                                                                                                            |
+| Paciente                            | `Patient` (nome usado, nome civil, data de nascimento)                                                                           |
+| Autor de registro ou documento      | `Practitioner` (nome e CRM/UF, quando houver)                                                                                    |
+| Registro assinado                   | `Composition` com status `final` (ou `amended` se retificado)                                                                    |
+| Seções do registro                  | `Composition.section` com código LOINC e texto                                                                                   |
+| Hipótese diagnóstica                | `Condition` provisória, com CID-10 quando informado                                                                              |
+| Retificação / adendo                | `Composition.relatesTo` `replaces` / `appends`                                                                                   |
+| Documento médico assinado/cancelado | `DocumentReference` (`current` / `entered-in-error`) com o conteúdo em anexo JSON                                                |
+| Documento registrado do CFM         | `DocumentReference` `current`, categoria "Emitido na Plataforma de Prescrição Eletrônica do CFM", com o resumo em anexo de texto |
+| Aviso e itens que ficaram de fora   | `OperationOutcome` com mensagens informativas                                                                                    |
 
 Códigos usados:
 
@@ -67,6 +68,12 @@ Códigos usados:
 
 O resumo (hash) de assinatura de cada registro e documento vai como `identifier` com o sistema
 `urn:crm-medico:sha256`, para quem receber poder conferir que o conteúdo não mudou.
+
+Documento emitido na plataforma do CFM ([documentos-externos.md](documentos-externos.md),
+[ADR 0036](../adr/0036-documentos-do-cfm-na-copia-fhir.md)): entra só o registro não cancelado,
+com identificador `urn:crm-medico:documento-externo` e, quando o médico digitou, o código de
+validação com o sistema `urn:crm-medico:cfm:codigo-de-validacao`. O código não é conferido com o
+CFM; quem receber confere no validador do ITI. O documento assinado não vai no arquivo.
 
 ### O que fica de fora de propósito
 

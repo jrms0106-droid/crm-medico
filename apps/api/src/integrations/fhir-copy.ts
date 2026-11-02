@@ -4,6 +4,8 @@ import {
   type ClinicalCopyDto,
   DOCUMENT_KIND_LABELS,
   type DocumentDto,
+  EXTERNAL_DOCUMENT_KIND_LABELS,
+  type ExternalDocumentDto,
   type RecordDto,
   type RecordKind,
 } from '@crm/shared';
@@ -30,6 +32,9 @@ const LOINC = 'http://loinc.org';
 const ICD10 = 'http://hl7.org/fhir/sid/icd-10';
 const SHA256 = 'urn:crm-medico:sha256';
 const RECORD_ID = 'urn:crm-medico:registro';
+const EXTERNAL_ID = 'urn:crm-medico:documento-externo';
+const CFM_CODE = 'urn:crm-medico:cfm:codigo-de-validacao';
+const CFM_PLATFORM = 'Plataforma de Prescrição Eletrônica do CFM';
 const XHTML = 'http://www.w3.org/1999/xhtml';
 
 const RECORD_TYPE: Record<RecordKind, { code: string; display: string; title: string }> = {
@@ -99,7 +104,7 @@ export function toFhirBundle(
   const subject = ref(copy.patient.id, copy.patient.name);
 
   const authors = new Map<string, string>();
-  for (const item of [...copy.records, ...copy.documents])
+  for (const item of [...copy.records, ...copy.documents, ...copy.externalDocuments])
     authors.set(item.author.id, item.author.name);
   for (const [id, name] of authors) {
     const reg = crm.get(id);
@@ -147,6 +152,7 @@ export function toFhirBundle(
   }
 
   for (const d of copy.documents) add(d.id, documentReference(d, subject));
+  for (const d of copy.externalDocuments) add(d.id, externalDocumentReference(d, subject));
 
   const outcome: OperationOutcome = {
     resourceType: 'OperationOutcome',
@@ -260,6 +266,39 @@ function documentReference(d: DocumentDto, subject: Reference): DocumentReferenc
           data: content,
           title: `${label}.json`,
           ...(d.signedAt && { creation: d.signedAt }),
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Registro de documento emitido fora do CRM, na plataforma do CFM (docs/api/documentos-externos.md).
+ * O original assinado com ICP-Brasil fica na plataforma; aqui vai só o que o médico registrou: o
+ * tipo, a data, o resumo e o código de validação, se houver.
+ */
+function externalDocumentReference(d: ExternalDocumentDto, subject: Reference): DocumentReference {
+  const label = EXTERNAL_DOCUMENT_KIND_LABELS[d.kind];
+  const identifier: Identifier[] = [{ system: EXTERNAL_ID, value: d.id }];
+  if (d.validationCode) identifier.push({ system: CFM_CODE, value: d.validationCode });
+  return {
+    resourceType: 'DocumentReference',
+    identifier,
+    status: 'current',
+    docStatus: 'final',
+    type: { text: label },
+    category: [{ text: `Emitido na ${CFM_PLATFORM}` }],
+    subject,
+    date: `${d.issuedOn}T00:00:00Z`,
+    author: [ref(d.author.id, d.author.name)],
+    description: `${label} emitido na ${CFM_PLATFORM}. O documento assinado fica na plataforma.`,
+    content: [
+      {
+        attachment: {
+          contentType: 'text/plain; charset=utf-8',
+          language: 'pt-BR',
+          data: Buffer.from(d.summary, 'utf8').toString('base64'),
+          title: `Resumo: ${label}`,
         },
       },
     ],

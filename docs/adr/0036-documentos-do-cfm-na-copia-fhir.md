@@ -1,0 +1,9 @@
+# ADR 0036: documentos emitidos no CFM na cópia FHIR do prontuário
+
+- **Status:** aceito (2026-11-02, escolha do responsável)
+- **Contexto:** Desde o [ADR 0034](0034-registro-de-documentos-emitidos-no-cfm.md), o médico registra no CRM o que emitiu na plataforma do CFM, e a cópia do prontuário em JSON leva esses registros. A cópia no padrão FHIR ([ADR 0024](0024-integracoes-fhir-r4-e-importacao-csv.md)) não levava, então as duas cópias diferiam.
+- **Decisão:** Cada registro não cancelado vira um `DocumentReference` com status `current`, tipo em texto (por exemplo, "Receita de controle especial"), categoria "Emitido na Plataforma de Prescrição Eletrônica do CFM", data da emissão, autor (`Practitioner` do próprio arquivo) e o resumo como anexo `text/plain`. O identificador usa o sistema `urn:crm-medico:documento-externo`; o código de validação, quando houver, vai com `urn:crm-medico:cfm:codigo-de-validacao`. Registros cancelados ficam de fora, como na cópia em JSON.
+- **Motivo:** As duas cópias passam a ter o mesmo conteúdo. `DocumentReference` é o recurso do FHIR para "existe um documento, e aqui está o que se sabe dele", que é exatamente o que o CRM guarda. Separar pela categoria evita confundir com os documentos assinados dentro do CRM.
+- **Alternativas descartadas:** `MedicationRequest` para as receitas (o CRM não guarda medicamento, dose nem posologia estruturados, só o resumo digitado); levar os cancelados com `entered-in-error` (a cópia em JSON não leva, e o registro errado pode ser de outro paciente); um sistema oficial para o código do CFM (não há um publicado).
+- **Consequências:** O código de validação não é conferido; quem receber confere no validador do ITI. O documento assinado com ICP-Brasil não vai no arquivo. O arquivo continua sem validação pelo validador oficial da HL7.
+- **Revisar quando:** O CFM oferecer integração, a RNDS definir perfil para prescrição, ou o CRM passar a guardar o PDF assinado.

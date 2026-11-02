@@ -63,5 +63,7 @@ Toda rota tem teste de acesso permitido e negado (`apps/api/test/external-docume
 - Sem integração com o CFM: o código não é conferido e o documento não é baixado.
 - Sem anexo do PDF.
 - A IA não lê estes registros nesta fase.
-- A cópia do prontuário em JSON leva os registros não cancelados
-  ([direitos-do-titular.md](direitos-do-titular.md)); a cópia no padrão FHIR ainda não.
+- As cópias do prontuário, em JSON e no padrão FHIR, levam os registros não cancelados
+  ([direitos-do-titular.md](direitos-do-titular.md), [integracoes.md](integracoes.md),
+  [ADR 0036](../adr/0036-documentos-do-cfm-na-copia-fhir.md)). O documento assinado com
+  ICP-Brasil continua só na plataforma do CFM.
