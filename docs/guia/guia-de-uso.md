@@ -213,6 +213,22 @@ Regras: [ia-nivel-2.md](../api/ia-nivel-2.md).
 
 Regras: [documentos.md](../api/documentos.md).
 
+### Receitas com certificado ICP-Brasil (plataforma do CFM)
+
+Receita de controle especial, receita de antimicrobiano e documentos que precisam de certificado
+ICP-Brasil são emitidos na **Plataforma de Prescrição Eletrônica do CFM**, que é gratuita para
+médicos com inscrição ativa. O CRM não emite esses documentos.
+
+1. Emita o documento na plataforma do CFM, como de costume.
+2. No prontuário, na área **Emitidos na plataforma do CFM**, aperte **Registrar documento emitido
+   no CFM**.
+3. Escolha o tipo, confira a data, escreva o que foi emitido e, se quiser, copie o código que a
+   plataforma mostra. Aperte **Registrar**.
+4. Se registrou por engano, use **Cancelar registro** com o motivo. Isso não cancela o documento
+   no CFM.
+
+Regras: [documentos-externos.md](../api/documentos-externos.md).
+
 ### Cópia do prontuário pedida pelo paciente
 
 Com o vínculo valendo (atendimento iniciado, acompanhamento ou encerrado), aperte **Cópia do

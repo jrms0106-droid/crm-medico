@@ -5,6 +5,7 @@ import { AuthorizationService } from '../authz/authorization.service.js';
 import { Clock } from '../common/clock.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { DocumentsService } from '../documents/documents.service.js';
+import { ExternalDocumentsService } from '../documents/external-documents.service.js';
 import type { AuthContext } from '../identity/session.service.js';
 import { RecordsService } from './records.service.js';
 
@@ -22,6 +23,7 @@ export class ClinicalCopyService {
     @Inject(AuthorizationService) private readonly authz: AuthorizationService,
     @Inject(RecordsService) private readonly records: RecordsService,
     @Inject(DocumentsService) private readonly documents: DocumentsService,
+    @Inject(ExternalDocumentsService) private readonly external: ExternalDocumentsService,
   ) {}
 
   async build(
@@ -32,7 +34,7 @@ export class ClinicalCopyService {
     const organizationId = ctx.user.organizationId;
     // A cópia nunca usa o acesso emergencial nem justificativa: só o que o vínculo libera.
     const plain: AccessContext = { ...context, emergencyAccess: false, justified: false };
-    const [org, patient, recordRows, documentRows] = await Promise.all([
+    const [org, patient, recordRows, documentRows, externalRows] = await Promise.all([
       this.prisma.organization.findUniqueOrThrow({
         where: { id: organizationId },
         select: { name: true },
@@ -48,6 +50,10 @@ export class ClinicalCopyService {
       this.prisma.medicalDocument.findMany({
         where: { organizationId, patientId, status: { in: ['signed', 'cancelled'] } },
         orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.externalDocument.findMany({
+        where: { organizationId, patientId, status: 'registered' },
+        orderBy: [{ issuedOn: 'asc' }, { createdAt: 'asc' }],
       }),
     ]);
 
@@ -75,8 +81,18 @@ export class ClinicalCopyService {
           plain,
         ).allowed,
     );
+    const external = externalRows.filter(
+      (d) =>
+        this.authz.check(
+          ctx,
+          'view',
+          { type: 'medical_document', id: d.id, patientId, authorUserId: d.authorUserId },
+          plain,
+        ).allowed,
+    );
     const withheldRecords = recordRows.length - records.length;
-    const withheldDocuments = documentRows.length - documents.length;
+    const withheldDocuments =
+      documentRows.length - documents.length + (externalRows.length - external.length);
     const withheld = withheldRecords + withheldDocuments > 0;
 
     return {
@@ -95,6 +111,7 @@ export class ClinicalCopyService {
         'Contém dados de saúde: entregue só ao paciente ou ao seu representante legal.',
       records: await Promise.all(records.map((r) => this.records.dto(r))),
       documents: await Promise.all(documents.map((d) => this.documents.dto(d))),
+      externalDocuments: await this.external.dtos(external),
       withheld: {
         records: withheldRecords,
         documents: withheldDocuments,

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ChargeDto } from './billing.js';
 import type { DocumentDto } from './documents.js';
+import type { ExternalDocumentDto } from './external-documents.js';
 import type { PatientDto } from './patients.js';
 import type { RecordDto } from './records.js';
 
@@ -172,5 +173,7 @@ export interface ClinicalCopyDto {
   notice: string;
   records: RecordDto[];
   documents: DocumentDto[];
+  /** Documentos emitidos na plataforma do CFM e registrados no CRM (só os não cancelados). */
+  externalDocuments: ExternalDocumentDto[];
   withheld: { records: number; documents: number; reason: string | null };
 }

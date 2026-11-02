@@ -13,6 +13,7 @@ import {
 import { ApiError, api, query } from '../api';
 import { ReauthDialog } from '../reauth';
 import { DocumentsPanel } from './documents';
+import { ExternalDocumentsPanel } from './external-documents';
 import { type InsertedField, NotesOrganizer, RecordSummaryPanel } from './clinical-assistant';
 import { ClinicalCopyButton } from './privacy';
 import {
@@ -180,7 +181,14 @@ export function RecordPage({
         </ol>
       </Panel>
       {can && (can.viewHistory || can.viewOwnRecords) && (
-        <DocumentsPanel session={session} patientId={patientId} canCreate={can.createRecords} />
+        <>
+          <DocumentsPanel session={session} patientId={patientId} canCreate={can.createRecords} />
+          <ExternalDocumentsPanel
+            session={session}
+            patientId={patientId}
+            canCreate={can.createRecords}
+          />
+        </>
       )}
     </Page>
   );

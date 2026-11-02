@@ -67,7 +67,8 @@ prontuário ([ADR 0022](../adr/0022-copia-do-prontuario-pelo-medico-com-vinculo.
 - devolve um arquivo JSON (`crm-medico/copia-do-prontuario`, versão 1) com os **registros
   assinados** (inclusive os retificados, com o vínculo para a retificação) e os **documentos
   assinados ou cancelados**, cada um com o conteúdo, o autor, a data, o hash e a verificação de
-  integridade;
+  integridade; e os **documentos emitidos na plataforma do CFM** registrados no CRM e não
+  cancelados (`externalDocuments`, [documentos-externos.md](documentos-externos.md));
 - leva só o que esse médico lê **sem justificativa**: registros sensíveis de outros autores ficam
   de fora, e o arquivo diz quantos ficaram de fora e que devem ser pedidos ao autor ou ao diretor
   técnico. Rascunhos e registros não assinados nunca entram.

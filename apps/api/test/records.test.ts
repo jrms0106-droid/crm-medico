@@ -564,6 +564,22 @@ describe('cópia do prontuário pedida pelo paciente', () => {
       version: doc.body.version,
     });
     expect(signedDoc.status).toBe(200);
+    // Emitidos no CFM: vai o registrado; o registro cancelado fica de fora (ADR 0034).
+    const external = `/patients/${c.patientId}/external-documents`;
+    const cfm = await c.as.doctor.post(external, {
+      kind: 'prescription',
+      issuedOn: '2026-03-01',
+      summary: 'Receita fictícia emitida no CFM.',
+    });
+    expect(cfm.status).toBe(201);
+    const wrong = await c.as.doctor.post(external, {
+      kind: 'certificate',
+      issuedOn: '2026-03-01',
+      summary: 'Atestado registrado por engano.',
+    });
+    await c.as.doctor.post(`/external-documents/${wrong.body.id}/cancel`, {
+      reason: 'Registrado no paciente errado.',
+    });
 
     await c.as.doctor.reauth(c.doctor, t.clock);
     const res = await c.as.doctor.get(`/patients/${c.patientId}/clinical-copy`);
@@ -585,6 +601,9 @@ describe('cópia do prontuário pedida pelo paciente', () => {
     expect(ids).not.toContain(draft.body.id);
     expect(res.body.records[0]).toMatchObject({ status: 'signed', integrity: 'valid' });
     expect((res.body.documents as { id: string }[]).map((d) => d.id)).toEqual([doc.body.id]);
+    expect((res.body.externalDocuments as { id: string }[]).map((d) => d.id)).toEqual([
+      cfm.body.id,
+    ]);
     expect(res.body.withheld.reason).toMatch(/sensíveis de outros profissionais/);
 
     const event = await t.db.auditEvent.findFirstOrThrow({
