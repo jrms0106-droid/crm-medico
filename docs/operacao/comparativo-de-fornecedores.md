@@ -80,7 +80,8 @@ não serve para controlados nem antimicrobianos.
 
 1. **Hospedagem:** pedir cotação da **AWS em São Paulo**, com RDS for PostgreSQL 16, cofre de
    segredos e backup em outra região. Como segunda opção, cotar a **Azure Brazil South**. Uma nuvem
-   nacional só entra se cumprir todos os itens obrigatórios dos requisitos. Com o banco, as chaves
+   nacional só entra se cumprir todos os itens obrigatórios dos requisitos. O texto pronto do
+   pedido está em [pedido de cotação](pedido-de-cotacao.md). Com o banco, as chaves
    e a transcrição na mesma região do Brasil, não há transferência internacional.
 2. **Transcrição:** quando for autorizado, testar o **Transcribe comum em São Paulo** (ou o Azure
    Speech, se a hospedagem for Microsoft) **só com áudio fictício**, medindo a qualidade em
