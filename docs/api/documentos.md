@@ -98,7 +98,7 @@ Toda rota tem teste de acesso permitido e negado (`apps/api/test/documents.test.
 ## Limites conhecidos
 
 - Assinatura interna, sem ICP-Brasil e sem validação jurídica (ver o aviso no início).
-- Sem receita de controle especial, sem receita antimicrobiana e sem integração com plataformas de prescrição eletrônica.
+- Sem receita de controle especial, sem receita antimicrobiana e sem integração com plataformas de prescrição eletrônica. Esses documentos são emitidos na plataforma do CFM e só registrados aqui ([documentos-externos.md](documentos-externos.md)).
 - A unidade ainda não tem endereço cadastrado, que receitas costumam exigir. Entra quando os campos forem validados.
 - Não há verificação pública de autenticidade (QR code ou página de conferência). É uma superfície exposta na internet e fica para quando houver hospedagem e validação jurídica.
 - Os mesmos limites do prontuário sobre o papel dono das tabelas valem aqui ([prontuario.md](prontuario.md)).

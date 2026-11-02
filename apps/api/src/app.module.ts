@@ -18,6 +18,8 @@ import type { AppConfig } from './config.js';
 import { PrismaService } from './database/prisma.service.js';
 import { DocumentsController } from './documents/documents.controller.js';
 import { DocumentsService } from './documents/documents.service.js';
+import { ExternalDocumentsController } from './documents/external-documents.controller.js';
+import { ExternalDocumentsService } from './documents/external-documents.service.js';
 import { HealthController } from './health/health.controller.js';
 import { AdminUsersController } from './identity/admin-users.controller.js';
 import { AuthController } from './identity/auth.controller.js';
@@ -78,6 +80,7 @@ export class AppModule {
         CareController,
         RecordsController,
         DocumentsController,
+        ExternalDocumentsController,
         BillingController,
         PrivacyController,
         CrmController,
@@ -105,6 +108,7 @@ export class AppModule {
         { provide: LanguageModel, useValue: overrides.languageModel ?? new SimulatedModel() },
         PatientImportService,
         DocumentsService,
+        ExternalDocumentsService,
         BillingService,
         PrivacyService,
         RemindersService,

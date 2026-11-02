@@ -48,6 +48,7 @@ function copy(records: RecordDto[]): ClinicalCopyDto {
     notice: 'Aviso.',
     records,
     documents: [],
+    externalDocuments: [],
     withheld: { records: 0, documents: 0, reason: null },
   };
 }

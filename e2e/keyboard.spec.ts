@@ -20,6 +20,15 @@ async function tabTo(page: Page, target: Locator): Promise<void> {
   throw new Error(`Não chegou pelo Tab em ${target.toString()}`);
 }
 
+/** Igual a `tabTo`, voltando com Shift+Tab. */
+async function shiftTabTo(page: Page, target: Locator): Promise<void> {
+  for (let i = 0; i < MAX_TABS; i++) {
+    if (await target.evaluate((el) => el.matches(':focus'))) return;
+    await page.keyboard.press('Shift+Tab');
+  }
+  throw new Error(`Não chegou pelo Shift+Tab em ${target.toString()}`);
+}
+
 async function focusedIsVisible(page: Page): Promise<boolean> {
   const focused = page.locator(':focus');
   if ((await focused.count()) !== 1) return false;
@@ -77,6 +86,12 @@ test('secretária cadastra e agenda só pelo teclado, com foco sempre visível',
   await tabTo(page, page.getByRole('link', { name: 'Agendar consulta' }));
   await page.keyboard.press('Enter');
   await expect(page.getByText(`Paciente: ${PATIENT}`)).toBeVisible();
+  // Um dia à frente, pela seta: perto da meia-noite os horários de hoje já acabaram.
+  const day = page.getByLabel('Dia');
+  const today = await day.inputValue();
+  await shiftTabTo(page, day);
+  await page.keyboard.press('ArrowUp');
+  await expect(day).not.toHaveValue(today);
   const firstSlot = page.locator('.slot input').first();
   await tabTo(page, firstSlot);
   await page.keyboard.press('Space');

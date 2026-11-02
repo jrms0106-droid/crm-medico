@@ -166,6 +166,20 @@ test.describe.serial('fluxos por perfil', () => {
     expect(pdf.headers()['content-type']).toBe('application/pdf');
     expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
 
+    // Receita de controle especial emitida na plataforma do CFM: só o registro (ADR 0034).
+    const cfm = page.locator('.panel', {
+      has: page.getByRole('heading', { name: 'Emitidos na plataforma do CFM' }),
+    });
+    await cfm.getByRole('button', { name: 'Registrar documento emitido no CFM' }).click();
+    const cfmForm = page.getByRole('form', { name: 'Registrar documento emitido no CFM' });
+    await cfmForm.getByLabel('Tipo').selectOption('controlled_prescription');
+    await cfmForm.getByLabel('O que foi emitido').fill('Medicamento fictício controlado, 30 dias.');
+    await cfmForm.getByLabel('Código do documento no CFM (opcional)').fill('CODIGO-FICTICIO-1');
+    await cfmForm.getByRole('button', { name: 'Registrar' }).click();
+    await expect(cfm.locator('.timeline')).toContainText('Receita de controle especial');
+    await expect(cfm.locator('.timeline')).toContainText('Código no CFM: CODIGO-FICTICIO-1');
+    await snap(page, '6b-receita-cfm-registrada');
+
     await page.getByRole('button', { name: 'Encerrar atendimento' }).click();
     await expect(page.getByText('Vínculo: Atendimento encerrado')).toBeVisible();
 
@@ -178,9 +192,11 @@ test.describe.serial('fluxos por perfil', () => {
     const copy = JSON.parse(await readFile(await download.path(), 'utf8')) as {
       records: { status: string }[];
       documents: { kind: string }[];
+      externalDocuments: { kind: string }[];
     };
     expect(copy.records.map((r) => r.status)).toEqual(['signed']);
     expect(copy.documents.map((d) => d.kind)).toEqual(['prescription']);
+    expect(copy.externalDocuments.map((d) => d.kind)).toEqual(['controlled_prescription']);
     await expect(page.getByRole('status')).toContainText('Cópia gerada com 1 registro(s)');
 
     // A mesma cópia no padrão FHIR (docs/api/integracoes.md).
