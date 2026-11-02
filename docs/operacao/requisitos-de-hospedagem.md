@@ -1,7 +1,8 @@
 # Requisitos para escolher a hospedagem
 
 > Nada foi contratado. Esta lista serve para comparar ofertas; a escolha e a contratação
-> dependem da autorização do responsável.
+> dependem da autorização do responsável. Comparação de ofertas públicas em
+> [comparativo-de-fornecedores.md](comparativo-de-fornecedores.md).
 
 ## Obrigatórios
 
