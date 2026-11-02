@@ -1,4 +1,5 @@
-import { type Locator, type Page, expect, test } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import { expect, test } from './test.js';
 import { E2E_PASSWORD, E2E_TOTP_SECRET, USERS } from './fixtures.js';
 import { currentStep, totpAt } from './totp.js';
 

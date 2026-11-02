@@ -15,6 +15,28 @@ describe('loadConfig', () => {
     expect(config.CARE_COURTESY_DAYS).toBe(30);
     expect(config.EMERGENCY_ACCESS_HOURS).toBe(4);
     expect(config.TRUST_PROXY).toBe(0);
+    expect(config.CLOCK_OFFSET_MINUTES).toBe(0);
+  });
+
+  it('CLOCK_OFFSET_MINUTES aceita até 7 dias fora de produção e é recusado em produção', () => {
+    const base = {
+      DATABASE_URL: 'postgresql://x@localhost/db',
+      MFA_ENCRYPTION_KEY: Buffer.alloc(32).toString('base64'),
+      PII_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
+    };
+    expect(loadConfig({ ...base, CLOCK_OFFSET_MINUTES: '600' }).CLOCK_OFFSET_MINUTES).toBe(600);
+    expect(loadConfig({ ...base, CLOCK_OFFSET_MINUTES: '-90' }).CLOCK_OFFSET_MINUTES).toBe(-90);
+    expect(() => loadConfig({ ...base, CLOCK_OFFSET_MINUTES: '10081' })).toThrow(
+      /CLOCK_OFFSET_MINUTES/,
+    );
+    expect(() => loadConfig({ ...base, CLOCK_OFFSET_MINUTES: '1.5' })).toThrow(
+      /CLOCK_OFFSET_MINUTES/,
+    );
+    const prod = { ...base, NODE_ENV: 'production' };
+    expect(loadConfig({ ...prod, CLOCK_OFFSET_MINUTES: '0' }).CLOCK_OFFSET_MINUTES).toBe(0);
+    expect(() => loadConfig({ ...prod, CLOCK_OFFSET_MINUTES: '600' })).toThrow(
+      /CLOCK_OFFSET_MINUTES precisa ser 0 em produção/,
+    );
   });
 
   it('TRUST_PROXY conta proxies: true vale 1, false vale 0, e só aceita 0 a 5', () => {

@@ -58,6 +58,8 @@ Nenhum dado de paciente é guardado no navegador: o token de proteção (CSRF) f
 11. o administrador liga as duas funcionalidades do assistente clínico; a secretária marca uma nova consulta da mesma paciente e registra a chegada; o médico inicia o atendimento, gera o resumo com fontes (vê o trecho do registro assinado, marca como útil e abre a fonte), organiza anotações num novo rascunho, insere no registro e confere cada campo; depois descarta o rascunho e encerra o atendimento;
 12. o axe-core confere as regras WCAG 2.1 A e AA no login e em todas as telas do menu de secretária, médico e administrador; o atalho **Pular para o conteúdo** é o primeiro item do teclado e o foco vai para o conteúdo ao trocar de tela.
 
+**Relógio dos testes** ([ADR 0035](adr/0035-relogio-controlado-nos-testes.md)): a API, o navegador e os códigos de MFA dos testes começam às 10:00 de Brasília (o próximo 10:00 a partir de agora) e seguem andando, para os testes não dependerem da hora em que rodam. O horário escolhido aparece no início da execução. Para forçar outro, defina `E2E_CLOCK_OFFSET_MINUTES` (minutos a somar ao horário real).
+
 No contêiner de desenvolvimento, use o Chromium já instalado: `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e`. Com `E2E_SCREENSHOTS=<pasta>`, o teste guarda imagens das telas.
 
 Limite conhecido: a agenda de teste é aberta o dia todo, mas perto da meia-noite pode não haver horário livre no mesmo dia, e o teste da secretária falharia.

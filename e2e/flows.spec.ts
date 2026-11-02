@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
-import { type Page, expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, test } from './test.js';
 import { readFile } from 'node:fs/promises';
 import { E2E_PASSWORD, E2E_TOTP_SECRET, USERS, type UserKey } from './fixtures.js';
 import { currentStep, totpAt } from './totp.js';
@@ -29,6 +30,15 @@ async function login(page: Page, user: UserKey) {
     await page.getByRole('button', { name: 'Confirmar' }).click();
   }
   await expect(page.getByRole('navigation', { name: 'Menu principal' })).toBeVisible();
+}
+
+/**
+ * Sai e espera a tela de login. Sem essa espera, o `page.goto` do próximo login pode cancelar o
+ * pedido de saída ainda em andamento, e a sessão anterior continua aberta.
+ */
+async function logout(page: Page) {
+  await page.getByRole('button', { name: 'Sair' }).click();
+  await expect(page.getByLabel('E-mail')).toBeVisible();
 }
 
 /** Com E2E_SCREENSHOTS=<pasta>, guarda imagens das telas para a revisão do PR. */
@@ -75,7 +85,7 @@ test.describe.serial('fluxos por perfil', () => {
     // O administrador não acessa pacientes, nem digitando o endereço.
     await page.goto('/#/pacientes');
     await expect(page.getByText('Esta área não faz parte do seu perfil.')).toBeVisible();
-    await page.getByRole('button', { name: 'Sair' }).click();
+    await logout(page);
 
     await login(page, 'secretary');
     await expect(menu(page).getByRole('link')).toHaveText([
@@ -275,7 +285,7 @@ test.describe.serial('fluxos por perfil', () => {
     await item.getByLabel('Valor (R$)').fill('250,00');
     await item.getByRole('button', { name: 'Adicionar item' }).click();
     await expect(page.getByText('Consulta particular: R$ 250,00')).toBeVisible();
-    await page.getByRole('button', { name: 'Sair' }).click();
+    await logout(page);
 
     // A secretária cobra a consulta pela agenda, com desconto, e recebe em duas partes.
     await login(page, 'secretary');
@@ -307,7 +317,7 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(row).toContainText('Quitada');
     await expect(page.getByLabel('Resumo financeiro')).toContainText('R$ 200,00');
     await snap(page, '8-financeiro-secretaria');
-    await page.getByRole('button', { name: 'Sair' }).click();
+    await logout(page);
 
     // Só o administrador estorna, com motivo e confirmação de identidade.
     await login(page, 'admin');
@@ -329,7 +339,7 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(adminRow).toContainText('Pago em parte');
     await expect(adminRow).toContainText('R$ 120,00');
     await snap(page, '9-financeiro-estorno');
-    await page.getByRole('button', { name: 'Sair' }).click();
+    await logout(page);
 
     // O médico não vê o financeiro, nem digitando o endereço.
     await login(page, 'doctor');
@@ -486,7 +496,7 @@ test.describe.serial('fluxos por perfil', () => {
       await item.getByRole('button', { name: 'Ligar' }).click();
       await expect(item).toContainText('Ligado');
     }
-    await page.getByRole('button', { name: 'Sair' }).click();
+    await logout(page);
 
     await login(page, 'secretary');
     await menu(page).getByRole('link', { name: 'Assistente (IA)' }).click();
@@ -535,7 +545,7 @@ test.describe.serial('fluxos por perfil', () => {
     await snap(page, '15-assistente-agenda');
     await organize.getByRole('button', { name: 'Marcar como útil' }).click();
     await expect(organize.getByText('Marcado como útil.')).toBeVisible();
-    await page.getByRole('button', { name: 'Sair' }).click();
+    await logout(page);
 
     // Relatório assistido: o administrador gera no Financeiro, com os números ao lado.
     await login(page, 'admin');
@@ -571,7 +581,7 @@ test.describe.serial('fluxos por perfil', () => {
     const summarySwitch = ai.getByRole('listitem').filter({ hasText: 'Resumo do prontuário' });
     await summarySwitch.getByRole('button', { name: 'Ligar' }).click();
     await expect(summarySwitch).toContainText('Ligado');
-    await page.getByRole('button', { name: 'Sair' }).click();
+    await logout(page);
 
     // Nova consulta da mesma paciente, para o médico ter um atendimento iniciado.
     await login(page, 'secretary');
@@ -588,7 +598,7 @@ test.describe.serial('fluxos por perfil', () => {
       .filter({ hasText: 'Agendada' });
     await booked.getByRole('button', { name: 'Registrar chegada' }).click();
     await expect(booked).toHaveCount(0);
-    await page.getByRole('button', { name: 'Sair' }).click();
+    await logout(page);
 
     await login(page, 'doctor');
     await menu(page).getByRole('link', { name: 'Agenda' }).click();
@@ -682,7 +692,7 @@ test.describe.serial('fluxos por perfil', () => {
         await page.waitForLoadState('networkidle');
         await scan(`${user} › ${name}`);
       }
-      await page.getByRole('button', { name: 'Sair' }).click();
+      await logout(page);
     }
     test.info().annotations.push({ type: 'axe', description: scanned.join(', ') });
     expect(scanned.length).toBeGreaterThan(15);
