@@ -486,11 +486,25 @@ describe('sensibilidade, arquivamento e linha do tempo', () => {
     const denied = await c.as.doctor.get(`/records/${sensitive.id}`);
     expect(denied.status).toBe(403);
     const reason = 'Avaliar interação medicamentosa antes de prescrever.';
-    const opened = await c.as.doctor.get(
-      `/records/${sensitive.id}?justification=${encodeURIComponent(reason)}`,
-    );
+    // A justificativa não vai no endereço (ADR 0033).
+    expect(
+      (
+        await c.as.doctor.get(
+          `/records/${sensitive.id}?justification=${encodeURIComponent(reason)}`,
+        )
+      ).status,
+    ).toBe(400);
+    expect((await c.as.doctor.post(`/records/${sensitive.id}/open`, {})).status).toBe(400);
+    const opened = await c.as.doctor.post(`/records/${sensitive.id}/open`, {
+      justification: reason,
+    });
     expect(opened.status).toBe(200);
     expect(opened.body.content).toEqual(sensitive.content);
+    // Quem não pode ver o prontuário continua barrado, com ou sem justificativa.
+    const secretary = await c.as.secretary.post(`/records/${sensitive.id}/open`, {
+      justification: reason,
+    });
+    expect(secretary.status).toBe(403);
     const stored = await t.db.accessJustification.findMany({ where: { recordId: sensitive.id } });
     expect(stored).toMatchObject([{ userId: c.doctor.id, justification: reason }]);
     const audited = await t.db.auditEvent.count({

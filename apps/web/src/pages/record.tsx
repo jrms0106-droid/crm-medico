@@ -221,7 +221,7 @@ function RecordView({
   const openJustified = async (justification: string) => {
     setError(null);
     try {
-      setRecord(await api.get<RecordDto>(`/records/${recordId}${query({ justification })}`));
+      setRecord(await api.post<RecordDto>(`/records/${recordId}/open`, { justification }));
       setNeedsJustification(false);
     } catch (e) {
       setError(errorText(e));

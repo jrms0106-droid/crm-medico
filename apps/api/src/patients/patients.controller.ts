@@ -8,7 +8,6 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Query,
 } from '@nestjs/common';
 import {
   type PatientDto,
@@ -66,10 +65,12 @@ export class PatientsController {
     return this.imports.commit(ctx, csv);
   }
 
-  @Get()
-  async search(@Auth() ctx: AuthContext, @Query() query: unknown): Promise<PatientSummaryDto[]> {
+  /** Busca pelo corpo: CPF e telefone não vão no endereço (ADR 0033). */
+  @Post('search')
+  @HttpCode(200)
+  async search(@Auth() ctx: AuthContext, @Body() body: unknown): Promise<PatientSummaryDto[]> {
     await this.authz.authorize(ctx, 'view', { type: TYPE });
-    return this.patients.search(ctx.user.organizationId, parseBody(patientSearchSchema, query));
+    return this.patients.search(ctx.user.organizationId, parseBody(patientSearchSchema, body));
   }
 
   @Post('duplicate-check')

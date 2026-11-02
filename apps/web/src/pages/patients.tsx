@@ -6,7 +6,7 @@ import {
   ageOn,
   maskCpf,
 } from '@crm/shared';
-import { ApiError, api, query } from '../api';
+import { ApiError, api } from '../api';
 import { href, navigate } from '../router';
 import { canSee } from '../shell';
 import { PatientRemindersPanel } from './crm';
@@ -33,7 +33,7 @@ export function PatientsPage({ session }: { session: SessionInfo }) {
     event.preventDefault();
     setError(null);
     try {
-      setResults(await api.get<PatientSummaryDto[]>(`/patients${query({ q })}`));
+      setResults(await api.post<PatientSummaryDto[]>('/patients/search', { q }));
     } catch (e) {
       setError(errorText(e));
     }

@@ -31,7 +31,7 @@ describe('login com senha', () => {
     const info = sessionInfoSchema.parse(res.body);
     // Desde 2026-11-02 o código é obrigatório também para a secretária (padrão de MFA_REQUIRED_ROLES).
     expect(info.state).toBe('pending_mfa');
-    expect((await client.get('/patients?q=ab')).status).toBe(403);
+    expect((await client.post('/patients/search', { q: 'ab' })).status).toBe(403);
     const cookie = String(res.headers['set-cookie']);
     expect(cookie).toMatch(/crm_session=/);
     expect(cookie).toMatch(/HttpOnly/);

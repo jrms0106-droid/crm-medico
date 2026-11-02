@@ -174,11 +174,8 @@ export const duplicateCheckSchema = z.strictObject({
 
 export const patientSearchSchema = z.strictObject({
   q: z.string().trim().min(2, 'Digite ao menos 2 caracteres.').max(100),
-  includeInactive: z
-    .enum(['true', 'false'])
-    .transform((v) => v === 'true')
-    .default(false),
-  limit: z.coerce.number().int().min(1).max(50).default(20),
+  includeInactive: z.boolean().default(false),
+  limit: z.number().int().min(1).max(50).default(20),
 });
 
 export interface PatientPhoneDto {

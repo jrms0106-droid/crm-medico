@@ -259,7 +259,7 @@ describe('busca', () => {
       phones: [{ number: '2133334444' }],
     });
     const ids = async (q: string) => {
-      const res = await c.as.secretary.get(`/patients?q=${encodeURIComponent(q)}`);
+      const res = await c.as.secretary.post('/patients/search', { q });
       expect(res.status, q).toBe(200);
       return res.body.map((p: { id: string }) => p.id);
     };
@@ -275,7 +275,7 @@ describe('busca', () => {
     expect(await ids('8765-4321')).toEqual([jose.body.id]);
     expect(await ids('ninguem')).toEqual([]);
 
-    const summary = (await c.as.secretary.get('/patients?q=jose')).body[0];
+    const summary = (await c.as.secretary.post('/patients/search', { q: 'jose' })).body[0];
     expect(summary).toEqual({
       id: jose.body.id,
       displayName: 'José da Silva',
@@ -286,18 +286,36 @@ describe('busca', () => {
       primaryPhone: '11987654321',
       active: true,
     });
-    expect((await c.as.secretary.get('/patients?q=mel')).body[0].displayName).toBe('Mel Conceição');
+    expect((await c.as.secretary.post('/patients/search', { q: 'mel' })).body[0].displayName).toBe(
+      'Mel Conceição',
+    );
   });
 
   it('inativos só aparecem quando pedidos; busca curta é recusada', async () => {
     const c = await setupClinic();
     const p = await c.as.secretary.post('/patients', patient());
     await c.as.secretary.patch(`/patients/${p.body.id}`, { version: 1, active: false });
-    expect((await c.as.secretary.get('/patients?q=jose')).body).toEqual([]);
-    expect((await c.as.secretary.get('/patients?q=jose&includeInactive=true')).body).toHaveLength(
-      1,
+    const search = (body: object) => c.as.secretary.post('/patients/search', body);
+    expect((await search({ q: 'jose' })).body).toEqual([]);
+    expect((await search({ q: 'jose', includeInactive: true })).body).toHaveLength(1);
+    expect((await search({ q: 'j' })).status).toBe(400);
+  });
+
+  it('a busca vai no corpo: o GET com CPF no endereço não existe mais (ADR 0033)', async () => {
+    const c = await setupClinic();
+    await c.as.secretary.post('/patients', patient({ cpf: CPF_A }));
+    expect((await c.as.secretary.get(`/patients?q=${CPF_A}`)).status).toBe(404);
+    const found = await c.as.secretary.post('/patients/search', { q: CPF_A });
+    expect(found.status).toBe(200);
+    expect(found.body).toHaveLength(1);
+    // Tipos do JSON, não texto de endereço.
+    expect((await c.as.secretary.post('/patients/search', { q: 'jose', limit: '5' })).status).toBe(
+      400,
     );
-    expect((await c.as.secretary.get('/patients?q=j')).status).toBe(400);
+    expect(
+      (await c.as.secretary.post('/patients/search', { q: 'jose', includeInactive: 'true' }))
+        .status,
+    ).toBe(400);
   });
 });
 
@@ -393,7 +411,7 @@ describe('permissões', () => {
     const p = await c.as.secretary.post('/patients', patient());
     const id = p.body.id;
     const calls = [
-      () => c.as.admin.get('/patients?q=jose'),
+      () => c.as.admin.post('/patients/search', { q: 'jose' }),
       () => c.as.admin.get(`/patients/${id}`),
       () => c.as.admin.get(`/patients/${id}/history`),
       () => c.as.admin.post('/patients', patient({ phones: [{ number: '11900000000' }] })),
@@ -469,7 +487,7 @@ describe('permissões', () => {
     expect((await other.as.secretary.get(`/patients/${foreign.body.id}`)).body.fullName).toBe(
       'José da Silva',
     );
-    const search = await c.as.secretary.get('/patients?q=jose');
+    const search = await c.as.secretary.post('/patients/search', { q: 'jose' });
     expect(search.body).toEqual([]);
   });
 });
