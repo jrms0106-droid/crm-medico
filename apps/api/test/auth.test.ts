@@ -22,14 +22,16 @@ beforeEach(async () => {
 const errorCode = (body: unknown) => errorResponseSchema.parse(body).error.code;
 
 describe('login com senha', () => {
-  it('login válido de secretária cria sessão ativa e cookie seguro', async () => {
+  it('login válido de secretária pede o código de 6 dígitos e cria cookie seguro', async () => {
     const user = await createUser(t.db, ['secretary']);
     const client = new Client(t.app);
     const res = await client.login(user.email, user.password);
 
     expect(res.status).toBe(200);
     const info = sessionInfoSchema.parse(res.body);
-    expect(info.state).toBe('active');
+    // Desde 2026-11-02 o código é obrigatório também para a secretária (padrão de MFA_REQUIRED_ROLES).
+    expect(info.state).toBe('pending_mfa');
+    expect((await client.get('/patients?q=ab')).status).toBe(403);
     const cookie = String(res.headers['set-cookie']);
     expect(cookie).toMatch(/crm_session=/);
     expect(cookie).toMatch(/HttpOnly/);

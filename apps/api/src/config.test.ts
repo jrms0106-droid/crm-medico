@@ -10,7 +10,7 @@ describe('loadConfig', () => {
     });
     expect(config.API_PORT).toBe(3000);
     expect(config.NODE_ENV).toBe('development');
-    expect(config.MFA_REQUIRED_ROLES).toEqual(['doctor', 'admin']);
+    expect(config.MFA_REQUIRED_ROLES).toEqual(['doctor', 'admin', 'secretary']);
     expect(config.COOKIE_SECURE).toBe(false);
     expect(config.CARE_COURTESY_DAYS).toBe(30);
     expect(config.EMERGENCY_ACCESS_HOURS).toBe(4);

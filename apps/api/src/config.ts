@@ -22,7 +22,7 @@ const envSchema = z
     }),
     MFA_REQUIRED_ROLES: z
       .string()
-      .default('doctor,admin')
+      .default('doctor,admin,secretary')
       .transform((v) =>
         v
           .split(',')

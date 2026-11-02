@@ -25,7 +25,7 @@ sistema no dia a dia. Para detalhes de cada regra, siga os links para `docs/api/
 
 1. Abra o endereço do sistema no navegador (no ambiente de teste, `http://localhost:5173`).
 2. Digite seu e-mail e sua senha e aperte **Entrar**.
-3. **Médico e administrador** também digitam o código de 6 dígitos do aplicativo autenticador
+3. **Todos** (secretária, médico e administrador) também digitam o código de 6 dígitos do aplicativo autenticador
    do celular. No primeiro acesso, a tela mostra um código QR para cadastrar o aplicativo
    (Google Authenticator, Microsoft Authenticator ou similar). Quem não puder usar a câmera
    digita a chave que aparece embaixo do código QR.
@@ -47,7 +47,7 @@ seguidas, a conta fica bloqueada por 15 minutos.
 ### Confirmar a identidade em ações importantes
 
 Assinar, estornar, exportar dados, mudar acessos e ligar o assistente de IA pedem **a sua senha
-de novo** (e o código, para quem usa). A confirmação vale por 5 minutos. Isso protege o sistema
+de novo** e o código. A confirmação vale por 5 minutos. Isso protege o sistema
 se alguém usar um computador que ficou aberto.
 
 ## 2. Secretária

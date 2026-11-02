@@ -355,11 +355,12 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(acessos).toContainText('Registro do prontuário');
     await snap(page, '10-relatorio-de-acessos');
 
-    // Exportar exige a senha de novo; o arquivo é JSON, sem a parte clínica.
+    // Exportar exige a senha e o código de novo; o arquivo é JSON, sem a parte clínica.
     const downloading = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Exportar dados' }).click();
     const dialog = page.getByRole('form', { name: 'Confirmar identidade' });
     await dialog.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await dialog.getByLabel('Código de 6 dígitos').fill(await nextCode('secretary'));
     await dialog.getByRole('button', { name: 'Confirmar' }).click();
     const download = await downloading;
     expect(download.suggestedFilename()).toMatch(/^dados-do-paciente-\d{4}-\d{2}-\d{2}\.json$/);
