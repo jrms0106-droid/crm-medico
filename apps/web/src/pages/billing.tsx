@@ -220,7 +220,7 @@ function PatientPicker() {
   const search = (event: FormEvent) => {
     event.preventDefault();
     void action.run(async () => {
-      setFound(await api.get<PatientSummaryDto[]>(`/patients${query({ q, limit: 10 })}`));
+      setFound(await api.post<PatientSummaryDto[]>('/patients/search', { q, limit: 10 }));
     });
   };
   return (

@@ -84,7 +84,8 @@ describe('cadastro de paciente', () => {
     expect(ok.success).toBe(true);
   });
 
-  it('busca exige ao menos 2 caracteres', () => {
+  it('busca exige ao menos 2 caracteres e tipos do JSON', () => {
+    expect(patientSearchSchema.safeParse({ q: 'jo', limit: '5' }).success).toBe(false);
     expect(patientSearchSchema.safeParse({ q: 'j' }).success).toBe(false);
     expect(patientSearchSchema.parse({ q: 'jo' })).toEqual({
       q: 'jo',

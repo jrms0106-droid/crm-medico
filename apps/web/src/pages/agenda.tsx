@@ -298,7 +298,7 @@ function BookingForm({
   async function search(event: FormEvent) {
     event.preventDefault();
     try {
-      setFound(await api.get<PatientSummaryDto[]>(`/patients${query({ q, limit: 10 })}`));
+      setFound(await api.post<PatientSummaryDto[]>('/patients/search', { q, limit: 10 }));
     } catch (e) {
       setError(errorText(e));
     }

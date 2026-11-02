@@ -78,21 +78,22 @@ A consulta à linha do tempo é auditada uma vez, com o paciente.
 
 ## Endpoints (`/api/v1`, sessão `active`)
 
-| Método e rota                | Ação (`clinical_record`) | Corpo / parâmetros                                   | Resposta                                                           |
-| ---------------------------- | ------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------ |
-| `POST /patients/:id/records` | create                   | `{ kind?, clinicalDate?, sensitivity?, content? }`   | 201 `Record` (rascunho)                                            |
-| `GET /patients/:id/records`  | view                     | `includeArchived?`                                   | 200 `RecordSummary[]`                                              |
-| `GET /records/:id`           | view                     | `justification?` (registro sensível de outro autor)  | 200 `Record`; 403 `justification_required`                         |
-| `GET /records/:id/versions`  | view (só o autor)        | —                                                    | 200 versões salvas                                                 |
-| `GET /records/:id/history`   | view                     | —                                                    | 200 eventos                                                        |
-| `PATCH /records/:id`         | edit                     | `{ version, content?, clinicalDate?, sensitivity? }` | 200 `Record`; 409 `VERSION_CONFLICT` ou `INVALID_STATE_TRANSITION` |
-| `POST /records/:id/finalize` | edit                     | `{ version }`                                        | 200; 422 se o conteúdo estiver vazio                               |
-| `POST /records/:id/reopen`   | edit                     | `{ reason }`                                         | 200 (volta a rascunho)                                             |
-| `POST /records/:id/discard`  | edit                     | —                                                    | 200                                                                |
-| `POST /records/:id/sign`     | sign + reautenticação    | `{ version }`                                        | 200                                                                |
-| `POST /records/:id/rectify`  | correct                  | `{ justification, content? }`                        | 201 `Record` (rascunho da retificação)                             |
-| `POST /records/:id/addendum` | correct                  | `{ justification, content? }`                        | 201 `Record` (rascunho do adendo)                                  |
-| `POST /records/:id/archive`  | edit                     | —                                                    | 200                                                                |
+| Método e rota                | Ação (`clinical_record`) | Corpo / parâmetros                                     | Resposta                                                           |
+| ---------------------------- | ------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------ |
+| `POST /patients/:id/records` | create                   | `{ kind?, clinicalDate?, sensitivity?, content? }`     | 201 `Record` (rascunho)                                            |
+| `GET /patients/:id/records`  | view                     | `includeArchived?`                                     | 200 `RecordSummary[]`                                              |
+| `GET /records/:id`           | view                     | — (nada no endereço; com `?justification=` dá 400)     | 200 `Record`; 403 `justification_required`                         |
+| `POST /records/:id/open`     | view com justificativa   | `{ justification }` (registro sensível de outro autor) | 200 `Record`; justificativa gravada e auditada                     |
+| `GET /records/:id/versions`  | view (só o autor)        | —                                                      | 200 versões salvas                                                 |
+| `GET /records/:id/history`   | view                     | —                                                      | 200 eventos                                                        |
+| `PATCH /records/:id`         | edit                     | `{ version, content?, clinicalDate?, sensitivity? }`   | 200 `Record`; 409 `VERSION_CONFLICT` ou `INVALID_STATE_TRANSITION` |
+| `POST /records/:id/finalize` | edit                     | `{ version }`                                          | 200; 422 se o conteúdo estiver vazio                               |
+| `POST /records/:id/reopen`   | edit                     | `{ reason }`                                           | 200 (volta a rascunho)                                             |
+| `POST /records/:id/discard`  | edit                     | —                                                      | 200                                                                |
+| `POST /records/:id/sign`     | sign + reautenticação    | `{ version }`                                          | 200                                                                |
+| `POST /records/:id/rectify`  | correct                  | `{ justification, content? }`                          | 201 `Record` (rascunho da retificação)                             |
+| `POST /records/:id/addendum` | correct                  | `{ justification, content? }`                          | 201 `Record` (rascunho do adendo)                                  |
+| `POST /records/:id/archive`  | edit                     | —                                                      | 200                                                                |
 
 Transição de estado inválida: 409 `INVALID_STATE_TRANSITION`.
 

@@ -52,7 +52,7 @@ type Org = Awaited<ReturnType<typeof setupOrg>>;
 
 /** Gera alguns eventos permitidos e negados. */
 async function someActivity(o: Org) {
-  await o.as.secretary.get('/patients?q=ficticia');
+  await o.as.secretary.post('/patients/search', { q: 'ficticia' });
   await o.as.secretary.get('/admin/users');
   await o.as.doctor.get('/audit/events');
   await o.as.admin.get('/admin/users');

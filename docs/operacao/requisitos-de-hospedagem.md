@@ -37,7 +37,7 @@ e o site, e o menor plano de PostgreSQL gerenciado com backup. Revisar com o uso
    API (normalmente `1`). Número errado faz o limite de login por IP olhar o endereço errado.
 4. Servidor do site com os cabeçalhos de `SECURITY_HEADERS` em `apps/web/vite.config.ts`
    (política de conteúdo, `nosniff`, `no-referrer`, sem moldura) e HSTS.
-5. Proxy **sem registrar a query string** dos endereços da API (a busca de paciente pode levar
-   CPF ou telefone) e sem guardar corpo de requisição nem cookie.
+5. Proxy **sem registrar a query string** dos endereços da API (reforço: desde o ADR 0033 a
+   busca e a justificativa vão no corpo) e sem guardar corpo de requisição nem cookie.
 6. Backup diário agendado e o primeiro ensaio de restauração registrado.
 7. Primeira verificação da trilha de auditoria e cópia do resumo da cabeça da cadeia fora do banco.

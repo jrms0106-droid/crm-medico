@@ -40,7 +40,7 @@ O CPF é guardado **criptografado** (AES-256-GCM, com a chave `PII_ENCRYPTION_KE
 
 ## Busca
 
-`GET /patients?q=...` procura em pacientes ativos da organização:
+`POST /patients/search` com `{ q }` no corpo procura em pacientes ativos da organização. A busca vai no corpo, e não no endereço, para o CPF e o telefone não ficarem em registros de proxy nem no histórico do navegador ([ADR 0033](../adr/0033-busca-e-justificativa-no-corpo.md)):
 
 - **Texto:** cada palavra digitada precisa aparecer no nome completo ou no nome social, sem diferença de acentos e maiúsculas ("jose" encontra "José"; "maria silva" encontra "Maria da Silva").
 - **Números:** com 11 dígitos de um CPF válido, procura o CPF exato e também telefones. Com 4 ou mais dígitos, procura telefones que contenham esses dígitos.
@@ -66,7 +66,7 @@ O cadastro é da organização, não da unidade: qualquer secretária ou médico
 
 | Método e rota                    | Ação   | Corpo / parâmetros                                                 | Resposta                                                                                       |
 | -------------------------------- | ------ | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| `GET /patients`                  | view   | `q` (mín. 2 caracteres), `includeInactive?`, `limit?`              | 200 `PatientSummary[]`                                                                         |
+| `POST /patients/search`          | view   | `{ q (mín. 2 caracteres), includeInactive?, limit? }`              | 200 `PatientSummary[]`                                                                         |
 | `POST /patients/duplicate-check` | create | `{ fullName, birthDate, cpf?, phones? }`                           | 200 `PatientSummary[]` com os parecidos                                                        |
 | `POST /patients`                 | create | `PatientInput` + `allowPossibleDuplicate?`                         | 201 `Patient`; 409 `CPF_ALREADY_REGISTERED` ou `POSSIBLE_DUPLICATE`; 422 menor sem responsável |
 | `GET /patients/:id`              | view   | —                                                                  | 200 `Patient`; 404                                                                             |

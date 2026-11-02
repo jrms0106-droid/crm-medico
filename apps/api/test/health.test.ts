@@ -27,7 +27,7 @@ describe('API: saúde e formato de erro (integração com PostgreSQL real)', () 
   it('respostas da API pedem para não guardar cópia (Cache-Control: no-store)', async () => {
     const res = await request(app.getHttpServer()).get('/api/v1/health').expect(200);
     expect(res.headers['cache-control']).toBe('no-store');
-    const denied = await request(app.getHttpServer()).get('/api/v1/patients').expect(401);
+    const denied = await request(app.getHttpServer()).get('/api/v1/admin/users').expect(401);
     expect(denied.headers['cache-control']).toBe('no-store');
   });
 

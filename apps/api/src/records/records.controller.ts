@@ -22,6 +22,7 @@ import {
   recordReopenSchema,
   recordUpdateSchema,
   recordVersionSchema,
+  recordOpenSchema,
   recordViewQuerySchema,
   timelineQuerySchema,
 } from '@crm/shared';
@@ -172,9 +173,22 @@ export class RecordsController {
     @Param('id', uuid) id: string,
     @Query() query: unknown,
   ): Promise<RecordDto> {
-    const { justification } = parseBody(recordViewQuerySchema, query);
-    const record = await this.load(ctx, id, 'view', justification !== undefined);
-    if (justification && isSensitive(record) && record.authorUserId !== ctx.user.id) {
+    // A justificativa não vai no endereço (ADR 0033): ela usa POST /records/:id/open.
+    parseBody(recordViewQuerySchema, query);
+    return this.records.dto(await this.load(ctx, id, 'view'));
+  }
+
+  /** Abre um registro sensível de outro médico com justificativa, enviada no corpo. */
+  @Post('records/:id/open')
+  @HttpCode(200)
+  async open(
+    @Auth() ctx: AuthContext,
+    @Param('id', uuid) id: string,
+    @Body() body: unknown,
+  ): Promise<RecordDto> {
+    const { justification } = parseBody(recordOpenSchema, body);
+    const record = await this.load(ctx, id, 'view', true);
+    if (isSensitive(record) && record.authorUserId !== ctx.user.id) {
       await this.records.recordJustification(record, ctx.user.id, justification);
       await this.audit.record(ctx, {
         action: 'view',

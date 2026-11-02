@@ -91,9 +91,10 @@ export const recordCorrectionSchema = z.strictObject({
   content: recordContentSchema.optional(),
 });
 
-export const recordViewQuerySchema = z.strictObject({
-  justification: reasonText(10).optional(),
-});
+/** `GET /records/:id` não aceita nada no endereço (ADR 0033). */
+export const recordViewQuerySchema = z.strictObject({});
+
+export const recordOpenSchema = z.strictObject({ justification: reasonText(10) });
 
 export const timelineQuerySchema = z.strictObject({
   includeArchived: z
