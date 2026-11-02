@@ -28,7 +28,7 @@ Para aprender a usar as telas (secretária, médico e administrador), veja o [gu
 - Teste automático de acessibilidade (WCAG 2.1 A/AA) nas telas de cada perfil; última revisão geral em [docs/revisao](docs/revisao/2026-11-01-revisao-geral.md).
 - Assistente de IA **nível 1, só administrativo**: classificação dos pedidos dos pacientes, rascunho de mensagens e organização da agenda para a secretária, e resumo assistido do período para o administrador, sempre para revisão humana, com interruptor por funcionalidade (desligado por padrão) e registro de uso. Por enquanto com **modelo simulado**, sem serviço de IA contratado ([regras](docs/api/ia-nivel-1.md)).
 - Assistente de IA **nível 2, documental, para o médico**: organiza as anotações da consulta nos campos do rascunho e resume o prontuário com a fonte de cada trecho. Só reorganiza frases que já existem, sem escrever texto clínico, e não preenche hipóteses nem CID; o texto clínico não fica no histórico de uso. Também com modelo simulado ([regras](docs/api/ia-nivel-2.md)). Transcrição de consultas e leitura de exames dependem de serviço contratado.
-- Preparação para produção (sem nada contratado): papel de banco da aplicação sem poderes de dono, backup cifrado com ensaio de restauração que confere o conteúdo, matriz de conformidade, modelagem de ameaças, plano de resposta a incidentes e requisitos de hospedagem ([conformidade](docs/conformidade/matriz-de-conformidade.md), [operação](docs/operacao/backup-e-restauracao.md)). A matriz não é declaração de conformidade.
+- Preparação para produção (sem nada contratado): papel de banco da aplicação sem poderes de dono, backup cifrado com ensaio de restauração que confere o conteúdo, matriz de conformidade, modelagem de ameaças, plano de resposta a incidentes e requisitos de hospedagem, com [comparativo de fornecedores](docs/operacao/comparativo-de-fornecedores.md) ([conformidade](docs/conformidade/matriz-de-conformidade.md), [operação](docs/operacao/backup-e-restauracao.md)). A matriz não é declaração de conformidade.
 - Verificações automáticas a cada alteração: tipos, lint, formatação, testes, vulnerabilidades e segredos.
 
 O plano completo está em [docs/planejamento/04-plano-do-mvp.md](docs/planejamento/04-plano-do-mvp.md).
@@ -44,7 +44,7 @@ prisma/            esquema e migrações do banco
 scripts/           dados fictícios e utilitários
 docs/adr/          decisões arquiteturais
 docs/conformidade/ matriz de conformidade e modelagem de ameaças
-docs/operacao/     papéis do banco, backup, incidentes e hospedagem
+docs/operacao/     papéis do banco, backup, incidentes, hospedagem e fornecedores
 docs/planejamento/ stack, ambiente, arquitetura e plano do MVP
 ```
 
