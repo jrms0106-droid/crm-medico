@@ -43,6 +43,12 @@ const envSchema = z
     REMINDERS_INTERVAL_SECONDS: z.coerce.number().int().min(0).max(3600).default(0),
     COOKIE_SECURE: booleanFromEnv,
     /**
+     * Desloca o relógio da API, em minutos (até 7 dias para frente ou para trás). Existe só para
+     * os testes no navegador rodarem sempre no mesmo horário do dia (docs/adr/0035); em produção
+     * precisa ficar em 0.
+     */
+    CLOCK_OFFSET_MINUTES: z.coerce.number().int().min(-10_080).max(10_080).default(0),
+    /**
      * Quantos proxies reversos ficam na frente da API. O IP do cliente é o que o último proxy
      * de confiança viu; um `X-Forwarded-For` montado pelo próprio cliente é ignorado. `true`
      * vale 1 (um proxy), `false` vale 0.
@@ -88,6 +94,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       PUBLIC_DEV_KEYS.has(config.PII_ENCRYPTION_KEY)
     ) {
       throw new Error('Configuração inválida: chave pública de desenvolvimento usada em produção.');
+    }
+    if (config.CLOCK_OFFSET_MINUTES !== 0) {
+      throw new Error('Configuração inválida: CLOCK_OFFSET_MINUTES precisa ser 0 em produção.');
     }
   }
   if (config.MFA_ENCRYPTION_KEY === config.PII_ENCRYPTION_KEY) {

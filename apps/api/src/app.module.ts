@@ -88,7 +88,10 @@ export class AppModule {
       ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
-        { provide: Clock, useValue: overrides.clock ?? new SystemClock() },
+        {
+          provide: Clock,
+          useValue: overrides.clock ?? new SystemClock(config.CLOCK_OFFSET_MINUTES * 60_000),
+        },
         { provide: PrismaService, useFactory: () => new PrismaService(config.DATABASE_URL) },
         SessionService,
         AuthService,

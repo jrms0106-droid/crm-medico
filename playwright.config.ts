@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { defineConfig, devices } from '@playwright/test';
+import { E2E_TIMEZONE, clockOffsetMinutes } from './e2e/clock.js';
 import { TEST_KEYS } from './e2e/fixtures.js';
 
 /**
@@ -12,9 +13,13 @@ const dbUrl = process.env['E2E_DATABASE_URL'] ?? process.env['DATABASE_URL_TEST'
 // Com E2E_API_DATABASE_URL, a API conecta com outro papel (por exemplo `crm_app`, o papel de
 // produção sem permissões de dono); o preparo do banco continua com o papel dono.
 const apiDbUrl = process.env['E2E_API_DATABASE_URL'] ?? dbUrl;
+// API e navegador andam com o mesmo relógio deslocado, que começa às 10:00 (e2e/clock.ts).
+const clockOffset = clockOffsetMinutes();
 
 export default defineConfig({
   testDir: 'e2e',
+  // Os *.test.ts de e2e/ são testes de unidade dos auxiliares (Vitest), não do navegador.
+  testMatch: '**/*.spec.ts',
   globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,
@@ -24,7 +29,7 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,
     locale: 'pt-BR',
-    timezoneId: 'America/Sao_Paulo',
+    timezoneId: E2E_TIMEZONE,
     trace: 'retain-on-failure',
   },
   projects: [
@@ -51,6 +56,7 @@ export default defineConfig({
         WEB_ORIGIN: `http://localhost:${WEB_PORT}`,
         NODE_ENV: 'test',
         COOKIE_SECURE: 'false',
+        CLOCK_OFFSET_MINUTES: String(clockOffset),
       },
     },
     {

@@ -30,7 +30,8 @@ e o site, e o menor plano de PostgreSQL gerenciado com backup. Revisar com o uso
 
 ## Configuração mínima no primeiro deploy
 
-1. `NODE_ENV=production` (a API recusa cookie sem HTTPS e chaves públicas de desenvolvimento).
+1. `NODE_ENV=production` (a API recusa cookie sem HTTPS, chaves públicas de desenvolvimento e
+   relógio deslocado por `CLOCK_OFFSET_MINUTES`, que só existe para os testes).
 2. `npx prisma migrate deploy` com o papel dono; depois `scripts/db/papel-aplicacao.sql` e
    `scripts/db/verificar-papel.sql`.
 3. API com `DATABASE_URL` de `crm_app`; `TRUST_PROXY` com o **número** de proxies na frente da

@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { e2eNow } from './clock.js';
 
 /** TOTP (RFC 6238) para os testes: mesmo algoritmo dos aplicativos autenticadores. */
 const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -18,7 +19,8 @@ function decode(input: string): Buffer {
   return Buffer.from(out);
 }
 
-export const currentStep = () => Math.floor(Date.now() / 30_000);
+/** Passo de 30 s no relógio dos testes, o mesmo que a API usa (e2e/clock.ts). */
+export const currentStep = () => Math.floor(e2eNow().getTime() / 30_000);
 
 /** Código de um passo de 30 s. O servidor aceita o passo atual e os vizinhos, sem repetição. */
 export function totpAt(secret: string, counter: number): string {
