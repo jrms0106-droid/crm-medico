@@ -39,7 +39,7 @@ Senha de todas: `senha-de-desenvolvimento` (só para desenvolvimento).
 
 | Perfil        | E-mail                             | Observação                                                                                               |
 | ------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Secretária    | `secretaria@clinica-ficticia.test` | entra só com a senha                                                                                     |
+| Secretária    | `secretaria@clinica-ficticia.test` | no primeiro acesso cadastra a verificação em duas etapas, como o médico                                  |
 | Médico        | `medico@clinica-ficticia.test`     | no primeiro acesso cadastra a verificação em duas etapas num aplicativo autenticador do celular do teste |
 | Administrador | `admin@clinica-ficticia.test`      | igual ao médico                                                                                          |
 

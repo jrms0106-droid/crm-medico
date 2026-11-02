@@ -16,7 +16,7 @@ Regras definidas antes da implementação (seção 30 do Prompt Mestre). Etapa 1
 | `active`                                             | Rotas protegidas, conforme a política de acesso |
 | expirada / revogada                                  | Nada (401)                                      |
 
-MFA é obrigatório para os papéis configurados em `MFA_REQUIRED_ROLES` (padrão: `doctor,admin`). Para os demais, é opcional e, se ativado, passa a ser exigido.
+MFA é obrigatório para os papéis configurados em `MFA_REQUIRED_ROLES` (padrão: `doctor,admin,secretary`, isto é, todos os perfis, decidido em 2026-11-02). Para os demais, é opcional e, se ativado, passa a ser exigido.
 
 ## Regras
 

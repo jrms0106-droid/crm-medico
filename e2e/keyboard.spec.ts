@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
-import { E2E_PASSWORD, USERS } from './fixtures.js';
+import { E2E_PASSWORD, E2E_TOTP_SECRET, USERS } from './fixtures.js';
+import { currentStep, totpAt } from './totp.js';
 
 /**
  * Fluxo da secretária feito só pelo teclado (Tab, Shift+Tab, Enter, Espaço e setas), sem
@@ -38,6 +39,13 @@ test('secretária cadastra e agenda só pelo teclado, com foco sempre visível',
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Senha')).toBeFocused();
   await page.keyboard.type(E2E_PASSWORD);
+  await page.keyboard.press('Enter');
+  // A secretária também usa o código de 6 dígitos. O outro arquivo de teste pode ter usado os
+  // passos de agora; esperar um passo novo evita código repetido, que o servidor recusa.
+  const start = currentStep();
+  while (currentStep() < start + 1) await page.waitForTimeout(1_000);
+  await tabTo(page, page.getByLabel('Código de 6 dígitos'));
+  await page.keyboard.type(totpAt(E2E_TOTP_SECRET, currentStep() + 1));
   await page.keyboard.press('Enter');
   const menu = page.getByRole('navigation', { name: 'Menu principal' });
   await expect(menu).toBeVisible();
