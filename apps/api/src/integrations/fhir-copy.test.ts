@@ -1,9 +1,10 @@
 /// <reference types="fhir" />
-import type { ClinicalCopyDto, RecordDto } from '@crm/shared';
+import type { ClinicalCopyDto, ExternalDocumentDto, RecordDto } from '@crm/shared';
 import { describe, expect, it } from 'vitest';
 import { toFhirBundle } from './fhir-copy.js';
 
 type Composition = fhir4.Composition;
+type DocumentReference = fhir4.DocumentReference;
 
 const AUTHOR = { id: '01900000-0000-7000-8000-000000000001', name: 'Dra. Fictícia' };
 
@@ -108,5 +109,44 @@ describe('toFhirBundle', () => {
       resourceType: 'Practitioner',
       name: [{ text: AUTHOR.name }],
     });
+  });
+
+  it('documento do CFM vira DocumentReference com o resumo em anexo e autor no arquivo', () => {
+    const other = { id: '01900000-0000-7000-8000-000000000002', name: 'Dr. Fictício' };
+    const external: ExternalDocumentDto = {
+      id: '01900000-0000-7000-8000-0000000000c1',
+      patientId: '01900000-0000-7000-8000-0000000000p1',
+      author: other,
+      encounterId: null,
+      platform: 'cfm',
+      kind: 'certificate',
+      status: 'registered',
+      issuedOn: '2026-03-01',
+      summary: 'Atestado fictício de 2 dias <sem HTML>.',
+      validationCode: null,
+      createdAt: '2026-03-01T15:00:00.000Z',
+      cancelledAt: null,
+      cancelReason: null,
+    };
+    const bundle = toFhirBundle({ ...copy([]), externalDocuments: [external] }, new Map(), seq);
+    const entry = bundle.entry!.find((e) => e.resource?.resourceType === 'DocumentReference')!;
+    expect(entry.fullUrl).toBe(`urn:uuid:${external.id}`);
+    const doc = entry.resource as DocumentReference;
+    expect(doc.identifier).toEqual([
+      { system: 'urn:crm-medico:documento-externo', value: external.id },
+    ]);
+    expect(doc.type).toEqual({ text: 'Atestado' });
+    expect(doc.category).toEqual([
+      { text: 'Emitido na Plataforma de Prescrição Eletrônica do CFM' },
+    ]);
+    expect(doc.author).toEqual([{ reference: `urn:uuid:${other.id}`, display: other.name }]);
+    const attachment = doc.content[0]!.attachment;
+    expect(attachment.contentType).toBe('text/plain; charset=utf-8');
+    expect(Buffer.from(attachment.data!, 'base64').toString('utf8')).toBe(external.summary);
+    expect(
+      bundle.entry!.some(
+        (e) => e.resource?.resourceType === 'Practitioner' && e.fullUrl === `urn:uuid:${other.id}`,
+      ),
+    ).toBe(true);
   });
 });
