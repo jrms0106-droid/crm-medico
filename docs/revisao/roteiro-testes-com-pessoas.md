@@ -5,6 +5,10 @@ que a verificação automática (axe-core e o teste só pelo teclado em `e2e/key
 não consegue julgar: se uma pessoa que usa leitor de tela ou só o teclado **consegue de fato
 fazer o trabalho** no CRM.
 
+Atualizado em 2026-11-03 com o que entrou depois da primeira versão: código de 6 dígitos também
+para a secretária, assistente clínico (M7 e M8), registro de documentos emitidos no CFM (M6) e a
+cópia no padrão FHIR (M9).
+
 > **Só dados fictícios.** O teste roda no ambiente de desenvolvimento, com a clínica fictícia
 > criada pelo `npm run db:seed`. Nunca digite nome, CPF, telefone ou dado clínico de pessoa real,
 > nem os de quem está testando. O MVP não é apto a uso clínico real.
@@ -103,7 +107,7 @@ achado. Vale para todas as tarefas:
 | Nº  | Tarefa                   | Passos                                                             | O que deve acontecer                                                                                                 |
 | --- | ------------------------ | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | G1  | Entrar com senha errada  | Digitar o e-mail da secretária e uma senha errada, apertar `Enter` | O erro é lido na hora, sem dizer se o e-mail existe                                                                  |
-| G2  | Entrar                   | Repetir com a senha certa                                          | A tela inicial abre, e o título da página muda (o leitor anuncia a nova página)                                      |
+| G2  | Entrar                   | Repetir com a senha certa e digitar o código de 6 dígitos          | A tela inicial abre, e o título da página muda (o leitor anuncia a nova página)                                      |
 | G3  | Pular o menu             | Na tela inicial, apertar `Tab` uma vez                             | O primeiro item é "Pular para o conteúdo"; com `Enter`, o foco vai para o conteúdo principal                         |
 | G4  | Andar pelo menu          | Ir pelo menu até "Pacientes" e abrir                               | O menu é anunciado como "Menu principal"; ao abrir a tela, o foco vai para o conteúdo, não volta para o topo do menu |
 | G5  | Faixa de dados fictícios | Ler o topo da página                                               | A faixa avisando que o ambiente é de dados fictícios é lida                                                          |
@@ -115,7 +119,7 @@ achado. Vale para todas as tarefas:
 | --- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | S1  | Cadastrar paciente             | Em "Pacientes", acionar "Novo paciente". Preencher nome completo `Joana Exemplo Teste`, nascimento `12/04/1985`, telefone `11987654321`, marcar "Este telefone tem WhatsApp" e acionar "Cadastrar" | Cada campo é anunciado com o nome e se é obrigatório; a ficha da paciente abre com o nome como título                                                    |
 | S2  | Erro no cadastro               | Repetir S1 deixando o nome vazio e acionar "Cadastrar"                                                                                                                                             | O erro é lido e diz qual campo corrigir                                                                                                                  |
-| S3  | Aviso de possível duplicidade  | Cadastrar de novo `Joana Exemplo Teste` com o mesmo nascimento                                                                                                                                     | O aviso de possível duplicidade é lido, e fica claro que é preciso confirmar de novo para cadastrar                                                      |
+| S3  | Aviso de possível duplicidade  | Cadastrar de novo `Joana Exemplo Teste` com o mesmo nascimento                                                                                                                                     | O aviso de possível duplicidade é lido, e o botão passa a se chamar "Cadastrar mesmo assim"                                                              |
 | S4  | Marcar consulta                | Na ficha da paciente, acionar "Agendar consulta", escolher o primeiro horário livre (com as setas) e acionar "Agendar"                                                                             | Os horários são anunciados como um grupo de opções com a hora; a mensagem "Consulta marcada…" é lida                                                     |
 | S5  | Confirmar e registrar chegada  | Na agenda do dia, achar a linha da paciente, acionar "Confirmar" e depois "Registrar chegada"                                                                                                      | Na tabela, dá para saber de quem é cada linha e a situação; a mudança de situação é perceptível                                                          |
 | S6  | Cobrar e receber               | Na mesma linha, acionar "Cobrar", criar a cobrança, abrir e registrar um pagamento em dinheiro                                                                                                     | Os valores em reais são lidos de forma compreensível; a situação da cobrança muda e isso é anunciado ou fácil de achar                                   |
@@ -125,27 +129,31 @@ achado. Vale para todas as tarefas:
 
 ### Médico
 
-| Nº  | Tarefa              | Passos                                                                                                                         | O que deve acontecer                                                                                         |
-| --- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| M1  | Entrar com código   | Entrar com senha e o código de 6 dígitos do aplicativo autenticador                                                            | O campo do código é anunciado; código errado gera erro lido na hora                                          |
-| M2  | Iniciar atendimento | Na agenda, achar a paciente que chegou (de S5) e acionar "Iniciar atendimento"                                                 | O prontuário abre com o título "Prontuário de Joana Exemplo Teste" e o vínculo "Atendimento iniciado" é lido |
-| M3  | Escrever registro   | Acionar "Novo registro", preencher motivo da consulta, anamnese e conduta com textos fictícios                                 | O salvamento automático do rascunho é anunciado sem tirar o foco do campo em que a pessoa escreve            |
-| M4  | Finalizar e assinar | Acionar "Finalizar", depois "Assinar", digitar senha e código e acionar "Confirmar e assinar"                                  | Fica claro o que a assinatura faz; o resultado ("Conteúdo íntegro." e a situação "Assinado") é lido          |
-| M5  | Receita simples     | Em "Documentos", acionar "Receita simples", preencher o medicamento 1 e a posologia 1, salvar o rascunho, assinar, abrir o PDF | O aviso de que a receita simples não serve para controlados nem antimicrobianos é lido; o PDF abre           |
-| M6  | Cópia do prontuário | Acionar "Encerrar atendimento" e depois "Cópia do prontuário"                                                                  | A mensagem dizendo quantos registros foram incluídos é lida                                                  |
+| Nº  | Tarefa               | Passos                                                                                                                                                                       | O que deve acontecer                                                                                                    |
+| --- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| M1  | Entrar com código    | Entrar com senha e o código de 6 dígitos do aplicativo autenticador                                                                                                          | O campo do código é anunciado; código errado gera erro lido na hora                                                     |
+| M2  | Iniciar atendimento  | Na agenda, achar a paciente que chegou (de S5) e acionar "Iniciar atendimento"                                                                                               | O prontuário abre com o título "Prontuário de Joana Exemplo Teste" e o vínculo "Atendimento iniciado" é lido            |
+| M3  | Escrever registro    | Acionar "Novo registro", preencher motivo da consulta, anamnese e conduta com textos fictícios                                                                               | O salvamento automático do rascunho é anunciado sem tirar o foco do campo em que a pessoa escreve                       |
+| M4  | Finalizar e assinar  | Acionar "Finalizar", depois "Assinar", digitar senha e código e acionar "Confirmar e assinar"                                                                                | Fica claro o que a assinatura faz; o resultado ("Conteúdo íntegro." e a situação "Assinado") é lido                     |
+| M5  | Receita simples      | Em "Documentos", acionar "Receita simples", preencher o medicamento 1 e a posologia 1, salvar o rascunho, assinar, abrir o PDF                                               | O aviso de que a receita simples não serve para controlados nem antimicrobianos é lido; o PDF abre                      |
+| M6  | Documento do CFM     | Em "Emitidos na plataforma do CFM", acionar "Registrar documento emitido no CFM", escolher "Receita de controle especial", escrever um resumo fictício e acionar "Registrar" | O formulário é anunciado pelo nome; o registro aparece na lista com o tipo e a data                                     |
+| M7  | Organizar anotações  | Num rascunho, acionar "Organizar anotações nos campos", colar anotações fictícias em "Suas anotações da consulta" e acionar "Organizar"; depois "Inserir no registro"        | Fica claro em que campo cada frase vai e quais ficaram de fora; depois de inserir, o texto aparece no fim de cada campo |
+| M8  | Resumo com fontes    | Em "Resumo com fontes (IA)", acionar "Gerar resumo" e depois "Abrir registro" num trecho                                                                                     | Cada trecho é lido com a data, o tipo e o autor da fonte; "Abrir registro" leva até o registro citado                   |
+| M9  | Cópias do prontuário | Acionar "Encerrar atendimento", depois "Cópia do prontuário" e "Cópia no padrão FHIR"                                                                                        | As mensagens dizendo o que entrou em cada cópia são lidas, inclusive o documento do CFM de M6                           |
 
 ### Administrador
 
-| Nº  | Tarefa             | Passos                                                                                         | O que deve acontecer                                                                  |
-| --- | ------------------ | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| A1  | Criar usuário      | Em "Configurações", criar uma secretária fictícia, confirmando a identidade com senha e código | A senha temporária, mostrada uma única vez, é lida e dá para copiar                   |
-| A2  | Horários da agenda | Editar as faixas de atendimento de um dia da semana e salvar                                   | Cada faixa diz o dia e o horário; "Horários salvos." é lido                           |
-| A3  | Estornar pagamento | Em "Financeiro", abrir a cobrança de S6 e estornar o pagamento com motivo                      | O pedido de senha e código aparece no lugar certo, e o resultado é lido               |
-| A4  | Auditoria          | Em "Auditoria", filtrar por resultado e verificar a trilha                                     | A tabela de eventos é navegável por linha e coluna; o resultado da verificação é lido |
+| Nº  | Tarefa             | Passos                                                                                                                                                | O que deve acontecer                                                                  |
+| --- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| A1  | Criar usuário      | Em "Configurações", criar uma secretária fictícia, confirmando a identidade com senha e código                                                        | A senha temporária, mostrada uma única vez, é lida e dá para copiar                   |
+| A2  | Horários da agenda | Editar as faixas de atendimento de um dia da semana e salvar                                                                                          | Cada faixa diz o dia e o horário; "Horários salvos." é lido                           |
+| A3  | Estornar pagamento | Em "Financeiro", abrir a cobrança de S6 e estornar o pagamento com motivo                                                                             | O pedido de senha e código aparece no lugar certo, e o resultado é lido               |
+| A4  | Auditoria          | Em "Auditoria", filtrar por resultado e verificar a trilha                                                                                            | A tabela de eventos é navegável por linha e coluna; o resultado da verificação é lido |
+| A5  | Ligar o assistente | Em "Configurações", no quadro "Assistente de IA", ligar "Organizar anotações no registro" e "Resumo do prontuário com fontes" (faça antes de M7 e M8) | Cada função diz se está ligada ou desligada; o pedido de senha e código é lido        |
 
 ## 5. Telas longas só pelo teclado
 
-Sem leitor de tela e sem mouse, refaça **M2 a M5** (prontuário) e **S6 e A3** (financeiro)
+Sem leitor de tela e sem mouse, refaça **M2 a M7** (prontuário) e **S6 e A3** (financeiro)
 prestando atenção em:
 
 1. **Ordem do foco:** o `Tab` segue a ordem em que as coisas aparecem na tela, de cima para

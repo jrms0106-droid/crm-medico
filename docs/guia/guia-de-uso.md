@@ -62,7 +62,7 @@ paciente, Importar pacientes, Assistente (IA) e Profissionais.
    telefone com DDD. Nome social e CPF são opcionais. Marque **Este telefone tem WhatsApp**
    quando for o caso.
 3. Aperte **Cadastrar**. Se o sistema avisar que **encontrou cadastros parecidos**, confira a
-   lista. Se tiver certeza de que é outra pessoa, envie de novo.
+   lista. Se tiver certeza de que é outra pessoa, aperte **Cadastrar mesmo assim**.
 4. Na ficha, o CPF aparece mascarado. A ficha também mostra se o paciente **autoriza os
    lembretes** pelo WhatsApp, os pedidos de direitos e o relatório de acessos.
 
@@ -176,8 +176,8 @@ O menu do médico tem: Início, Pacientes, Agenda e Profissionais. A agenda most
 5. Para corrigir um registro assinado, use **Retificar** (substitui o anterior, que continua
    visível) ou **Adendo** (complementa sem substituir). Os dois pedem justificativa e
    assinatura.
-6. Registros sensíveis de outro médico aparecem na linha do tempo sem o conteúdo. Para abrir, é
-   preciso escrever uma justificativa, que fica gravada.
+6. Registros sensíveis de outro médico aparecem na linha do tempo sem o conteúdo. Para abrir,
+   escreva a **Justificativa** e aperte **Abrir com justificativa**. A justificativa fica gravada.
 7. No fim, aperte **Encerrar atendimento**.
 
 Regras: [prontuario.md](../api/prontuario.md) e
@@ -191,8 +191,8 @@ Só aparece quando o administrador liga a função em Configurações. Ele **nã
 clínico**: só reorganiza as suas frases ou as de registros assinados, sem mudar uma letra, e
 nunca preenche hipóteses nem CID. Por enquanto usa um modelo simulado.
 
-- **Organizar anotações (IA)**, dentro do rascunho: escreva ou cole as anotações livres da
-  consulta e aperte **Organizar**. Confira em que campo cada frase foi parar e as frases que
+- **Organizar anotações nos campos**, dentro do rascunho: escreva ou cole as anotações livres
+  da consulta em **Suas anotações da consulta** e aperte **Organizar**. Confira em que campo cada frase foi parar e as frases que
   ficaram de fora. **Inserir no registro** acrescenta o texto ao fim de cada campo; revise antes
   de finalizar e assinar, como sempre.
 - **Resumo com fontes (IA)**, acima da linha do tempo: aperte **Gerar resumo**. Cada trecho
@@ -222,8 +222,9 @@ médicos com inscrição ativa. O CRM não emite esses documentos.
 1. Emita o documento na plataforma do CFM, como de costume.
 2. No prontuário, na área **Emitidos na plataforma do CFM**, aperte **Registrar documento emitido
    no CFM**.
-3. Escolha o tipo, confira a data, escreva o que foi emitido e, se quiser, copie o código que a
-   plataforma mostra. Aperte **Registrar**.
+3. Escolha o **Tipo**, confira a **Data de emissão**, escreva **O que foi emitido** e, se quiser,
+   copie o código que a plataforma mostra em **Código do documento no CFM**. Aperte
+   **Registrar**.
 4. Se registrou por engano, use **Cancelar registro** com o motivo. Isso não cancela o documento
    no CFM.
 
@@ -234,7 +235,9 @@ Regras: [documentos-externos.md](../api/documentos-externos.md).
 Com o vínculo valendo (atendimento iniciado, acompanhamento ou encerrado), aperte **Cópia do
 prontuário** (arquivo JSON) ou **Cópia no padrão FHIR** (para levar a outro serviço de saúde).
 O sistema confirma a sua senha e diz quantos registros entraram e se algum registro sensível de
-outro profissional ficou de fora.
+outro profissional ficou de fora. As duas cópias levam também os documentos registrados como
+emitidos no CFM (os registros cancelados ficam de fora); o documento assinado continua na
+plataforma do CFM.
 
 ## 4. Administrador
 
@@ -254,8 +257,9 @@ Toda mudança de acesso pede a sua senha e o código de novo.
 - **Agendas:** crie a agenda do médico numa unidade e ajuste os horários de atendimento por dia
   da semana. Para isso, você precisa estar vinculado à unidade.
 - **Tabela de preços (particular):** crie itens, mude valores e desative.
-- **Assistente de IA:** ligue ou desligue cada função. Você vê quanto cada pessoa usou, mas
-  não o texto das sugestões.
+- **Assistente de IA:** ligue ou desligue cada função, tanto as da secretária quanto as do
+  médico (**Organizar anotações no registro** e **Resumo do prontuário com fontes**). Você vê
+  quanto cada pessoa usou, mas não o texto das sugestões.
 
 ### Financeiro
 

@@ -366,7 +366,7 @@ export function AiSettingsSection({ guarded }: { guarded: Guarded }) {
       features.reload();
     });
   return (
-    <Panel title="Assistente de IA (nível 1, administrativo)">
+    <Panel title="Assistente de IA">
       <p className="muted">
         Cada funcionalidade começa desligada. Hoje as respostas vêm de um modelo simulado, sem
         enviar dados para fora; contratar um serviço de IA depende de autorização e de avaliação de
