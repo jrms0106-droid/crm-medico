@@ -564,7 +564,10 @@ export function ClinicalCopyButton({
       {result && (
         <p role="status" className="muted">
           Cópia gerada com {result.records.length} registro(s) e {result.documents.length}{' '}
-          documento(s) assinados. Entregue só ao paciente ou ao representante legal.
+          documento(s) assinados
+          {result.externalDocuments.length > 0 &&
+            `, além de ${result.externalDocuments.length} documento(s) emitidos no CFM`}
+          . Entregue só ao paciente ou ao representante legal.
           {result.withheld.reason && ` ${result.withheld.reason}`}
         </p>
       )}

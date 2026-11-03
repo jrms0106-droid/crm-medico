@@ -208,6 +208,7 @@ test.describe.serial('fluxos por perfil', () => {
     expect(copy.documents.map((d) => d.kind)).toEqual(['prescription']);
     expect(copy.externalDocuments.map((d) => d.kind)).toEqual(['controlled_prescription']);
     await expect(page.getByRole('status')).toContainText('Cópia gerada com 1 registro(s)');
+    await expect(page.getByRole('status')).toContainText('além de 1 documento(s) emitidos no CFM');
 
     // A mesma cópia no padrão FHIR (docs/api/integracoes.md).
     const downloadingFhir = page.waitForEvent('download');
