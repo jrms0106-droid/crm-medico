@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  CARDIOLOGY_FORM_VERSION,
   ErrorCode,
-  GENERIC_FORM_VERSION,
+  FORM_VERSIONS,
   type RecordContent,
   type RecordDto,
   type RecordStatus,
@@ -45,6 +46,17 @@ export function canonicalJson(value: unknown): string {
 }
 
 const dateOnly = (d: Date) => d.toISOString().slice(0, 10);
+
+/** A ficha de cardiologia só vale no registro criado com esse formulário (ADR 0037). */
+function assertFormContent(formVersion: string, content: RecordContent | undefined): void {
+  if (content?.cardiology !== undefined && formVersion !== CARDIOLOGY_FORM_VERSION) {
+    throw new AppError(
+      400,
+      ErrorCode.VALIDATION_FAILED,
+      'Este registro usa o formulário genérico; a ficha de cardiologia não se aplica a ele.',
+    );
+  }
+}
 
 /** SHA-256 do conteúdo canônico do registro (docs/api/prontuario.md, Assinatura). */
 export function recordHash(r: ClinicalRecord): string {
@@ -122,6 +134,8 @@ export class RecordsService {
     patientId: string,
     input: z.infer<typeof recordCreateSchema>,
   ): Promise<RecordDto> {
+    const formVersion = FORM_VERSIONS[input.form];
+    assertFormContent(formVersion, input.content);
     const org = ctx.user.organizationId;
     const encounter = await this.openEncounter(org, ctx.user.id, patientId);
     const clinicalDate = input.clinicalDate
@@ -136,7 +150,7 @@ export class RecordsService {
       kind: input.kind,
       clinicalDate,
       sensitivity: input.sensitivity,
-      formVersion: GENERIC_FORM_VERSION,
+      formVersion,
       content: input.content,
     });
     return this.dto(await this.reload(id));
@@ -157,6 +171,7 @@ export class RecordsService {
     if (mode === 'addendum' && !['signed', 'rectified'].includes(original.status)) {
       throw invalidTransition('Só um registro assinado pode receber adendo.');
     }
+    assertFormContent(original.formVersion, input.content);
     const encounter = await this.openEncounter(
       original.organizationId,
       ctx.user.id,
@@ -230,6 +245,7 @@ export class RecordsService {
     if (record.status !== 'draft') {
       throw invalidTransition('Só um rascunho pode ser alterado. Reabra o registro finalizado.');
     }
+    assertFormContent(record.formVersion, input.content);
     const content = (input.content ?? record.content) as Prisma.InputJsonObject;
     const next = input.version + 1;
     await this.prisma.$transaction(async (tx) => {

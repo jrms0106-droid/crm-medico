@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  CARDIOLOGY_FORM_VERSION,
   CARE_STATE_LABELS,
+  FORM_LABELS,
   type CareAccessDto,
   type PatientDto,
   RECORD_STATUS_LABELS,
   type RecordContent,
   type RecordDto,
+  type RecordForm,
   type RecordSensitivity,
   type RecordSummaryDto,
   type SessionInfo,
 } from '@crm/shared';
 import { ApiError, api, query } from '../api';
 import { ReauthDialog } from '../reauth';
+import { CardiologyEditor, CardiologyView } from './cardiology';
 import { DocumentsPanel } from './documents';
 import { ExternalDocumentsPanel } from './external-documents';
 import { type InsertedField, NotesOrganizer, RecordSummaryPanel } from './clinical-assistant';
@@ -85,9 +89,9 @@ export function RecordPage({
     access.reload();
   };
 
-  const create = () =>
+  const create = (form: RecordForm) =>
     action.run(async () => {
-      const created = await api.post<RecordDto>(`/patients/${patientId}/records`, {});
+      const created = await api.post<RecordDto>(`/patients/${patientId}/records`, { form });
       setOpenId(created.id);
       timeline.reload();
     });
@@ -107,9 +111,19 @@ export function RecordPage({
       actions={
         <>
           {can?.createRecords && (
-            <button type="button" onClick={() => void create()} disabled={action.busy}>
-              Novo registro
-            </button>
+            <>
+              <button type="button" onClick={() => void create('generic')} disabled={action.busy}>
+                Novo registro
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void create('cardiology')}
+                disabled={action.busy}
+              >
+                Nova ficha de cardiologia
+              </button>
+            </>
           )}
           {access.data?.state && ['started', 'follow_up', 'closed'].includes(access.data.state) && (
             <ClinicalCopyButton session={session} patientId={patientId} />
@@ -123,8 +137,8 @@ export function RecordPage({
       }
     >
       <Notice kind="warn">
-        Formulário genérico e assinatura eletrônica interna, ainda sem validação médica e jurídica.
-        Não use com pacientes reais.
+        Formulário genérico, ficha de cardiologia e assinatura eletrônica interna, ainda sem
+        validação médica e jurídica. Não use com pacientes reais.
       </Notice>
       <Alert message={patient.error ?? access.error ?? action.error} />
       {access.data && (
@@ -295,6 +309,7 @@ function RecordMeta({ record }: { record: RecordDto }) {
   return (
     <p className="muted small">
       {KIND_LABELS[record.kind]} de {formatDate(record.clinicalDate)} · {record.author.name} ·{' '}
+      {FORM_LABELS[record.formVersion] ?? record.formVersion} ·{' '}
       <Badge tone={STATUS_TONE[record.status]}>{RECORD_STATUS_LABELS[record.status]}</Badge>
       {record.sensitivity !== 'normal' && (
         <> · sensibilidade {SENSITIVITY_LABELS[record.sensitivity]}</>
@@ -316,6 +331,7 @@ function ContentView({ content }: { content: RecordContent }) {
             </div>
           ),
       )}
+      <CardiologyView value={content.cardiology} />
       {content.hypotheses && content.hypotheses.length > 0 && (
         <div>
           <dt>Hipóteses</dt>
@@ -547,8 +563,8 @@ function DraftEditor({
   return (
     <form onSubmit={(e) => e.preventDefault()} aria-label="Editar rascunho">
       <p className="muted small">
-        {KIND_LABELS[initial.kind]} de {formatDate(initial.clinicalDate)} · rascunho de{' '}
-        {session.user.name}
+        {KIND_LABELS[initial.kind]} de {formatDate(initial.clinicalDate)} ·{' '}
+        {FORM_LABELS[initial.formVersion] ?? initial.formVersion} · rascunho de {session.user.name}
         {initial.justification && <> · justificativa: {initial.justification}</>}
       </p>
       <NotesOrganizer session={session} patientId={initial.patientId} onInsert={insert} />
@@ -563,6 +579,12 @@ function DraftEditor({
           />
         </label>
       ))}
+      {initial.formVersion === CARDIOLOGY_FORM_VERSION && (
+        <CardiologyEditor
+          value={content.cardiology}
+          onChange={(cardiology) => edit({ cardiology })}
+        />
+      )}
       <fieldset>
         <legend>Hipóteses diagnósticas</legend>
         {hypotheses.map((h, i) => (

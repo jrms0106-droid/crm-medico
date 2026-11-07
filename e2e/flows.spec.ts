@@ -650,12 +650,45 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(page.getByLabel('Conduta')).toHaveValue('Oriento manter hidratação.');
     await expect(page.getByLabel('Anamnese')).toHaveValue('Dorme bem.');
 
-    // Limpeza: descarta o rascunho e encerra o atendimento.
+    // Descarta o rascunho organizado pelo assistente.
     page.once('dialog', (d) => void d.accept());
     await page
       .getByRole('form', { name: 'Editar rascunho' })
       .getByRole('button', { name: 'Descartar', exact: true })
       .click();
+
+    // Ficha de cardiologia (ADR 0037): campos estruturados, sem violação de acessibilidade,
+    // e a mesma leitura em linhas depois de assinada.
+    await page.getByRole('button', { name: 'Nova ficha de cardiologia' }).click();
+    const ficha = page.getByRole('group', { name: 'Ficha de cardiologia' });
+    await ficha.getByLabel('Hipertensão arterial').check();
+    await ficha.getByLabel('Tabagismo').selectOption('former');
+    await ficha.getByLabel('Classe funcional (NYHA)').selectOption('2');
+    await ficha.getByLabel('PA sistólica (mmHg)').fill('142');
+    await ficha.getByLabel('PA diastólica (mmHg)').fill('88');
+    await ficha.getByLabel('Peso (kg)').fill('80,5');
+    await ficha.getByLabel('Altura (cm)').fill('175');
+    await expect(ficha.getByText('IMC calculado: 26,3 kg/m²')).toBeVisible();
+    await ficha.getByLabel('FEVE (%)').fill('58');
+    await ficha.getByLabel('LDL (mg/dL)').fill('132');
+    const axe = await new AxeBuilder({ page })
+      .include('[aria-label="Ficha de cardiologia"]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(axe.violations.map((v) => v.id)).toEqual([]);
+    await snap(page, '19-ficha-cardiologia');
+    await page.getByRole('button', { name: 'Finalizar' }).click();
+    await page.getByRole('button', { name: 'Assinar' }).click();
+    await page.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await page.getByLabel('Código de 6 dígitos').fill(await nextCode('doctor'));
+    await page.getByRole('button', { name: 'Confirmar e assinar' }).click();
+    await expect(page.getByText('Conteúdo íntegro.')).toBeVisible();
+    await expect(page.getByText('Hipertensão arterial; Ex-tabagista')).toBeVisible();
+    await expect(
+      page.getByText('PA 142/88 mmHg; peso 80,5 kg; altura 175 cm; IMC 26,3 kg/m²'),
+    ).toBeVisible();
+    await expect(page.getByText('FEVE 58%')).toBeVisible();
+
     await page.getByRole('button', { name: 'Encerrar atendimento' }).click();
     await expect(page.getByText('Vínculo: Atendimento encerrado')).toBeVisible();
   });

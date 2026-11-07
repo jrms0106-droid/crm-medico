@@ -15,7 +15,10 @@ concurrency:
 jobs:
   verificar:
     name: Tipos, lint, formatação e testes
-    runs-on: ubuntu-latest
+    # Fixo no 24.04: o ensaio de restauração usa o pg_dump/pg_restore do sistema, que precisa ser
+    # da mesma versão do servidor (PostgreSQL 16). O ubuntu-latest virou 26.04, com cliente 18, e o
+    # dump dele não restaura num servidor 16 ("transaction_timeout").
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     services:
       postgres:

@@ -1,6 +1,7 @@
 /// <reference types="fhir" />
 import { randomUUID } from 'node:crypto';
 import {
+  cardiologyFacts,
   type ClinicalCopyDto,
   DOCUMENT_KIND_LABELS,
   type DocumentDto,
@@ -54,6 +55,7 @@ const SECTIONS = [
   { field: 'physicalExam', code: '29545-1', display: 'Physical findings', title: 'Exame físico' },
 ] as const;
 const HYPOTHESES = { code: '51848-0', display: 'Assessment note', title: 'Hipóteses diagnósticas' };
+const CARDIOLOGY_TITLE = 'Ficha de cardiologia';
 const PLAN = { code: '18776-5', display: 'Plan of care note', title: 'Conduta' };
 
 const urn = (id: string) => `urn:uuid:${id}`;
@@ -202,6 +204,14 @@ function composition(
         text: narrative(value.split(/\r?\n\r?\n/)),
       });
     }
+  }
+  // Ficha de cardiologia (ADR 0037): o mesmo texto da tela, em uma seção sem código padronizado.
+  const cardiology = cardiologyFacts(r.content.cardiology);
+  if (cardiology.length > 0) {
+    section.push({
+      title: CARDIOLOGY_TITLE,
+      text: narrative(cardiology.map((f) => `${f.label}: ${f.value}`)),
+    });
   }
   if (conditions.length > 0) {
     section.push({

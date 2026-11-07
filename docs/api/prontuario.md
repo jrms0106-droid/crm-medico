@@ -10,7 +10,7 @@ Cada registro (`records.clinical_records`) guarda:
 
 - paciente, autor e atendimento de origem (quando houver um aberto), unidade do atendimento;
 - tipo: `consultation` (consulta), `evolution` (evolução) ou `addendum` (adendo);
-- data clínica, sensibilidade, versão, estado e versão do formulário (`generic-v1`);
+- data clínica, sensibilidade, versão, estado e versão do formulário (`generic-v1` ou `cardiology-v1`, ver abaixo);
 - o conteúdo e, depois da assinatura, o resumo SHA-256 e as evidências da assinatura.
 
 Conteúdo do formulário genérico, todos os campos opcionais, cada um com até 20.000 caracteres:
@@ -22,6 +22,25 @@ Conteúdo do formulário genérico, todos os campos opcionais, cada um com até 
 | `physicalExam`   | Exame físico                                                                                               |
 | `hypotheses`     | Até 20 hipóteses, cada uma com descrição e CID-10 opcional (só o formato é conferido, por exemplo `J06.9`) |
 | `plan`           | Conduta                                                                                                    |
+
+## Ficha de cardiologia
+
+Ao criar o registro, o médico pode pedir `form: "cardiology"` ([ADR 0037](../adr/0037-ficha-de-cardiologia.md)). O registro fica com `formVersion: "cardiology-v1"`, tem os mesmos campos de texto acima e aceita o bloco `cardiology`, todo opcional. **Os campos ainda precisam da conferência de um cardiologista.**
+
+| Grupo         | Campos                                                                                                                              |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `riskFactors` | hipertensão, diabetes, dislipidemia, obesidade, doença renal crônica, sedentarismo, história familiar; tabagismo (nunca, ex, atual) |
+| `history`     | infarto, angioplastia, revascularização cirúrgica, insuficiência cardíaca, fibrilação atrial, AVC/AIT, valvopatia, marca-passo/CDI  |
+| `symptoms`    | dor torácica (sem dor, típica, atípica, não anginosa), classe CCS e NYHA (1 a 4), dispneia, palpitações, síncope, edema             |
+| `vitals`      | PA sistólica e diastólica, FC, SpO₂, peso, altura, circunferência abdominal (o IMC é calculado na tela e na leitura)                |
+| `ecg`         | data, ritmo, FC, achados                                                                                                            |
+| `echo`        | data, FEVE, diâmetro diastólico do VE, volume indexado do AE, PSAP, achados                                                         |
+| `labs`        | data, colesterol total, LDL, HDL, triglicerídeos, glicemia, HbA1c, creatinina, potássio, NT-proBNP                                  |
+| `medications` | texto livre, até 2.000 caracteres                                                                                                   |
+
+- Números fora de uma faixa larga (por exemplo, FEVE acima de 90%) e diastólica maior ou igual à sistólica respondem 400, com mensagem que pede para conferir a digitação. As faixas não dizem o que é normal.
+- O bloco `cardiology` num registro do formulário genérico responde 400 `VALIDATION_FAILED`, ao criar, salvar ou retificar. Retificação e adendo herdam o formulário do original.
+- A ficha preenchida conta como conteúdo para finalizar. A leitura e a cópia FHIR mostram as mesmas linhas de texto.
 
 ## Estados
 
