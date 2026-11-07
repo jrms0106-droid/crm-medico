@@ -74,6 +74,36 @@ describe('toFhirBundle', () => {
     );
   });
 
+  it('ficha de cardiologia vira uma seção com o mesmo texto da tela, antes das hipóteses', () => {
+    const bundle = toFhirBundle(
+      copy([
+        record({
+          formVersion: 'cardiology-v1',
+          content: {
+            physicalExam: 'Bulhas rítmicas.',
+            cardiology: {
+              vitals: { systolicBp: 130, diastolicBp: 80 },
+              echo: { lvef: 60, findings: 'Sem <alterações>.' },
+            },
+            hypotheses: [{ description: 'Angina estável' }],
+          },
+        }),
+      ]),
+      new Map(),
+      seq,
+    );
+    const comp = bundle.entry!.find((e) => e.resource?.resourceType === 'Composition')!
+      .resource as Composition;
+    expect(comp.section!.map((s) => s.title)).toEqual([
+      'Exame físico',
+      'Ficha de cardiologia',
+      'Hipóteses diagnósticas',
+    ]);
+    const div = comp.section![1]!.text!.div;
+    expect(div).toContain('<p>Sinais vitais: PA 130/80 mmHg</p>');
+    expect(div).toContain('<p>Ecocardiograma: FEVE 60%; Sem &#60;alterações&#62;.</p>');
+  });
+
   it('retificação aponta para o original no arquivo; original fora da cópia vira só identificador', () => {
     const original = record({ id: '01900000-0000-7000-8000-0000000000b1', status: 'rectified' });
     const fix = record({ id: '01900000-0000-7000-8000-0000000000b2', rectifiesId: original.id });

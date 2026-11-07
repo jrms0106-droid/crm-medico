@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CARDIOLOGY_FORM_VERSION, cardiologyFacts, cardiologySchema } from './cardiology.js';
 
 export const RECORD_KINDS = ['consultation', 'evolution', 'addendum'] as const;
 export type RecordKind = (typeof RECORD_KINDS)[number];
@@ -28,6 +29,18 @@ export const RECORD_STATUS_LABELS: Record<RecordStatus, string> = {
 /** Versão do formulário genérico (docs/api/prontuario.md), até a validação por especialidade. */
 export const GENERIC_FORM_VERSION = 'generic-v1';
 
+/** Formulários que o médico escolhe ao criar o registro (ADR 0037). */
+export const RECORD_FORMS = ['generic', 'cardiology'] as const;
+export type RecordForm = (typeof RECORD_FORMS)[number];
+export const FORM_VERSIONS: Record<RecordForm, string> = {
+  generic: GENERIC_FORM_VERSION,
+  cardiology: CARDIOLOGY_FORM_VERSION,
+};
+export const FORM_LABELS: Record<string, string> = {
+  [GENERIC_FORM_VERSION]: 'Formulário genérico',
+  [CARDIOLOGY_FORM_VERSION]: 'Ficha de cardiologia',
+};
+
 const longText = z.string().max(20_000, 'Máximo de 20.000 caracteres.');
 export const ICD10_PATTERN = /^[A-TV-Z][0-9][0-9AB](\.[0-9A-Z]{1,2})?$/;
 
@@ -50,19 +63,26 @@ export const recordContentSchema = z.strictObject({
     .max(20, 'No máximo 20 hipóteses.')
     .optional(),
   plan: longText.optional(),
+  /** Só no formulário de cardiologia; a API recusa no genérico. */
+  cardiology: cardiologySchema,
 });
 export type RecordContent = z.infer<typeof recordContentSchema>;
 
 /** O conteúdo tem algo escrito? Registro vazio não pode ser finalizado. */
 export function hasContent(c: RecordContent): boolean {
   const texts = [c.chiefComplaint, c.anamnesis, c.physicalExam, c.plan];
-  return texts.some((t) => (t ?? '').trim().length > 0) || (c.hypotheses?.length ?? 0) > 0;
+  return (
+    texts.some((t) => (t ?? '').trim().length > 0) ||
+    (c.hypotheses?.length ?? 0) > 0 ||
+    cardiologyFacts(c.cardiology).length > 0
+  );
 }
 
 const clinicalDate = z.iso.date('Data inválida: use AAAA-MM-DD.');
 
 export const recordCreateSchema = z.strictObject({
   kind: z.enum(['consultation', 'evolution']).default('consultation'),
+  form: z.enum(RECORD_FORMS).default('generic'),
   clinicalDate: clinicalDate.optional(),
   sensitivity: z.enum(RECORD_SENSITIVITIES).default('normal'),
   content: recordContentSchema.default({}),

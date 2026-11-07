@@ -169,6 +169,10 @@ O menu do médico tem: Início, Pacientes, Agenda e Profissionais. A agenda most
 2. Aperte **Novo registro** e preencha motivo da consulta, anamnese, exame físico, conduta e,
    se quiser, hipóteses diagnósticas. Escolha a **sensibilidade** (por exemplo, para assuntos
    de saúde mental).
+   - Em consulta de cardiologia, use **Nova ficha de cardiologia**. Além dos mesmos campos de
+     texto, ela tem fatores de risco, antecedentes, sintomas (CCS e NYHA), sinais vitais (o IMC
+     aparece sozinho), ECG, ecocardiograma, exames e medicações. Deixe em branco o que não foi
+     avaliado. Os campos ainda estão em teste.
 3. O rascunho é **salvo sozinho** alguns segundos depois de você parar de digitar. Se outra
    janela salvou antes, o sistema avisa e mantém o seu texto.
 4. Aperte **Finalizar** quando o registro estiver pronto e depois **Assinar**, com a sua senha e

@@ -212,6 +212,110 @@ describe('criação e acesso', () => {
   });
 });
 
+const CARDIOLOGY = {
+  riskFactors: { hypertension: true, smoking: 'former' },
+  symptoms: { chestPain: 'typical', ccsClass: 2 },
+  vitals: { systolicBp: 142, diastolicBp: 88, heartRate: 72 },
+  echo: { lvef: 58 },
+  labs: { ldl: 132 },
+};
+
+describe('ficha de cardiologia', () => {
+  it('o médico com vínculo cria, salva, assina e retifica a ficha', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const path = `/patients/${c.patientId}/records`;
+    const created = await c.as.doctor.post(path, {
+      form: 'cardiology',
+      content: { chiefComplaint: 'Dor no peito aos esforços (fictício).', cardiology: CARDIOLOGY },
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({
+      formVersion: 'cardiology-v1',
+      content: { cardiology: CARDIOLOGY },
+    });
+
+    const saved = await c.as.doctor.patch(`/records/${created.body.id}`, {
+      version: 1,
+      content: { cardiology: { ...CARDIOLOGY, echo: { lvef: 55 } } },
+    });
+    expect(saved.status).toBe(200);
+    const signed = await finalizeAndSign(c, 'doctor', created.body.id, 2);
+    expect(signed).toMatchObject({ status: 'signed', integrity: 'valid' });
+    expect(signed.content.cardiology.echo).toEqual({ lvef: 55 });
+
+    const rectify = await c.as.doctor.post(`/records/${signed.id}/rectify`, {
+      justification: 'FEVE digitada errada no rascunho.',
+    });
+    expect(rectify.status).toBe(201);
+    expect(rectify.body).toMatchObject({
+      formVersion: 'cardiology-v1',
+      content: { cardiology: { echo: { lvef: 55 } } },
+    });
+  });
+
+  it('ficha só com campos estruturados pode ser finalizada; fora da faixa responde 400', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const path = `/patients/${c.patientId}/records`;
+    const created = await c.as.doctor.post(path, {
+      form: 'cardiology',
+      content: { cardiology: { vitals: { heartRate: 64 } } },
+    });
+    expect(created.status).toBe(201);
+    const finalized = await c.as.doctor.post(`/records/${created.body.id}/finalize`, {
+      version: 1,
+    });
+    expect(finalized.status).toBe(200);
+
+    const bad = await c.as.doctor.post(path, {
+      form: 'cardiology',
+      content: { cardiology: { echo: { lvef: 580 } } },
+    });
+    expect(bad.status).toBe(400);
+    const bp = await c.as.doctor.post(path, {
+      form: 'cardiology',
+      content: { cardiology: { vitals: { systolicBp: 80, diastolicBp: 95 } } },
+    });
+    expect(bp.status).toBe(400);
+  });
+
+  it('o formulário genérico recusa a ficha de cardiologia ao criar, salvar e retificar', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const path = `/patients/${c.patientId}/records`;
+    const created = await c.as.doctor.post(path, { content: { cardiology: CARDIOLOGY } });
+    expect(created.status).toBe(400);
+    expect(errorCode(created.body)).toBe('VALIDATION_FAILED');
+
+    const generic = await c.as.doctor.post(path, { content: CONTENT });
+    expect(generic.body.formVersion).toBe('generic-v1');
+    const saved = await c.as.doctor.patch(`/records/${generic.body.id}`, {
+      version: 1,
+      content: { ...CONTENT, cardiology: CARDIOLOGY },
+    });
+    expect(saved.status).toBe(400);
+    expect((await c.as.doctor.get(`/records/${generic.body.id}`)).body.version).toBe(1);
+
+    const signed = await finalizeAndSign(c, 'doctor', generic.body.id, 1);
+    const rectify = await c.as.doctor.post(`/records/${signed.id}/rectify`, {
+      justification: 'Tentativa de trocar o formulário.',
+      content: { cardiology: CARDIOLOGY },
+    });
+    expect(rectify.status).toBe(400);
+  });
+
+  it('secretária, administrador e médico sem vínculo não criam a ficha', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const body = { form: 'cardiology', content: { cardiology: CARDIOLOGY } };
+    for (const client of [c.as.secretary, c.as.admin, c.as.otherDoctor]) {
+      expect((await client.post(`/patients/${c.patientId}/records`, body)).status).toBe(403);
+    }
+    expect(await t.db.clinicalRecord.count()).toBe(0);
+  });
+});
+
 describe('rascunho e salvamento', () => {
   it('cada gravação cria uma versão; versão desatualizada responde 409 sem gravar nada', async () => {
     const c = await setupClinic();
