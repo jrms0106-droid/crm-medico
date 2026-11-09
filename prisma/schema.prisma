@@ -414,6 +414,14 @@ enum AppointmentKind {
   @@schema("scheduling")
 }
 
+/// Presencial ou teleconsulta (ADR 0043).
+enum AppointmentModality {
+  in_person
+  telemedicine
+
+  @@schema("scheduling")
+}
+
 enum AppointmentStatus {
   scheduled
   confirmed
@@ -427,30 +435,37 @@ enum AppointmentStatus {
 
 /// Consulta marcada. Sobreposição na mesma agenda é barrada no banco (EXCLUDE USING gist).
 model Appointment {
-  id                String             @id @default(uuid(7)) @db.Uuid
-  organizationId    String             @map("organization_id") @db.Uuid
-  unitId            String             @map("unit_id") @db.Uuid
-  scheduleId        String             @map("schedule_id") @db.Uuid
-  schedule          Schedule           @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
-  patientId         String             @map("patient_id") @db.Uuid
-  patient           Patient            @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  startsAt          DateTime           @map("starts_at") @db.Timestamptz(3)
-  endsAt            DateTime           @map("ends_at") @db.Timestamptz(3)
-  kind              AppointmentKind    @default(regular)
-  status            AppointmentStatus  @default(scheduled)
-  notes             String?            @db.VarChar(200)
-  returnOfId        String?            @map("return_of_id") @db.Uuid
-  rescheduledFromId String?            @unique @map("rescheduled_from_id") @db.Uuid
-  rescheduledToId   String?            @unique @map("rescheduled_to_id") @db.Uuid
-  cancelReason      String?            @map("cancel_reason") @db.VarChar(200)
-  cancelRequestedBy String?            @map("cancel_requested_by") @db.VarChar(20)
-  createdByUserId   String             @map("created_by_user_id") @db.Uuid
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
-  events            AppointmentEvent[]
-  encounter         Encounter?
-  charges           Charge[]
-  messages          OutboundMessage[]
+  id                  String              @id @default(uuid(7)) @db.Uuid
+  organizationId      String              @map("organization_id") @db.Uuid
+  unitId              String              @map("unit_id") @db.Uuid
+  scheduleId          String              @map("schedule_id") @db.Uuid
+  schedule            Schedule            @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  patientId           String              @map("patient_id") @db.Uuid
+  patient             Patient             @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  startsAt            DateTime            @map("starts_at") @db.Timestamptz(3)
+  endsAt              DateTime            @map("ends_at") @db.Timestamptz(3)
+  kind                AppointmentKind     @default(regular)
+  modality            AppointmentModality @default(in_person)
+  /// Sala de vídeo da teleconsulta; vem do adaptador de vídeo (hoje só o simulado).
+  meetingUrl          String?             @map("meeting_url") @db.VarChar(300)
+  /// Consentimento do paciente para a teleconsulta, registrado pela clínica.
+  teleConsentAt       DateTime?           @map("tele_consent_at") @db.Timestamptz(3)
+  teleConsentByUserId String?             @map("tele_consent_by_user_id") @db.Uuid
+  teleConsentVersion  String?             @map("tele_consent_version") @db.VarChar(40)
+  status              AppointmentStatus   @default(scheduled)
+  notes               String?             @db.VarChar(200)
+  returnOfId          String?             @map("return_of_id") @db.Uuid
+  rescheduledFromId   String?             @unique @map("rescheduled_from_id") @db.Uuid
+  rescheduledToId     String?             @unique @map("rescheduled_to_id") @db.Uuid
+  cancelReason        String?             @map("cancel_reason") @db.VarChar(200)
+  cancelRequestedBy   String?             @map("cancel_requested_by") @db.VarChar(20)
+  createdByUserId     String              @map("created_by_user_id") @db.Uuid
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  events              AppointmentEvent[]
+  encounter           Encounter?
+  charges             Charge[]
+  messages            OutboundMessage[]
 
   @@index([scheduleId, startsAt])
   @@index([patientId, startsAt])

@@ -635,3 +635,116 @@ describe('lista de espera', () => {
     expect((await c.as.secretary.get(path)).body).toEqual([]);
   });
 });
+
+describe('teleconsulta', () => {
+  const consent = { version: 'teleconsulta-v1', patientAgreed: true };
+
+  it('marca com sala de vídeo simulada; presencial fica sem sala', async () => {
+    const c = await setupClinic();
+    const tele = await book(c, { modality: 'telemedicine' });
+    expect(tele.status).toBe(201);
+    expect(tele.body).toMatchObject({ modality: 'telemedicine', teleConsent: null });
+    expect(tele.body.meetingUrl).toMatch(
+      /^https:\/\/meet\.simulado\.invalid\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/,
+    );
+    const history = await c.as.secretary.get(`/appointments/${tele.body.id}/history`);
+    expect(history.body[0].details).toMatchObject({ modality: 'telemedicine' });
+
+    const inPerson = await book(c, { patientId: c.patients[1], startsAt: tue('10:00') });
+    expect(inPerson.body).toMatchObject({ modality: 'in_person', meetingUrl: null });
+    expect((await book(c, { modality: 'video' })).status).toBe(400);
+  });
+
+  it('secretária registra o consentimento uma vez, com evento e auditoria', async () => {
+    const c = await setupClinic();
+    const { body } = await book(c, { modality: 'telemedicine' });
+    const path = `/appointments/${body.id}/tele-consent`;
+    expect((await c.as.secretary.post(path, { version: 'teleconsulta-v1' })).status).toBe(400);
+    expect((await c.as.secretary.post(path, { ...consent, version: 'v0' })).status).toBe(400);
+    const res = await c.as.secretary.post(path, consent);
+    expect(res.status).toBe(200);
+    expect(res.body.teleConsent).toMatchObject({
+      at: NOW,
+      version: 'teleconsulta-v1',
+      byUserId: expect.any(String),
+    });
+    const twice = await c.as.secretary.post(path, consent);
+    expect(twice.status).toBe(409);
+    const history = await c.as.secretary.get(`/appointments/${body.id}/history`);
+    expect(history.body.map((e: { type: string }) => e.type)).toEqual(['created', 'tele_consent']);
+    const audit = await t.db.auditEvent.findFirst({
+      where: {
+        resourceType: 'appointment',
+        action: 'edit',
+        resourceId: body.id,
+        outcome: 'allowed',
+      },
+    });
+    expect(audit).not.toBeNull();
+  });
+
+  it('médico, secretária de outra unidade e administrador não registram; presencial recusa', async () => {
+    const c = await setupClinic();
+    const { body } = await book(c, { modality: 'telemedicine' });
+    const path = `/appointments/${body.id}/tele-consent`;
+    expect((await c.as.doctor.post(path, consent)).status).toBe(403);
+    expect((await c.as.otherUnitSecretary.post(path, consent)).status).toBe(403);
+    expect((await c.as.admin.post(path, consent)).status).toBe(403);
+    const denied = await t.db.auditEvent.count({
+      where: { resourceType: 'appointment', resourceId: body.id, outcome: 'denied' },
+    });
+    expect(denied).toBeGreaterThanOrEqual(3);
+
+    const inPerson = await book(c, { patientId: c.patients[1], startsAt: tue('10:00') });
+    const refused = await c.as.secretary.post(
+      `/appointments/${inPerson.body.id}/tele-consent`,
+      consent,
+    );
+    expect(refused.status).toBe(422);
+  });
+
+  it('o atendimento só começa com consentimento; o reagendamento mantém consentimento e cria sala nova', async () => {
+    const c = await setupClinic();
+    const { body } = await book(c, { modality: 'telemedicine' });
+    t.clock.set(utc(tue('08:00')));
+    expect((await c.as.secretary.post(`/appointments/${body.id}/check-in`)).status).toBe(200);
+    const blocked = await c.as.doctor.post(`/appointments/${body.id}/encounter`, {});
+    expect(blocked.status).toBe(422);
+    expect(blocked.body.error.message).toContain('consentimento');
+    expect(
+      (await c.as.secretary.post(`/appointments/${body.id}/tele-consent`, consent)).status,
+    ).toBe(200);
+    expect((await c.as.doctor.post(`/appointments/${body.id}/encounter`, {})).status).toBe(201);
+
+    t.clock.set(NOW);
+    const second = await book(c, {
+      modality: 'telemedicine',
+      patientId: c.patients[1],
+      startsAt: tue('10:00'),
+    });
+    await c.as.secretary.post(`/appointments/${second.body.id}/tele-consent`, consent);
+    const moved = await c.as.secretary.post(`/appointments/${second.body.id}/reschedule`, {
+      startsAt: tue('15:00'),
+    });
+    expect(moved.status).toBe(201);
+    expect(moved.body).toMatchObject({
+      modality: 'telemedicine',
+      teleConsent: { version: 'teleconsulta-v1' },
+    });
+    expect(moved.body.meetingUrl).not.toBe(second.body.meetingUrl);
+  });
+
+  it('o banco recusa sala ou consentimento em consulta presencial', async () => {
+    const c = await setupClinic();
+    const { body } = await book(c);
+    await expect(
+      t.db.appointment.update({
+        where: { id: body.id },
+        data: { meetingUrl: 'https://meet.simulado.invalid/abc-defg-hij' },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      t.db.appointment.update({ where: { id: body.id }, data: { teleConsentAt: new Date() } }),
+    ).rejects.toThrow();
+  });
+});

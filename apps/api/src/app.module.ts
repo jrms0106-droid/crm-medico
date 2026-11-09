@@ -49,6 +49,7 @@ import {
   WaitlistController,
 } from './scheduling/scheduling.controller.js';
 import { SchedulingService } from './scheduling/scheduling.service.js';
+import { SimulatedVideoMeeting, VideoMeetingProvider } from './scheduling/video-meeting.js';
 import { ProfessionalsController } from './org/professionals.controller.js';
 import { SpecialtiesController } from './org/specialties.controller.js';
 import { UnitsController } from './org/units.controller.js';
@@ -57,6 +58,7 @@ export interface AppOverrides {
   clock?: Clock;
   messageSender?: MessageSender;
   languageModel?: LanguageModel;
+  videoMeeting?: VideoMeetingProvider;
 }
 
 @Module({})
@@ -117,6 +119,10 @@ export class AppModule {
         RemindersService,
         RemindersRunner,
         { provide: MessageSender, useValue: overrides.messageSender ?? new SimulatedSender() },
+        {
+          provide: VideoMeetingProvider,
+          useValue: overrides.videoMeeting ?? new SimulatedVideoMeeting(),
+        },
         { provide: APP_GUARD, useClass: AuthGuard },
         { provide: APP_INTERCEPTOR, useClass: AuthorizationEnforcedInterceptor },
       ],

@@ -7,6 +7,7 @@ import {
   type AppointmentStatus,
   ErrorCode,
   type ScheduleDto,
+  TELE_CONSENT_VERSION,
   type WaitlistEntryDto,
   type appointmentCancelSchema,
   type appointmentRescheduleSchema,
@@ -25,6 +26,7 @@ import { Clock } from '../common/clock.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { fromLocal, toLocal, weekdayOf } from './time.js';
+import { VideoMeetingProvider } from './video-meeting.js';
 
 const MINUTE = 60_000;
 const CHECK_IN_WINDOW = 120 * MINUTE;
@@ -104,6 +106,16 @@ export const appointmentDto = (a: AppointmentRow): AppointmentDto => ({
   startsAt: a.startsAt.toISOString(),
   endsAt: a.endsAt.toISOString(),
   kind: a.kind,
+  modality: a.modality,
+  meetingUrl: a.meetingUrl,
+  teleConsent:
+    a.teleConsentAt && a.teleConsentByUserId && a.teleConsentVersion
+      ? {
+          at: a.teleConsentAt.toISOString(),
+          byUserId: a.teleConsentByUserId,
+          version: a.teleConsentVersion,
+        }
+      : null,
   status: a.status,
   notes: a.notes,
   returnOfId: a.returnOfId,
@@ -129,6 +141,7 @@ interface Booking {
   startsAt: Date;
   durationMinutes: number;
   kind: AppointmentCreateInput['kind'];
+  modality: AppointmentCreateInput['modality'];
 }
 
 /**
@@ -140,6 +153,7 @@ export class SchedulingService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(Clock) private readonly clock: Clock,
+    @Inject(VideoMeetingProvider) private readonly video: VideoMeetingProvider,
   ) {}
 
   // Agendas
@@ -373,6 +387,7 @@ export class SchedulingService {
             startsAt,
             durationMinutes,
             kind: input.kind,
+            modality: input.modality,
           },
           {
             returnOfId: input.returnOfId ?? null,
@@ -431,6 +446,53 @@ export class SchedulingService {
   }
 
   /**
+   * Registra que a clínica leu o termo da teleconsulta ao paciente e que ele concordou
+   * (Resolução CFM 2.314/2022). Só uma vez por consulta e enquanto ela não aconteceu.
+   */
+  async recordTeleConsent(appointment: AppointmentRow, userId: string): Promise<AppointmentDto> {
+    if (appointment.modality !== 'telemedicine') {
+      throw rule('Só a teleconsulta pede este consentimento.');
+    }
+    const now = this.clock.now();
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.appointment.updateMany({
+        where: {
+          id: appointment.id,
+          modality: 'telemedicine',
+          teleConsentAt: null,
+          status: { in: [...ACTIVE_STATUSES] },
+        },
+        data: {
+          teleConsentAt: now,
+          teleConsentByUserId: userId,
+          teleConsentVersion: TELE_CONSENT_VERSION,
+        },
+      });
+      if (count !== 1) {
+        throw conflict(
+          ErrorCode.INVALID_STATE_TRANSITION,
+          'O consentimento já foi registrado ou a consulta não está mais ativa.',
+        );
+      }
+      await tx.appointmentEvent.create({
+        data: {
+          appointmentId: appointment.id,
+          type: 'tele_consent',
+          at: now,
+          byUserId: userId,
+          details: { version: TELE_CONSENT_VERSION },
+        },
+      });
+    });
+    return appointmentDto(
+      await this.prisma.appointment.findUniqueOrThrow({
+        where: { id: appointment.id },
+        include: APPOINTMENT_INCLUDE,
+      }),
+    );
+  }
+
+  /**
    * Cria a consulta nova e marca a antiga como reagendada, numa única transação: se o novo
    * horário for recusado, a consulta original fica como estava.
    */
@@ -463,11 +525,19 @@ export class SchedulingService {
             startsAt,
             durationMinutes,
             kind: appointment.kind,
+            modality: appointment.modality,
           },
           {
             returnOfId: appointment.returnOfId,
             notes: appointment.notes,
             rescheduledFromId: appointment.id,
+            teleConsent: appointment.teleConsentAt
+              ? {
+                  teleConsentAt: appointment.teleConsentAt,
+                  teleConsentByUserId: appointment.teleConsentByUserId,
+                  teleConsentVersion: appointment.teleConsentVersion,
+                }
+              : undefined,
           },
           { rescheduledFromId: appointment.id },
         );
@@ -628,7 +698,16 @@ export class SchedulingService {
     tx: Tx,
     userId: string,
     b: Booking,
-    extra: { returnOfId: string | null; notes: string | null; rescheduledFromId?: string },
+    extra: {
+      returnOfId: string | null;
+      notes: string | null;
+      rescheduledFromId?: string;
+      /** No reagendamento, o consentimento já dado acompanha a consulta nova. */
+      teleConsent?: Pick<
+        Prisma.AppointmentUncheckedCreateInput,
+        'teleConsentAt' | 'teleConsentByUserId' | 'teleConsentVersion'
+      >;
+    },
     eventDetails: Record<string, string | null>,
   ): Promise<string> {
     const { schedule, startsAt } = b;
@@ -689,13 +768,24 @@ export class SchedulingService {
         startsAt,
         endsAt,
         kind: b.kind,
+        modality: b.modality,
         notes: extra.notes,
         returnOfId: extra.returnOfId,
         rescheduledFromId: extra.rescheduledFromId ?? null,
+        ...(b.modality === 'telemedicine' ? extra.teleConsent : {}),
         createdByUserId: userId,
       },
       select: { id: true },
     });
+    if (b.modality === 'telemedicine') {
+      // Sala nova a cada marcação; o fornecedor só recebe o código da consulta e os horários.
+      const meetingUrl = await this.video.createMeeting({
+        appointmentId: created.id,
+        startsAt,
+        endsAt,
+      });
+      await tx.appointment.update({ where: { id: created.id }, data: { meetingUrl } });
+    }
     await tx.appointmentEvent.create({
       data: {
         appointmentId: created.id,
@@ -706,6 +796,7 @@ export class SchedulingService {
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
           kind: b.kind,
+          modality: b.modality,
           ...eventDetails,
         },
       },

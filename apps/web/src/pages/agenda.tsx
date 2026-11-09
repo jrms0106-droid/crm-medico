@@ -1,13 +1,17 @@
 import { type FormEvent, Fragment, useEffect, useState } from 'react';
 import {
+  APPOINTMENT_MODALITY_LABELS,
   APPOINTMENT_STATUS_LABELS,
   type AppointmentDto,
+  type AppointmentModality,
   type EncounterDto,
   type PatientDto,
   type PatientSummaryDto,
   type ProfessionalDto,
   type ScheduleDto,
   type SessionInfo,
+  TELE_CONSENT_TERM,
+  TELE_CONSENT_VERSION,
   type UnitDto,
 } from '@crm/shared';
 import { api, query } from '../api';
@@ -149,6 +153,7 @@ function DayList({
   const isSecretary = canSee(session, ['secretary']);
   const isDoctor = canSee(session, ['doctor']);
   const [drafting, setDrafting] = useState<string | null>(null);
+  const [consenting, setConsenting] = useState<string | null>(null);
 
   const act = (id: string, verb: string, body: object = {}) =>
     action.run(async () => {
@@ -191,6 +196,13 @@ function DayList({
                   </td>
                   <td>
                     <a href={href(`/pacientes/${a.patient.id}`)}>{a.patient.displayName}</a>
+                    {a.modality === 'telemedicine' && (
+                      <>
+                        {' '}
+                        <Badge tone="info">{APPOINTMENT_MODALITY_LABELS.telemedicine}</Badge>
+                        {!a.teleConsent && <span className="muted small"> sem consentimento</span>}
+                      </>
+                    )}
                   </td>
                   <td>
                     <Badge tone={STATUS_TONE[a.status]}>
@@ -224,8 +236,41 @@ function DayList({
                           Cobrar
                         </a>
                       )}
+                      {isSecretary &&
+                        a.modality === 'telemedicine' &&
+                        !a.teleConsent &&
+                        ['scheduled', 'confirmed', 'arrived'].includes(a.status) && (
+                          <button
+                            type="button"
+                            className="link"
+                            onClick={() => setConsenting(consenting === a.id ? null : a.id)}
+                          >
+                            Registrar consentimento
+                          </button>
+                        )}
+                      {a.meetingUrl && ['scheduled', 'confirmed', 'arrived'].includes(a.status) && (
+                        <a
+                          className="small"
+                          href={a.meetingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Abrir sala de vídeo (simulada)
+                        </a>
+                      )}
                       {isDoctor && a.status === 'arrived' && (
-                        <button type="button" onClick={() => void start(a)} disabled={action.busy}>
+                        <button
+                          type="button"
+                          onClick={() => void start(a)}
+                          disabled={
+                            action.busy || (a.modality === 'telemedicine' && !a.teleConsent)
+                          }
+                          title={
+                            a.modality === 'telemedicine' && !a.teleConsent
+                              ? 'Falta registrar o consentimento do paciente para a teleconsulta.'
+                              : undefined
+                          }
+                        >
                           Iniciar atendimento
                         </button>
                       )}
@@ -246,6 +291,23 @@ function DayList({
                     </div>
                   </td>
                 </tr>
+                {consenting === a.id && (
+                  <tr>
+                    <td colSpan={4}>
+                      <TeleConsentForm
+                        patientName={a.patient.displayName}
+                        busy={action.busy}
+                        onConfirm={() =>
+                          void act(a.id, 'tele-consent', {
+                            version: TELE_CONSENT_VERSION,
+                            patientAgreed: true,
+                          }).then(() => setConsenting(null))
+                        }
+                        onCancel={() => setConsenting(null)}
+                      />
+                    </td>
+                  </tr>
+                )}
                 {drafting === a.id && (
                   <tr>
                     <td colSpan={4}>
@@ -259,6 +321,53 @@ function DayList({
         </table>
       )}
     </Panel>
+  );
+}
+
+/** Termo lido ao paciente antes da teleconsulta; a clínica marca que ele concordou. */
+function TeleConsentForm({
+  patientName,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  patientName: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const [agreed, setAgreed] = useState(false);
+  return (
+    <form
+      className="tele-consent"
+      aria-label="Consentimento para teleconsulta"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (agreed) onConfirm();
+      }}
+    >
+      <p>
+        <strong>Termo de consentimento para teleconsulta</strong> (leia ao paciente)
+      </p>
+      <ul>
+        {TELE_CONSENT_TERM.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <Notice kind="warn">Texto provisório, a conferir pelo médico responsável.</Notice>
+      <label className="check">
+        <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />{' '}
+        {patientName} ouviu o termo e concordou com a teleconsulta.
+      </label>
+      <div className="row-actions">
+        <button type="submit" disabled={!agreed || busy}>
+          Registrar consentimento
+        </button>
+        <button type="button" className="link" onClick={onCancel}>
+          Fechar
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -277,6 +386,7 @@ function BookingForm({
   const [q, setQ] = useState('');
   const [found, setFound] = useState<PatientSummaryDto[]>([]);
   const [slot, setSlot] = useState('');
+  const [modality, setModality] = useState<AppointmentModality>('in_person');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const slots = useLoad(
@@ -308,8 +418,14 @@ function BookingForm({
     if (!patient || !slot) return;
     setError(null);
     try {
-      await api.post('/appointments', { scheduleId, patientId: patient.id, startsAt: slot });
-      setDone(`Consulta marcada para ${patient.displayName} às ${formatTime(slot)}.`);
+      await api.post('/appointments', {
+        scheduleId,
+        patientId: patient.id,
+        startsAt: slot,
+        modality,
+      });
+      const what = modality === 'telemedicine' ? 'Teleconsulta' : 'Consulta';
+      setDone(`${what} marcada para ${patient.displayName} às ${formatTime(slot)}.`);
       setSlot('');
       slots.reload();
       onBooked();
@@ -373,6 +489,22 @@ function BookingForm({
           </label>
         ))}
       </fieldset>
+      <label className="field">
+        <span>Modalidade</span>
+        <select
+          value={modality}
+          onChange={(e) => setModality(e.target.value as AppointmentModality)}
+        >
+          <option value="in_person">{APPOINTMENT_MODALITY_LABELS.in_person}</option>
+          <option value="telemedicine">{APPOINTMENT_MODALITY_LABELS.telemedicine}</option>
+        </select>
+      </label>
+      {modality === 'telemedicine' && (
+        <p className="muted small">
+          A sala de vídeo é criada ao marcar (hoje simulada, sem vídeo de verdade). Antes do
+          atendimento, registre o consentimento do paciente.
+        </p>
+      )}
       <Alert message={error ?? slots.error} />
       <button type="button" onClick={() => void book()} disabled={!patient || !slot}>
         Agendar
