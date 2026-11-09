@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import {
+  type CardiologyContent,
+  REPORT_TEXT_MAX_CHARS,
+  type ReportReadingSuggestionDto,
   type AiFeature,
   type AiFeatureDto,
   type AiRecordField,
@@ -7,6 +10,8 @@ import {
   type RecordDraftSuggestionDto,
   type RecordSummarySuggestionDto,
   type SessionInfo,
+  reportFieldValue,
+  withReportField,
 } from '@crm/shared';
 import { api } from '../api';
 import { Alert, Notice, formatDate, useAction, useLoad } from '../ui';
@@ -145,6 +150,185 @@ export function NotesOrganizer({
               disabled={action.busy || result.fields.length === 0}
             >
               Inserir no registro
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => decide('discarded')}
+              disabled={action.busy}
+            >
+              Descartar
+            </button>
+          </div>
+        </div>
+      )}
+      <Alert message={action.error} />
+    </fieldset>
+  );
+}
+
+/**
+ * Leitura de laudo (ADR 0042): o médico cola o texto, o assistente aponta números do laudo para
+ * campos da ficha de cardiologia, e o médico escolhe quais usar. Só muda o rascunho aberto.
+ */
+export function ReportReader({
+  session,
+  patientId,
+  value,
+  onApply,
+}: {
+  session: SessionInfo;
+  patientId: string;
+  value: CardiologyContent | undefined;
+  onApply: (next: CardiologyContent) => void;
+}) {
+  const enabled = useClinicalFeature(session, 'report_reading');
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const [result, setResult] = useState<ReportReadingSuggestionDto | null>(null);
+  const [skip, setSkip] = useState<Set<string>>(new Set());
+  const [decided, setDecided] = useState<string | null>(null);
+  const action = useAction();
+  if (!enabled) return null;
+
+  const read = () =>
+    void action.run(async () => {
+      setDecided(null);
+      setSkip(new Set());
+      setResult(
+        await api.post<ReportReadingSuggestionDto>('/ai/clinical/report-reading', {
+          patientId,
+          text,
+        }),
+      );
+    });
+
+  const decide = (decision: 'accepted' | 'discarded') =>
+    void action.run(async () => {
+      if (!result) return;
+      const chosen = result.suggestions.filter((s) => !skip.has(s.field));
+      await api.post(`/ai/requests/${result.requestId}/decision`, {
+        decision,
+        ...(decision === 'accepted' ? { edited: chosen.length < result.suggestions.length } : {}),
+      });
+      if (decision === 'accepted') {
+        onApply(chosen.reduce((c, s) => withReportField(c, s.field, s.value), value ?? {}));
+        setText('');
+      }
+      setDecided(
+        decision === 'accepted'
+          ? `${chosen.length} valor(es) colocado(s) na ficha. Confira com o laudo antes de finalizar.`
+          : 'Sugestão descartada.',
+      );
+      setResult(null);
+    });
+
+  const toggle = (field: string) =>
+    setSkip((prev) => {
+      const next = new Set(prev);
+      if (next.has(field)) next.delete(field);
+      else next.add(field);
+      return next;
+    });
+
+  return (
+    <fieldset className="ai-draft">
+      <legend>Ler laudo (IA)</legend>
+      {!open ? (
+        <button type="button" className="secondary" onClick={() => setOpen(true)}>
+          Ler laudo e sugerir valores
+        </button>
+      ) : (
+        <>
+          <label className="field">
+            <span>Texto do laudo (ecocardiograma ou exames)</span>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={5}
+              maxLength={REPORT_TEXT_MAX_CHARS}
+            />
+          </label>
+          <div className="inline">
+            <button type="button" onClick={read} disabled={action.busy || text.trim().length < 3}>
+              Sugerir valores
+            </button>
+            <button type="button" className="link" onClick={() => setOpen(false)}>
+              Fechar
+            </button>
+          </div>
+        </>
+      )}
+      {decided && <p role="status">{decided}</p>}
+      {result && (
+        <div aria-label="Valores sugeridos do laudo">
+          <Notice kind="warn">{result.notice}</Notice>
+          {result.suggestions.length === 0 ? (
+            <p className="muted">Nenhum valor reconhecido no texto.</p>
+          ) : (
+            <div className="table-scroll">
+              <table aria-label="Valores encontrados no laudo">
+                <thead>
+                  <tr>
+                    <th scope="col">Usar</th>
+                    <th scope="col">Campo</th>
+                    <th scope="col">Valor do laudo</th>
+                    <th scope="col">Na ficha agora</th>
+                    <th scope="col">Trecho do laudo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.suggestions.map((s) => {
+                    const current = reportFieldValue(value, s.field);
+                    return (
+                      <tr key={s.field}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            aria-label={`Usar ${s.label} ${s.raw}`}
+                            checked={!skip.has(s.field)}
+                            onChange={() => toggle(s.field)}
+                          />
+                        </td>
+                        <th scope="row">{s.label}</th>
+                        <td>
+                          {s.raw} {s.unit}
+                        </td>
+                        <td>
+                          {current === undefined
+                            ? '—'
+                            : `${String(current).replace('.', ',')} (será substituído)`}
+                        </td>
+                        <td className="small">{s.excerpt}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {result.outOfRange.length > 0 && (
+            <>
+              <p className="small">
+                Números apontados que não cabem no campo (confira a digitação do laudo; não serão
+                usados):
+              </p>
+              <ul className="small">
+                {result.outOfRange.map((s) => (
+                  <li key={s.field}>
+                    {s.label}: {s.raw} {s.unit} ({s.excerpt})
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <div className="inline">
+            <button
+              type="button"
+              onClick={() => decide('accepted')}
+              disabled={action.busy || result.suggestions.every((s) => skip.has(s.field))}
+            >
+              Usar os valores marcados
             </button>
             <button
               type="button"

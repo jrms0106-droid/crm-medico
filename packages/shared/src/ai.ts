@@ -9,6 +9,7 @@ export const AI_FEATURES = [
   'admin_report',
   'record_draft',
   'record_summary',
+  'report_reading',
 ] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 
@@ -19,6 +20,7 @@ export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
   admin_report: 'Relatório administrativo assistido',
   record_draft: 'Organizar anotações no registro (médico)',
   record_summary: 'Resumo do prontuário com fontes (médico)',
+  report_reading: 'Ler laudo e sugerir valores da ficha (médico)',
 };
 
 /** Funcionalidades da recepção (`ai_assist`) e do administrador (`ai_report`). */
@@ -29,7 +31,11 @@ export const AI_RECEPTION_FEATURES: readonly AiFeature[] = [
 ];
 
 /** IA nível 2, documental: só o médico (`ai_clinical`). */
-export const AI_CLINICAL_FEATURES: readonly AiFeature[] = ['record_draft', 'record_summary'];
+export const AI_CLINICAL_FEATURES: readonly AiFeature[] = [
+  'record_draft',
+  'record_summary',
+  'report_reading',
+];
 
 export const AI_SIMULATED_NOTICE =
   'Sugestão do modelo simulado: nenhum serviço de IA está contratado e nenhum dado sai do sistema. ' +

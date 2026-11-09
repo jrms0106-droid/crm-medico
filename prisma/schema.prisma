@@ -972,6 +972,7 @@ enum AiFeature {
   admin_report
   record_draft
   record_summary
+  report_reading
 
   @@schema("ai")
 }

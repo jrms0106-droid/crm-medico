@@ -4,10 +4,12 @@ import { allowedNumbers } from './ai-insights.service.js';
 import {
   type RecordNotesFacts,
   type RecordSummaryFacts,
+  type ReportFacts,
   type ScheduleFacts,
   simulatedRecordDraft,
   simulatedRecordSummary,
   simulatedReport,
+  simulatedReportReading,
   simulatedSchedule,
 } from './language-model.js';
 
@@ -140,5 +142,28 @@ describe('resumo simulado do prontuário', () => {
     ]);
     const many = simulatedRecordSummary({ records: [1, 2, 3, 4, 5, 6, 7].map(record) });
     expect(many.items).toHaveLength(12);
+  });
+});
+
+describe('leitura simulada de laudo', () => {
+  it('cada número vai para o campo da palavra mais perto antes dele; datas ficam de fora', () => {
+    const facts: ReportFacts = {
+      numbers: [
+        { code: 'N1', raw: '01', before: 'Exames de ' },
+        { code: 'N2', raw: '210', before: ': colesterol total ' },
+        { code: 'N3', raw: '132', before: ' mg/dL; LDL-colesterol ' },
+        { code: 'N4', raw: '45', before: ' mg/dL; HDL ' },
+        { code: 'N5', raw: '5,8', before: ' mg/dL. Hemoglobina glicada: ' },
+        { code: 'N6', raw: '58', before: '%. FEVE (Simpson) ' },
+        { code: 'N7', raw: '60', before: '%, antes era FEVE ' },
+      ],
+    };
+    expect(simulatedReportReading(facts).values).toEqual([
+      { field: 'labs.totalCholesterol', ref: 'N2' },
+      { field: 'labs.ldl', ref: 'N3' },
+      { field: 'labs.hdl', ref: 'N4' },
+      { field: 'labs.hba1c', ref: 'N5' },
+      { field: 'echo.lvef', ref: 'N6' },
+    ]);
   });
 });

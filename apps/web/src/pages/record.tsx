@@ -18,7 +18,12 @@ import { ReauthDialog } from '../reauth';
 import { CardiologyEditor, CardiologyTrendsPanel, CardiologyView } from './cardiology';
 import { DocumentsPanel } from './documents';
 import { ExternalDocumentsPanel } from './external-documents';
-import { type InsertedField, NotesOrganizer, RecordSummaryPanel } from './clinical-assistant';
+import {
+  type InsertedField,
+  NotesOrganizer,
+  RecordSummaryPanel,
+  ReportReader,
+} from './clinical-assistant';
 import { ClinicalCopyButton } from './privacy';
 import {
   Alert,
@@ -589,10 +594,18 @@ function DraftEditor({
         </label>
       ))}
       {initial.formVersion === CARDIOLOGY_FORM_VERSION && (
-        <CardiologyEditor
-          value={content.cardiology}
-          onChange={(cardiology) => edit({ cardiology })}
-        />
+        <>
+          <ReportReader
+            session={session}
+            patientId={initial.patientId}
+            value={content.cardiology}
+            onApply={(cardiology) => edit({ cardiology })}
+          />
+          <CardiologyEditor
+            value={content.cardiology}
+            onChange={(cardiology) => edit({ cardiology })}
+          />
+        </>
       )}
       <fieldset>
         <legend>Hipóteses diagnósticas</legend>

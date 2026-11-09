@@ -6,6 +6,8 @@ import {
   type MessagePurpose,
   RECORD_SUMMARY_MAX_ITEMS,
   type RecordDraftOutput,
+  type ReportField,
+  type ReportReadingOutput,
   type RecordSummaryOutput,
   SCHEDULE_SUGGESTIONS_MAX,
   type ScheduleSuggestionsOutput,
@@ -336,6 +338,56 @@ export function simulatedRecordSummary(facts: RecordSummaryFacts): RecordSummary
   return { items: items.slice(0, RECORD_SUMMARY_MAX_ITEMS) };
 }
 
+// ---- Leitura de laudo (ADR 0042) ----
+
+/** Números do laudo, cada um com o texto entre o número anterior e ele (até 60 letras). */
+export interface ReportFacts {
+  numbers: { code: string; raw: string; before: string }[];
+}
+
+/** Palavras que, logo antes de um número, indicam o campo. Sem acento, em minúsculas. */
+const REPORT_WORDS: Record<ReportField, string[]> = {
+  'echo.lvef': ['feve', 'fracao de ejecao'],
+  'echo.lvedd': ['ddve', 'diametro diastolico'],
+  'echo.laVolumeIndex': ['volume indexado', 'volume do atrio esquerdo indexado', 'vae indexado'],
+  'echo.pasp': ['psap', 'pressao sistolica da arteria pulmonar', 'pressao sistolica pulmonar'],
+  'labs.totalCholesterol': ['colesterol total'],
+  'labs.ldl': ['ldl'],
+  'labs.hdl': ['hdl'],
+  'labs.triglycerides': ['triglicer'],
+  'labs.glucose': ['glicemia', 'glicose'],
+  'labs.hba1c': ['hba1c', 'hemoglobina glicada'],
+  'labs.creatinine': ['creatinina'],
+  'labs.potassium': ['potassio'],
+  'labs.ntProBnp': ['nt probnp', 'ntprobnp'],
+};
+
+/**
+ * Leitura por palavras-chave: cada número vai para o campo cuja palavra aparece mais perto antes
+ * dele, se esse campo ainda está livre. Datas, unidades e números sem palavra ficam de fora. Só
+ * devolve códigos.
+ */
+export function simulatedReportReading(facts: ReportFacts): ReportReadingOutput {
+  const taken = new Set<ReportField>();
+  const values: ReportReadingOutput['values'] = [];
+  for (const n of facts.numbers) {
+    const before = ` ${normalizeSearch(n.before)} `;
+    let best: { field: ReportField; at: number } | null = null;
+    for (const [field, words] of Object.entries(REPORT_WORDS) as [ReportField, string[]][]) {
+      if (taken.has(field)) continue;
+      for (const w of words) {
+        const at = before.lastIndexOf(w);
+        if (at >= 0 && (!best || at > best.at)) best = { field, at };
+      }
+    }
+    if (best) {
+      taken.add(best.field);
+      values.push({ field: best.field, ref: n.code });
+    }
+  }
+  return { values };
+}
+
 /**
  * Modelo simulado: regras fixas dentro da API, sem enviar nada para fora. Único adaptador até
  * haver um fornecedor autorizado (docs/api/ia-nivel-1.md).
@@ -355,6 +407,10 @@ export class SimulatedModel extends LanguageModel {
     if (request.feature === 'record_draft') {
       const facts = JSON.parse(request.fields['facts'] ?? '{}') as RecordNotesFacts;
       return Promise.resolve(JSON.stringify(simulatedRecordDraft(facts)));
+    }
+    if (request.feature === 'report_reading') {
+      const facts = JSON.parse(request.fields['facts'] ?? '{}') as ReportFacts;
+      return Promise.resolve(JSON.stringify(simulatedReportReading(facts)));
     }
     if (request.feature === 'record_summary') {
       const facts = JSON.parse(request.fields['facts'] ?? '{}') as RecordSummaryFacts;
