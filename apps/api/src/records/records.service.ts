@@ -1,3 +1,4 @@
+import { telemedicineEncounterIds } from '../care/telemedicine.js';
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
@@ -544,11 +545,13 @@ export class RecordsService {
 
   async dto(r: ClinicalRecord): Promise<RecordDto> {
     const name = await this.names([r.authorUserId]);
+    const tele = await telemedicineEncounterIds(this.prisma, [r.encounterId]);
     return {
       id: r.id,
       patientId: r.patientId,
       author: name(r.authorUserId),
       encounterId: r.encounterId,
+      telemedicine: r.encounterId !== null && tele.has(r.encounterId),
       kind: r.kind,
       clinicalDate: dateOnly(r.clinicalDate),
       sensitivity: r.sensitivity,
@@ -572,6 +575,10 @@ export class RecordsService {
     rows: { record: ClinicalRecord; contentHidden: boolean }[],
   ): Promise<RecordSummaryDto[]> {
     const name = await this.names(rows.map((r) => r.record.authorUserId));
+    const tele = await telemedicineEncounterIds(
+      this.prisma,
+      rows.map((r) => r.record.encounterId),
+    );
     return rows.map(({ record: r, contentHidden }) => ({
       id: r.id,
       author: name(r.authorUserId),
@@ -582,6 +589,7 @@ export class RecordsService {
       rectifiesId: r.rectifiesId,
       rectifiedById: r.rectifiedById,
       addendumOfId: r.addendumOfId,
+      telemedicine: r.encounterId !== null && tele.has(r.encounterId),
       contentHidden,
       content: contentHidden ? null : (r.content as RecordContent),
     }));

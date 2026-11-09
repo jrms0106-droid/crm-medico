@@ -1,3 +1,4 @@
+import { telemedicineEncounterIds } from '../care/telemedicine.js';
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
@@ -187,6 +188,7 @@ export class DocumentsService {
     const unit = doc.unitId
       ? await this.prisma.unit.findUnique({ where: { id: doc.unitId }, select: { name: true } })
       : null;
+    const tele = await telemedicineEncounterIds(this.prisma, [doc.encounterId]);
     return {
       issuer: {
         name: author.name,
@@ -201,6 +203,8 @@ export class DocumentsService {
         birthDate: dateOnly(patient.birthDate),
       },
       place: { organization: organization.name, unit: unit?.name ?? null },
+      // Só entra quando verdadeiro, para o resumo de documentos presenciais não mudar.
+      ...(doc.encounterId && tele.has(doc.encounterId) ? { telemedicine: true as const } : {}),
     };
   }
 
@@ -338,11 +342,17 @@ export class DocumentsService {
 
   async dto(d: MedicalDocument): Promise<DocumentDto> {
     const name = await this.names([d.authorUserId]);
+    const tele = await telemedicineEncounterIds(this.prisma, [d.encounterId]);
+    const frozen = (d.snapshot as DocumentSnapshot | null)?.telemedicine;
     return {
       id: d.id,
       patientId: d.patientId,
       author: name(d.authorUserId),
       encounterId: d.encounterId,
+      // Assinado: vale o retrato congelado; rascunho: o atendimento de hoje.
+      telemedicine: d.snapshot
+        ? frozen === true
+        : d.encounterId !== null && tele.has(d.encounterId),
       kind: d.kind,
       status: d.status,
       version: d.version,
@@ -361,11 +371,18 @@ export class DocumentsService {
 
   async summaries(rows: MedicalDocument[]): Promise<DocumentSummaryDto[]> {
     const name = await this.names(rows.map((r) => r.authorUserId));
+    const tele = await telemedicineEncounterIds(
+      this.prisma,
+      rows.map((r) => r.encounterId),
+    );
     return rows.map((d) => ({
       id: d.id,
       author: name(d.authorUserId),
       kind: d.kind,
       status: d.status,
+      telemedicine: d.snapshot
+        ? (d.snapshot as unknown as DocumentSnapshot).telemedicine === true
+        : d.encounterId !== null && tele.has(d.encounterId),
       issuedOn: d.issuedOn ? dateOnly(d.issuedOn) : null,
       createdAt: d.createdAt.toISOString(),
     }));

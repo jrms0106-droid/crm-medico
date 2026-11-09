@@ -167,6 +167,7 @@ export function DocumentsPanel({
                 {DOCUMENT_KIND_LABELS[d.kind]} · {d.author.name}
               </span>
               <Badge tone={STATUS_TONE[d.status]}>{DOCUMENT_STATUS_LABELS[d.status]}</Badge>
+              {d.telemedicine && <Badge tone="info">Telemedicina</Badge>}
             </button>
           </li>
         ))}
@@ -243,6 +244,12 @@ function DocumentView({
               {d.author.name} ·{' '}
               <Badge tone={STATUS_TONE[d.status]}>{DOCUMENT_STATUS_LABELS[d.status]}</Badge>
               {d.issuedOn && <> · emitido em {formatDate(d.issuedOn)}</>}
+              {d.telemedicine && (
+                <>
+                  {' '}
+                  · <Badge tone="info">Emitido por telemedicina</Badge>
+                </>
+              )}
             </p>
             {d.integrity && (
               <p className={`small ${d.integrity === 'valid' ? 'ok' : 'error'}`}>

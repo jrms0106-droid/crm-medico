@@ -115,16 +115,29 @@ async function setupClinic(): Promise<Clinic> {
   return { patientId: patient.body.id, doctor, otherDoctor, as };
 }
 
-async function startEncounter(c: Clinic, who: 'doctor' | 'otherDoctor', time: string) {
+async function startEncounter(
+  c: Clinic,
+  who: 'doctor' | 'otherDoctor',
+  time: string,
+  modality: 'in_person' | 'telemedicine' = 'in_person',
+) {
   t.clock.set(NOW);
   const booked = await c.as.secretary.post('/appointments', {
     scheduleId: schedules[who],
     patientId: c.patientId,
     startsAt: tue(time),
+    modality,
   });
   if (booked.status !== 201) throw new Error(`Falha ao marcar: ${booked.status}`);
   t.clock.set(new Date(tue('08:30')));
   await c.as.secretary.post(`/appointments/${booked.body.id}/check-in`);
+  if (modality === 'telemedicine') {
+    const consent = await c.as.secretary.post(`/appointments/${booked.body.id}/tele-consent`, {
+      version: 'teleconsulta-v1',
+      patientAgreed: true,
+    });
+    if (consent.status !== 200) throw new Error(`Falha no consentimento: ${consent.status}`);
+  }
   const res = await c.as[who].post(`/appointments/${booked.body.id}/encounter`);
   if (res.status !== 201) throw new Error(`Falha ao iniciar atendimento: ${res.status}`);
   return res.body.id as string;
@@ -528,5 +541,34 @@ describe('PDF', () => {
       expect(res.status, JSON.stringify(input).slice(0, 40)).toBe(200);
       expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
     }
+  });
+});
+
+describe('telemedicina', () => {
+  it('documento de teleconsulta traz a marca, congelada na assinatura e dentro do resumo', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00', 'telemedicine');
+    const draft = await c.as.doctor.post(`/patients/${c.patientId}/documents`, PRESCRIPTION);
+    expect(draft.body.telemedicine).toBe(true);
+    const list = await c.as.doctor.get(`/patients/${c.patientId}/documents`);
+    expect(list.body[0].telemedicine).toBe(true);
+
+    const signed = await signedDocument(c);
+    expect(signed).toMatchObject({ telemedicine: true, integrity: 'valid' });
+    expect(signed.snapshot.telemedicine).toBe(true);
+    const row = await t.db.medicalDocument.findUniqueOrThrow({ where: { id: signed.id } });
+    expect((row.snapshot as { telemedicine?: boolean }).telemedicine).toBe(true);
+    const res = await pdf(c.as.doctor, signed.id);
+    expect(res.status).toBe(200);
+    expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('documento de consulta presencial não ganha a marca nem muda o retrato', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const signed = await signedDocument(c);
+    expect(signed.telemedicine).toBe(false);
+    expect('telemedicine' in signed.snapshot).toBe(false);
+    expect(signed.integrity).toBe('valid');
   });
 });

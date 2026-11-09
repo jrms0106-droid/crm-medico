@@ -14,6 +14,7 @@ function record(overrides: Partial<RecordDto>): RecordDto {
     patientId: '01900000-0000-7000-8000-0000000000p1',
     author: AUTHOR,
     encounterId: null,
+    telemedicine: false,
     kind: 'evolution',
     clinicalDate: '2026-03-02',
     sensitivity: 'normal',

@@ -128,6 +128,8 @@ export interface RecordDto {
   patientId: string;
   author: { id: string; name: string };
   encounterId: string | null;
+  /** Atendimento feito por teleconsulta (CFM 2.314/2022: o registro indica a modalidade). */
+  telemedicine: boolean;
   kind: RecordKind;
   clinicalDate: string;
   sensitivity: RecordSensitivity;
@@ -156,6 +158,7 @@ export interface RecordSummaryDto {
   rectifiesId: string | null;
   rectifiedById: string | null;
   addendumOfId: string | null;
+  telemedicine: boolean;
   /** Registro sensível de outro autor: o conteúdo só abre com justificativa. */
   contentHidden: boolean;
   content: RecordContent | null;

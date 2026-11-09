@@ -101,16 +101,29 @@ async function setupClinic(): Promise<Clinic> {
 }
 
 /** Marca, registra a chegada e inicia o atendimento do médico escolhido. */
-async function startEncounter(c: Clinic, who: 'doctor' | 'otherDoctor', time: string) {
+async function startEncounter(
+  c: Clinic,
+  who: 'doctor' | 'otherDoctor',
+  time: string,
+  modality: 'in_person' | 'telemedicine' = 'in_person',
+) {
   t.clock.set(NOW);
   const booked = await c.as.secretary.post('/appointments', {
     scheduleId: schedules[who],
     patientId: c.patientId,
     startsAt: tue(time),
+    modality,
   });
   if (booked.status !== 201) throw new Error(`Falha ao marcar: ${booked.status}`);
   t.clock.set(new Date(tue('08:30')));
   await c.as.secretary.post(`/appointments/${booked.body.id}/check-in`);
+  if (modality === 'telemedicine') {
+    const consent = await c.as.secretary.post(`/appointments/${booked.body.id}/tele-consent`, {
+      version: 'teleconsulta-v1',
+      patientAgreed: true,
+    });
+    if (consent.status !== 200) throw new Error(`Falha no consentimento: ${consent.status}`);
+  }
   const res = await c.as[who].post(`/appointments/${booked.body.id}/encounter`);
   if (res.status !== 201) throw new Error(`Falha ao iniciar atendimento: ${res.status}`);
   c.encounters[who] = res.body.id;
@@ -996,5 +1009,23 @@ describe('cópia do prontuário no padrão FHIR', () => {
       '/patients/00000000-0000-4000-8000-000000000000/clinical-copy/fhir',
     );
     expect(missing.status).toBe(404);
+  });
+});
+
+describe('telemedicina', () => {
+  it('registro de teleconsulta indica a modalidade e entra na linha do tempo', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00', 'telemedicine');
+    const tele = await signedRecord(c);
+    expect(tele).toMatchObject({ telemedicine: true, integrity: 'valid' });
+    const timeline = await c.as.doctor.get(`/patients/${c.patientId}/records`);
+    expect(timeline.body.map((r: { telemedicine: boolean }) => r.telemedicine)).toEqual([true]);
+  });
+
+  it('registro de consulta presencial não indica telemedicina', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const plain = await signedRecord(c);
+    expect(plain.telemedicine).toBe(false);
   });
 });
