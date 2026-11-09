@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   CARDIOLOGY_FORM_VERSION,
+  type CardiologyTrendRowDto,
   ErrorCode,
   FORM_VERSIONS,
   type RecordContent,
@@ -10,6 +11,7 @@ import {
   type RecordSummaryDto,
   type RecordVersionDto,
   hasContent,
+  trendValues,
   type recordCorrectionSchema,
   type recordCreateSchema,
   type recordUpdateSchema,
@@ -449,6 +451,27 @@ export class RecordsService {
       orderBy: [{ clinicalDate: 'desc' }, { createdAt: 'desc' }],
       take: 500,
     });
+  }
+
+  /** Fichas de cardiologia assinadas do paciente, antes do filtro da política (ADR 0038). */
+  async cardiologyCandidates(organizationId: string, patientId: string): Promise<ClinicalRecord[]> {
+    return this.prisma.clinicalRecord.findMany({
+      where: { organizationId, patientId, status: 'signed', formVersion: CARDIOLOGY_FORM_VERSION },
+      orderBy: [{ clinicalDate: 'asc' }, { signedAt: 'asc' }],
+      take: 500,
+    });
+  }
+
+  async trendRows(rows: ClinicalRecord[]): Promise<CardiologyTrendRowDto[]> {
+    const name = await this.names(rows.map((r) => r.authorUserId));
+    return rows
+      .map((r) => ({
+        recordId: r.id,
+        clinicalDate: dateOnly(r.clinicalDate),
+        author: name(r.authorUserId),
+        values: trendValues((r.content as RecordContent).cardiology),
+      }))
+      .filter((row) => Object.keys(row.values).length > 0);
   }
 
   async versions(record: ClinicalRecord): Promise<RecordVersionDto[]> {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bodyMassIndex, cardiologyFacts, cardiologySchema } from './cardiology.js';
+import { bodyMassIndex, cardiologyFacts, cardiologySchema, trendValues } from './cardiology.js';
 import { hasContent, recordContentSchema, recordCreateSchema } from './records.js';
 
 describe('ficha de cardiologia', () => {
@@ -20,7 +20,7 @@ describe('ficha de cardiologia', () => {
         value: 'Hipertensão arterial; Dislipidemia; Ex-tabagista',
       },
       { label: 'Antecedentes cardiovasculares', value: 'Angioplastia coronária prévia' },
-      { label: 'Sintomas', value: 'Angina típica; angina CCS 2; NYHA 1; Dispneia' },
+      { label: 'Sintomas', value: 'Angina típica; angina CCS II; NYHA I; Dispneia' },
       {
         label: 'Sinais vitais',
         value: 'PA 142/88 mmHg; FC 72 bpm; peso 80,5 kg; altura 175 cm; IMC 26,3 kg/m²',
@@ -77,5 +77,26 @@ describe('ficha de cardiologia', () => {
     expect(recordCreateSchema.parse({}).form).toBe('generic');
     expect(recordCreateSchema.parse({ form: 'cardiology' }).form).toBe('cardiology');
     expect(recordCreateSchema.safeParse({ form: 'pediatria' }).success).toBe(false);
+  });
+
+  it('extrai os valores acompanhados na evolução, em texto', () => {
+    expect(
+      trendValues({
+        vitals: { systolicBp: 130, diastolicBp: 80, heartRate: 64, weightKg: 70, heightCm: 170 },
+        symptoms: { nyhaClass: 3 },
+        labs: { hba1c: 6.1, creatinine: 1.25 },
+        riskFactors: { diabetes: true },
+      }),
+    ).toEqual({
+      bloodPressure: '130/80',
+      heartRate: '64',
+      weightKg: '70',
+      bmi: '24,2',
+      nyhaClass: 'III',
+      hba1c: '6,1',
+      creatinine: '1,25',
+    });
+    expect(trendValues({ vitals: { systolicBp: 120 } })).toEqual({ bloodPressure: '120' });
+    expect(trendValues(undefined)).toEqual({});
   });
 });

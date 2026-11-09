@@ -155,6 +155,8 @@ export interface CardiologyFact {
   value: string;
 }
 
+/** Classes CCS e NYHA são escritas em algarismos romanos, como na prática. */
+const ROMAN = ['I', 'II', 'III', 'IV'] as const;
 const br = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 const brDate = (d: string) => d.split('-').reverse().join('/');
 const marked = <K extends string>(values: object | undefined, labels: Record<K, string>) =>
@@ -185,8 +187,8 @@ export function cardiologyFacts(c: CardiologyContent | undefined): CardiologyFac
   const s = c.symptoms;
   push('Sintomas', [
     s?.chestPain && CHEST_PAIN_LABELS[s.chestPain],
-    s?.ccsClass && `angina CCS ${s.ccsClass}`,
-    s?.nyhaClass && `NYHA ${s.nyhaClass}`,
+    s?.ccsClass && `angina CCS ${ROMAN[s.ccsClass - 1]}`,
+    s?.nyhaClass && `NYHA ${ROMAN[s.nyhaClass - 1]}`,
     ...marked(s, SYMPTOM_LABELS),
   ]);
 
@@ -238,4 +240,64 @@ export function cardiologyFacts(c: CardiologyContent | undefined): CardiologyFac
 
   push('Medicações em uso', [c.medications?.trim()]);
   return facts;
+}
+
+/** Valores acompanhados na evolução (ADR 0038), na ordem das colunas da tabela. */
+export const TREND_COLUMNS = [
+  { key: 'bloodPressure', label: 'PA', unit: 'mmHg' },
+  { key: 'heartRate', label: 'FC', unit: 'bpm' },
+  { key: 'weightKg', label: 'Peso', unit: 'kg' },
+  { key: 'bmi', label: 'IMC', unit: 'kg/m²' },
+  { key: 'nyhaClass', label: 'NYHA', unit: '' },
+  { key: 'lvef', label: 'FEVE', unit: '%' },
+  { key: 'ldl', label: 'LDL', unit: 'mg/dL' },
+  { key: 'hdl', label: 'HDL', unit: 'mg/dL' },
+  { key: 'triglycerides', label: 'TG', unit: 'mg/dL' },
+  { key: 'hba1c', label: 'HbA1c', unit: '%' },
+  { key: 'creatinine', label: 'Creatinina', unit: 'mg/dL' },
+  { key: 'ntProBnp', label: 'NT-proBNP', unit: 'pg/mL' },
+] as const;
+export type TrendKey = (typeof TREND_COLUMNS)[number]['key'];
+
+/** Um valor por coluna, já em texto (PA como "142/88"); coluna sem valor fica de fora. */
+export function trendValues(c: CardiologyContent | undefined): Partial<Record<TrendKey, string>> {
+  if (!c) return {};
+  const v = c.vitals;
+  const bmi = bodyMassIndex(v);
+  const raw: Record<TrendKey, number | string | null | undefined> = {
+    bloodPressure:
+      v?.systolicBp && v.diastolicBp ? `${v.systolicBp}/${v.diastolicBp}` : v?.systolicBp,
+    heartRate: v?.heartRate,
+    weightKg: v?.weightKg,
+    bmi,
+    nyhaClass: c.symptoms?.nyhaClass && ROMAN[c.symptoms.nyhaClass - 1],
+    lvef: c.echo?.lvef,
+    ldl: c.labs?.ldl,
+    hdl: c.labs?.hdl,
+    triglycerides: c.labs?.triglycerides,
+    hba1c: c.labs?.hba1c,
+    creatinine: c.labs?.creatinine,
+    ntProBnp: c.labs?.ntProBnp,
+  };
+  const out: Partial<Record<TrendKey, string>> = {};
+  for (const { key } of TREND_COLUMNS) {
+    const value = raw[key];
+    if (typeof value === 'string') out[key] = value;
+    else if (typeof value === 'number') out[key] = br(value);
+  }
+  return out;
+}
+
+export interface CardiologyTrendRowDto {
+  recordId: string;
+  clinicalDate: string;
+  author: { id: string; name: string };
+  values: Partial<Record<TrendKey, string>>;
+}
+
+export interface CardiologyTrendsDto {
+  /** Fichas de cardiologia assinadas, da mais antiga para a mais recente. */
+  rows: CardiologyTrendRowDto[];
+  /** Fichas sensíveis de outros profissionais, que ficaram de fora. */
+  withheld: number;
 }

@@ -503,3 +503,7 @@ ul.plain {
 main.content:focus {
   outline: none;
 }
+
+.table-scroll {
+  overflow-x: auto;
+}

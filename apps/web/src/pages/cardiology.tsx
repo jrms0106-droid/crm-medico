@@ -2,6 +2,8 @@ import { useState } from 'react';
 import {
   CHEST_PAIN_LABELS,
   type CardiologyContent,
+  type CardiologyTrendsDto,
+  TREND_COLUMNS,
   ECG_RHYTHM_LABELS,
   HISTORY_LABELS,
   RISK_FACTOR_LABELS,
@@ -10,6 +12,8 @@ import {
   bodyMassIndex,
   cardiologyFacts,
 } from '@crm/shared';
+import { api } from '../api';
+import { Alert, Panel, formatDate, useLoad } from '../ui';
 
 type Section = 'riskFactors' | 'history' | 'symptoms' | 'vitals' | 'ecg' | 'echo' | 'labs';
 type SectionValue<S extends Section> = NonNullable<CardiologyContent[S]>;
@@ -359,5 +363,79 @@ export function CardiologyView({ value }: { value: CardiologyContent | undefined
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * Evolução dos valores da ficha nas consultas assinadas (ADR 0038). Some quando o paciente não
+ * tem ficha de cardiologia assinada; mostra só as colunas que têm algum valor.
+ */
+export function CardiologyTrendsPanel({
+  patientId,
+  refreshKey,
+  onOpen,
+}: {
+  patientId: string;
+  refreshKey: unknown;
+  onOpen: (recordId: string) => void;
+}) {
+  const trends = useLoad(
+    () => api.get<CardiologyTrendsDto>(`/patients/${patientId}/cardiology-trends`),
+    [patientId, refreshKey],
+  );
+  const data = trends.data;
+  if (trends.error) return <Alert message={trends.error} />;
+  if (!data || (data.rows.length === 0 && data.withheld === 0)) return null;
+  const columns = TREND_COLUMNS.filter((col) => data.rows.some((r) => r.values[col.key]));
+  return (
+    <Panel title="Evolução da cardiologia">
+      <p className="muted small">
+        Valores das fichas de cardiologia assinadas, da mais antiga para a mais recente. O sistema
+        não interpreta os valores.
+      </p>
+      {data.withheld > 0 && (
+        <p className="muted small">
+          {data.withheld} ficha(s) sensível(is) de outro profissional ficaram de fora.
+        </p>
+      )}
+      {data.rows.length > 0 && (
+        <div className="table-scroll">
+          <table aria-label="Evolução dos valores da ficha de cardiologia">
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                {columns.map((col) => (
+                  <th key={col.key} scope="col">
+                    {col.label}
+                    {col.unit && <span className="muted small"> ({col.unit})</span>}
+                  </th>
+                ))}
+                <th scope="col">Registro</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((row) => (
+                <tr key={row.recordId}>
+                  <th scope="row">{formatDate(row.clinicalDate)}</th>
+                  {columns.map((col) => (
+                    <td key={col.key}>{row.values[col.key] ?? '—'}</td>
+                  ))}
+                  <td>
+                    <button
+                      type="button"
+                      className="link"
+                      aria-label={`Abrir o registro de ${formatDate(row.clinicalDate)}, de ${row.author.name}`}
+                      onClick={() => onOpen(row.recordId)}
+                    >
+                      Abrir
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
   );
 }

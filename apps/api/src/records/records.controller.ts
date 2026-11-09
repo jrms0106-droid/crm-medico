@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import type { AccessContext, Action } from '@crm/policy';
 import {
+  type CardiologyTrendsDto,
   ErrorCode,
   type RecordDto,
   type RecordSummaryDto,
@@ -116,6 +117,44 @@ export class RecordsController {
       return [];
     });
     return this.records.summaries(visible);
+  }
+
+  /**
+   * Evolução dos valores da ficha de cardiologia (ADR 0038): só fichas assinadas que o médico
+   * pode ler sem justificativa. As sensíveis de outros profissionais ficam de fora e são contadas.
+   */
+  @Get('patients/:id/cardiology-trends')
+  async cardiologyTrends(
+    @Auth() ctx: AuthContext,
+    @Param('id', uuid) patientId: string,
+  ): Promise<CardiologyTrendsDto> {
+    await this.requirePatient(ctx, 'view', patientId);
+    const context = await this.context(ctx, patientId);
+    await this.authz.authorize(
+      ctx,
+      'view',
+      { type: 'clinical_record', patientId, authorUserId: ctx.user.id },
+      context,
+    );
+    const rows = await this.records.cardiologyCandidates(ctx.user.organizationId, patientId);
+    let withheld = 0;
+    const visible = rows.filter((record) => {
+      const allowed = this.authz.check(
+        ctx,
+        'view',
+        {
+          type: 'clinical_record',
+          id: record.id,
+          patientId,
+          authorUserId: record.authorUserId,
+          sensitivity: record.sensitivity,
+        },
+        context,
+      ).allowed;
+      if (!allowed && record.sensitivity !== 'normal') withheld += 1;
+      return allowed;
+    });
+    return { rows: await this.records.trendRows(visible), withheld };
   }
 
   /**
