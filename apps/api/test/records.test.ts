@@ -359,12 +359,14 @@ describe('evolução da ficha de cardiologia', () => {
           clinicalDate: '2026-01-10',
           author: { id: c.doctor.id, name: expect.any(String) },
           values: { bloodPressure: '150/95', weightKg: '82', bmi: '26,8' },
+          numbers: { systolicBp: 150, diastolicBp: 95 },
         },
         {
           recordId: second.id,
           clinicalDate: '2026-02-15',
           author: { id: c.otherDoctor.id, name: expect.any(String) },
           values: { ldl: '98', nyhaClass: 'II' },
+          numbers: { ldl: 98 },
         },
       ],
     });

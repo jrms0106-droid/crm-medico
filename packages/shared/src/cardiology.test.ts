@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { bodyMassIndex, cardiologyFacts, cardiologySchema, trendValues } from './cardiology.js';
+import {
+  bodyMassIndex,
+  cardiologyFacts,
+  cardiologySchema,
+  chartNumbers,
+  trendValues,
+} from './cardiology.js';
 import { hasContent, recordContentSchema, recordCreateSchema } from './records.js';
 
 describe('ficha de cardiologia', () => {
@@ -98,5 +104,12 @@ describe('ficha de cardiologia', () => {
     });
     expect(trendValues({ vitals: { systolicBp: 120 } })).toEqual({ bloodPressure: '120' });
     expect(trendValues(undefined)).toEqual({});
+  });
+
+  it('separa os números dos gráficos, sem os que faltam', () => {
+    expect(
+      chartNumbers({ vitals: { systolicBp: 140, heartRate: 70 }, echo: { lvef: 55 } }),
+    ).toEqual({ systolicBp: 140, lvef: 55 });
+    expect(chartNumbers(undefined)).toEqual({});
   });
 });

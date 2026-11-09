@@ -8,6 +8,7 @@ export * from './text.js';
 export * from './scheduling.js';
 export * from './care.js';
 export * from './cardiology.js';
+export * from './chart.js';
 export * from './records.js';
 export * from './documents.js';
 export * from './external-documents.js';

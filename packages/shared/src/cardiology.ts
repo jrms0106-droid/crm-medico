@@ -288,11 +288,28 @@ export function trendValues(c: CardiologyContent | undefined): Partial<Record<Tr
   return out;
 }
 
+/** Números desenhados nos gráficos da evolução (ADR 0039). */
+export const CHART_KEYS = ['systolicBp', 'diastolicBp', 'ldl', 'lvef'] as const;
+export type ChartKey = (typeof CHART_KEYS)[number];
+
+export function chartNumbers(c: CardiologyContent | undefined): Partial<Record<ChartKey, number>> {
+  const raw: Record<ChartKey, number | undefined> = {
+    systolicBp: c?.vitals?.systolicBp,
+    diastolicBp: c?.vitals?.diastolicBp,
+    ldl: c?.labs?.ldl,
+    lvef: c?.echo?.lvef,
+  };
+  return Object.fromEntries(
+    Object.entries(raw).filter(([, v]) => typeof v === 'number'),
+  ) as Partial<Record<ChartKey, number>>;
+}
+
 export interface CardiologyTrendRowDto {
   recordId: string;
   clinicalDate: string;
   author: { id: string; name: string };
   values: Partial<Record<TrendKey, string>>;
+  numbers: Partial<Record<ChartKey, number>>;
 }
 
 export interface CardiologyTrendsDto {
