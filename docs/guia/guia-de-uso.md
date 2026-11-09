@@ -176,7 +176,10 @@ O menu do médico tem: Início, Pacientes, Agenda e Profissionais. A agenda most
    - Depois de assinar fichas de cardiologia, o painel **Evolução da cardiologia** mostra os
      valores de cada consulta lado a lado. **Abrir** leva ao registro de onde veio o valor.
      Com duas ou mais consultas, aparecem gráficos da pressão, do LDL e da FEVE; passe o mouse
-     num ponto para ver a data e o valor.
+     num ponto para ver a data e o valor, ou use Tab e as setas do teclado. **Imprimir evolução**
+     abre a impressão do navegador (que também salva em PDF) só com os gráficos e a tabela, com o
+     nome e o nascimento do paciente, a data e quem imprimiu. A impressão não fica registrada no
+     sistema.
 3. O rascunho é **salvo sozinho** alguns segundos depois de você parar de digitar. Se outra
    janela salvou antes, o sistema avisa e mantém o seu texto.
 4. Aperte **Finalizar** quando o registro estiver pronto e depois **Assinar**, com a sua senha e

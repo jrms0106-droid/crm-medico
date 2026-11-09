@@ -47,6 +47,12 @@ async function snap(page: Page, name: string) {
   if (dir) await page.screenshot({ path: `${dir}/${name}.png`, fullPage: true });
 }
 
+/** Com E2E_SCREENSHOTS=<pasta>, guarda o PDF que a impressão geraria (mídia "print"). */
+async function snapPdf(page: Page, name: string) {
+  const dir = process.env['E2E_SCREENSHOTS'];
+  if (dir) await page.pdf({ path: `${dir}/${name}.pdf`, format: 'A4' });
+}
+
 const menu = (page: Page) => page.getByRole('navigation', { name: 'Menu principal' });
 
 const PATIENT = `Paciente Fictícia E2E ${Date.now()}`;
@@ -763,6 +769,24 @@ test.describe.serial('fluxos por perfil', () => {
       .analyze();
     expect(axeCharts.violations.map((v) => v.id)).toEqual([]);
     await snap(page, '21-graficos-cardiologia');
+
+    // Impressão (ADR 0041): o botão abre a impressão do navegador; na folha, só a evolução, com
+    // cabeçalho do paciente e sem os controles da tela.
+    await page.evaluate('window.__prints = 0; window.print = () => { window.__prints += 1; };');
+    await page.getByRole('button', { name: 'Imprimir evolução' }).click();
+    await expect.poll(() => page.evaluate('window.__prints')).toBe(1);
+    await page.emulateMedia({ media: 'print' });
+    const printHeader = page.getByTestId('print-header');
+    await expect(printHeader).toBeVisible();
+    await expect(printHeader).toContainText(/nascimento \d{2}\/\d{2}\/\d{4}/);
+    await expect(printHeader).toContainText(/Impresso em .+ por /);
+    await expect(page.getByRole('button', { name: 'Imprimir evolução' })).toBeHidden();
+    await expect(page.getByRole('columnheader', { name: 'Registro' })).toBeHidden();
+    await expect(trends).toBeVisible();
+    await snapPdf(page, '22-impressao-evolucao');
+    await page.emulateMedia({ media: 'screen' });
+    await page.evaluate("document.body.classList.remove('print-trend')");
+    await expect(printHeader).toBeHidden();
 
     await page.getByRole('button', { name: 'Encerrar atendimento' }).click();
     await expect(page.getByText('Vínculo: Atendimento encerrado')).toBeVisible();

@@ -164,6 +164,8 @@ export function RecordPage({
       {can && (can.viewHistory || can.viewOwnRecords) && (
         <CardiologyTrendsPanel
           patientId={patientId}
+          patient={patient.data ?? undefined}
+          printedBy={session.user.name}
           refreshKey={timeline.data?.map((r) => `${r.id}:${r.status}`).join(',')}
           onOpen={setOpenId}
         />
