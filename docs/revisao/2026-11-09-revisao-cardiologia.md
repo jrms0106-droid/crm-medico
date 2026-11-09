@@ -16,5 +16,3 @@ Escopo: PRs #49 (ficha), #50 (evolução) e #51 (gráficos). Data: 2026-11-09. R
 2. **Limite de 500 fichas cortava as mais recentes.** A consulta ordenava da mais antiga para a mais nova e parava em 500. Agora pega as 500 mais recentes e devolve em ordem cronológica.
 
 ## Fica para a fila
-
-
