@@ -38,6 +38,7 @@ const CFM_CODE = 'urn:crm-medico:cfm:codigo-de-validacao';
 const CFM_PLATFORM = 'Plataforma de Prescrição Eletrônica do CFM';
 const MEMED_CODE = 'urn:crm-medico:memed-simulada:codigo';
 const MEMED_PLATFORM = 'Memed (simulada, sem validade legal)';
+const TELEMEDICINE_CATEGORY = 'Emitido por telemedicina';
 const XHTML = 'http://www.w3.org/1999/xhtml';
 
 const RECORD_TYPE: Record<RecordKind, { code: string; display: string; title: string }> = {
@@ -243,6 +244,7 @@ function composition(
     ...(r.contentHash && { identifier: { system: SHA256, value: r.contentHash } }),
     status: r.status === 'rectified' ? 'amended' : 'final',
     type: loinc(type.code, type.display, type.title),
+    ...(r.telemedicine && { category: [{ text: TELEMEDICINE_CATEGORY }] }),
     subject,
     date,
     author: [author],
@@ -265,6 +267,7 @@ function documentReference(d: DocumentDto, subject: Reference): DocumentReferenc
     status: d.status === 'cancelled' ? 'entered-in-error' : 'current',
     docStatus: 'final',
     type: { text: label },
+    ...(d.telemedicine && { category: [{ text: TELEMEDICINE_CATEGORY }] }),
     subject,
     ...((d.signedAt ?? d.issuedOn) && { date: d.signedAt ?? `${d.issuedOn}T00:00:00Z` }),
     author: [ref(d.author.id, d.author.name)],

@@ -231,7 +231,7 @@ ICP-Brasil são emitidos na **Plataforma de Prescrição Eletrônica do CFM**, q
 médicos com inscrição ativa. O CRM não emite esses documentos.
 
 1. Emita o documento na plataforma do CFM, como de costume.
-2. No prontuário, na área **Emitidos na plataforma do CFM**, aperte **Registrar documento emitido
+2. No prontuário, na área **Emitidos em outras plataformas (CFM e Memed)**, aperte **Registrar documento emitido
    no CFM**.
 3. Escolha o **Tipo**, confira a **Data de emissão**, escreva **O que foi emitido** e, se quiser,
    copie o código que a plataforma mostra em **Código do documento no CFM**. Aperte

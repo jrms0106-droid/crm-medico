@@ -63,7 +63,7 @@ export function ExternalDocumentsPanel({
   });
 
   return (
-    <Panel title="Emitidos na plataforma do CFM">
+    <Panel title="Emitidos em outras plataformas (CFM e Memed)">
       <Notice kind="info">
         Receitas, atestados e pedidos com certificado ICP-Brasil são emitidos na{' '}
         <a href={CFM_URL} target="_blank" rel="noreferrer">
