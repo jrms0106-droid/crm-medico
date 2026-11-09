@@ -244,7 +244,7 @@ test.describe.serial('fluxos por perfil', () => {
 
     // Receita de controle especial emitida na plataforma do CFM: só o registro (ADR 0034).
     const cfm = page.locator('.panel', {
-      has: page.getByRole('heading', { name: 'Emitidos na plataforma do CFM' }),
+      has: page.getByRole('heading', { name: 'Emitidos em outras plataformas (CFM e Memed)' }),
     });
     await cfm.getByRole('button', { name: 'Registrar documento emitido no CFM' }).click();
     const cfmForm = page.getByRole('form', { name: 'Registrar documento emitido no CFM' });

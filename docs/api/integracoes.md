@@ -43,19 +43,20 @@ Resposta `application/fhir+json`, baixada como `copia-do-prontuario-fhir-AAAA-MM
 O arquivo é um `Bundle` do tipo `collection`. Cada recurso tem `fullUrl` `urn:uuid:<id>` e as
 referências entre eles apontam para esses endereços, então o arquivo se sustenta sozinho.
 
-| No CRM                              | No FHIR                                                                                                                                |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Organização                         | `Organization` (nome)                                                                                                                  |
-| Paciente                            | `Patient` (nome usado, nome civil, data de nascimento)                                                                                 |
-| Autor de registro ou documento      | `Practitioner` (nome e CRM/UF, quando houver)                                                                                          |
-| Registro assinado                   | `Composition` com status `final` (ou `amended` se retificado)                                                                          |
-| Seções do registro                  | `Composition.section` com código LOINC e texto                                                                                         |
-| Ficha de cardiologia                | `Composition.section` "Ficha de cardiologia", só com texto, as mesmas linhas da tela ([ADR 0037](../adr/0037-ficha-de-cardiologia.md)) |
-| Hipótese diagnóstica                | `Condition` provisória, com CID-10 quando informado                                                                                    |
-| Retificação / adendo                | `Composition.relatesTo` `replaces` / `appends`                                                                                         |
-| Documento médico assinado/cancelado | `DocumentReference` (`current` / `entered-in-error`) com o conteúdo em anexo JSON                                                      |
-| Documento registrado do CFM         | `DocumentReference` `current`, categoria "Emitido na Plataforma de Prescrição Eletrônica do CFM", com o resumo em anexo de texto       |
-| Aviso e itens que ficaram de fora   | `OperationOutcome` com mensagens informativas                                                                                          |
+| No CRM                              | No FHIR                                                                                                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Organização                         | `Organization` (nome)                                                                                                                                          |
+| Paciente                            | `Patient` (nome usado, nome civil, data de nascimento)                                                                                                         |
+| Autor de registro ou documento      | `Practitioner` (nome e CRM/UF, quando houver)                                                                                                                  |
+| Registro assinado                   | `Composition` com status `final` (ou `amended` se retificado)                                                                                                  |
+| Registro de teleconsulta            | `Composition.category` "Emitido por telemedicina" ([ADR 0044](../adr/0044-marca-de-telemedicina-em-registros-e-documentos.md)); o mesmo em `DocumentReference` |
+| Seções do registro                  | `Composition.section` com código LOINC e texto                                                                                                                 |
+| Ficha de cardiologia                | `Composition.section` "Ficha de cardiologia", só com texto, as mesmas linhas da tela ([ADR 0037](../adr/0037-ficha-de-cardiologia.md))                         |
+| Hipótese diagnóstica                | `Condition` provisória, com CID-10 quando informado                                                                                                            |
+| Retificação / adendo                | `Composition.relatesTo` `replaces` / `appends`                                                                                                                 |
+| Documento médico assinado/cancelado | `DocumentReference` (`current` / `entered-in-error`) com o conteúdo em anexo JSON                                                                              |
+| Documento registrado do CFM         | `DocumentReference` `current`, categoria "Emitido na Plataforma de Prescrição Eletrônica do CFM", com o resumo em anexo de texto                               |
+| Aviso e itens que ficaram de fora   | `OperationOutcome` com mensagens informativas                                                                                                                  |
 
 Códigos usados:
 

@@ -208,4 +208,16 @@ describe('toFhirBundle', () => {
     expect(doc.description).toContain('Não existe documento assinado em nenhuma plataforma');
     expect(JSON.stringify(doc)).not.toContain('CFM');
   });
+
+  it('registro e documento de teleconsulta levam a categoria de telemedicina; os presenciais não', () => {
+    const tele = record({ telemedicine: true });
+    const plain = record({ id: '01900000-0000-7000-8000-0000000000a2' });
+    const bundle = toFhirBundle({ ...copy([tele, plain]) }, new Map(), seq);
+    const compositions = bundle
+      .entry!.map((e) => e.resource!)
+      .filter((r): r is Composition => r.resourceType === 'Composition');
+    const byTele = compositions.map((c) => c.category?.[0]?.text);
+    expect(byTele.filter((c) => c === 'Emitido por telemedicina')).toHaveLength(1);
+    expect(byTele.filter((c) => c === undefined)).toHaveLength(1);
+  });
 });
