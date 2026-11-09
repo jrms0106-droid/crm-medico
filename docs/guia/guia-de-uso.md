@@ -248,7 +248,8 @@ prontuário** (arquivo JSON) ou **Cópia no padrão FHIR** (para levar a outro s
 O sistema confirma a sua senha e diz quantos registros entraram e se algum registro sensível de
 outro profissional ficou de fora. As duas cópias levam também os documentos registrados como
 emitidos no CFM (os registros cancelados ficam de fora); o documento assinado continua na
-plataforma do CFM.
+plataforma do CFM. Receitas feitas em **Prescrever com Memed (simulado)** também entram, com o
+aviso de que são simuladas e sem validade legal.
 
 ## 4. Administrador
 

@@ -180,4 +180,32 @@ describe('toFhirBundle', () => {
       ),
     ).toBe(true);
   });
+
+  it('receita simulada da Memed não se passa por documento do CFM', () => {
+    const external: ExternalDocumentDto = {
+      id: '01900000-0000-7000-8000-0000000000c2',
+      patientId: '01900000-0000-7000-8000-0000000000p1',
+      author: AUTHOR,
+      encounterId: null,
+      platform: 'memed',
+      kind: 'prescription',
+      status: 'registered',
+      issuedOn: '2026-03-01',
+      summary: 'Receita simulada, sem validade legal: nenhuma plataforma foi contratada.',
+      validationCode: 'SIMULADO-ABCD-EFGH',
+      createdAt: '2026-03-01T15:00:00.000Z',
+      cancelledAt: null,
+      cancelReason: null,
+    };
+    const bundle = toFhirBundle({ ...copy([]), externalDocuments: [external] }, new Map(), seq);
+    const doc = bundle.entry!.find((e) => e.resource?.resourceType === 'DocumentReference')!
+      .resource as DocumentReference;
+    expect(doc.identifier).toEqual([
+      { system: 'urn:crm-medico:documento-externo', value: external.id },
+      { system: 'urn:crm-medico:memed-simulada:codigo', value: 'SIMULADO-ABCD-EFGH' },
+    ]);
+    expect(doc.category).toEqual([{ text: 'Emitido na Memed (simulada, sem validade legal)' }]);
+    expect(doc.description).toContain('Não existe documento assinado em nenhuma plataforma');
+    expect(JSON.stringify(doc)).not.toContain('CFM');
+  });
 });

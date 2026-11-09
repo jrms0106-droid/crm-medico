@@ -256,6 +256,24 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(cfm.locator('.timeline')).toContainText('Código no CFM: CODIGO-FICTICIO-1');
     await snap(page, '6b-receita-cfm-registrada');
 
+    // Receita pela Memed: só simulada, com aviso e código de simulação (ADR 0045).
+    await cfm.getByRole('button', { name: 'Prescrever com Memed (simulado)' }).click();
+    const memedForm = page.getByRole('form', { name: 'Prescrever com Memed (simulado)' });
+    await expect(memedForm).toContainText('Receita simulada, sem validade legal');
+    await memedForm
+      .getByLabel('Medicamento 1', { exact: true })
+      .fill('Paracetamol 750 mg (fictício)');
+    await memedForm.getByLabel('Posologia 1').fill('1 comprimido a cada 8 horas.');
+    await memedForm.getByRole('button', { name: 'Adicionar medicamento' }).click();
+    await memedForm.getByLabel('Medicamento 2', { exact: true }).fill('Dipirona 500 mg (fictício)');
+    await memedForm.getByLabel('Posologia 2').fill('1 comprimido se febre.');
+    await snap(page, '26-receita-memed-simulada-formulario');
+    await memedForm.getByRole('button', { name: 'Emitir receita simulada' }).click();
+    await expect(cfm.locator('.timeline')).toContainText('Memed (simulada)');
+    await expect(cfm.locator('.timeline')).toContainText(/Código da receita simulada: SIMULADO-/);
+    await expect(cfm.locator('.timeline')).toContainText('2. Dipirona 500 mg (fictício)');
+    await snap(page, '27-receita-memed-simulada');
+
     await page.getByRole('button', { name: 'Encerrar atendimento' }).click();
     await expect(page.getByText('Vínculo: Atendimento encerrado')).toBeVisible();
 
@@ -272,9 +290,14 @@ test.describe.serial('fluxos por perfil', () => {
     };
     expect(copy.records.map((r) => r.status)).toEqual(['signed']);
     expect(copy.documents.map((d) => d.kind)).toEqual(['prescription']);
-    expect(copy.externalDocuments.map((d) => d.kind)).toEqual(['controlled_prescription']);
+    expect(copy.externalDocuments.map((d) => d.kind).sort()).toEqual([
+      'controlled_prescription',
+      'prescription',
+    ]);
     await expect(page.getByRole('status')).toContainText('Cópia gerada com 1 registro(s)');
-    await expect(page.getByRole('status')).toContainText('além de 1 documento(s) emitidos no CFM');
+    await expect(page.getByRole('status')).toContainText(
+      'além de 2 documento(s) emitidos em outras plataformas',
+    );
 
     // A mesma cópia no padrão FHIR (docs/api/integracoes.md).
     const downloadingFhir = page.waitForEvent('download');
@@ -290,10 +313,10 @@ test.describe.serial('fluxos por perfil', () => {
     expect(bundle.resourceType).toBe('Bundle');
     const types = bundle.entry.map((e) => e.resource.resourceType);
     expect(types.filter((x) => x === 'Composition')).toHaveLength(1);
-    // A receita assinada no CRM e o registro da receita de controle emitida no CFM.
+    // A receita assinada no CRM, o registro da receita do CFM e a receita simulada da Memed.
     const refs = bundle.entry.filter((e) => e.resource.resourceType === 'DocumentReference');
     expect(refs.map((e) => e.resource.type?.text)).toContain('Receita de controle especial');
-    expect(refs).toHaveLength(2);
+    expect(refs).toHaveLength(3);
     await expect(page.getByRole('status')).toContainText('Cópia no padrão FHIR gerada');
   });
 

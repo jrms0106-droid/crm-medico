@@ -1,15 +1,30 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ErrorCode, type ExternalDocumentCreateInput, type ExternalDocumentDto } from '@crm/shared';
+import {
+  ErrorCode,
+  type ExternalDocumentCreateInput,
+  type ExternalDocumentDto,
+  type ExternalPlatform,
+  type MemedPrescriptionInput,
+  SIMULATED_PRESCRIPTION_NOTICE,
+} from '@crm/shared';
 import { AppError } from '../common/app-error.js';
 import { Clock } from '../common/clock.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { ExternalDocument } from '../generated/prisma/client.js';
 import type { AuthContext } from '../identity/session.service.js';
 import { toLocal } from '../scheduling/time.js';
+import { PrescriptionProvider } from './prescription-provider.js';
 
 const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
 
 const dateOnly = (d: Date) => d.toISOString().slice(0, 10);
+
+const noProfessional = () =>
+  new AppError(
+    422,
+    ErrorCode.BUSINESS_RULE_VIOLATION,
+    'Seu registro profissional (CRM) não está cadastrado ou está inativo. Peça ao administrador.',
+  );
 
 /**
  * Registro de documentos emitidos na plataforma do CFM (docs/api/documentos-externos.md).
@@ -21,6 +36,7 @@ export class ExternalDocumentsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(Clock) private readonly clock: Clock,
+    @Inject(PrescriptionProvider) private readonly prescriptions: PrescriptionProvider,
   ) {}
 
   async find(organizationId: string, id: string): Promise<ExternalDocument | null> {
@@ -78,6 +94,63 @@ export class ExternalDocumentsService {
     return (await this.dtos([created]))[0]!;
   }
 
+  /**
+   * Receita simples pelo adaptador de prescrição (hoje só o simulado), registrada como documento
+   * externo da plataforma `memed`. O resumo começa com o aviso de receita simulada.
+   */
+  async createMemed(
+    ctx: AuthContext,
+    patientId: string,
+    input: MemedPrescriptionInput,
+  ): Promise<ExternalDocumentDto> {
+    const org = ctx.user.organizationId;
+    const professional = await this.prisma.professional.findFirst({
+      where: { organizationId: org, userId: ctx.user.id, active: true },
+      select: { crmNumber: true, crmState: true },
+    });
+    if (!professional) throw noProfessional();
+    const encounter = await this.prisma.encounter.findFirst({
+      where: { organizationId: org, doctorUserId: ctx.user.id, patientId, status: 'started' },
+      select: { id: true, unitId: true },
+    });
+    const patient = await this.prisma.patient.findFirstOrThrow({
+      where: { id: patientId, organizationId: org },
+      select: { fullName: true, birthDate: true },
+    });
+    const unit = encounter?.unitId
+      ? await this.prisma.unit.findUnique({
+          where: { id: encounter.unitId },
+          select: { timezone: true },
+        })
+      : null;
+    const issued = await this.prescriptions.issue({
+      prescriber: {
+        name: ctx.user.name,
+        crm: `CRM/${professional.crmState} ${professional.crmNumber}`,
+      },
+      patient: { fullName: patient.fullName, birthDate: dateOnly(patient.birthDate) },
+      items: input.items,
+    });
+    const lines = input.items.map((i, n) => `${n + 1}. ${i.medication}: ${i.instructions}`);
+    const created = await this.prisma.externalDocument.create({
+      data: {
+        organizationId: org,
+        patientId,
+        authorUserId: ctx.user.id,
+        encounterId: encounter?.id ?? null,
+        unitId: encounter?.unitId ?? null,
+        platform: 'memed' satisfies ExternalPlatform,
+        kind: 'prescription',
+        issuedOn: new Date(
+          `${toLocal(this.clock.now(), unit?.timezone ?? DEFAULT_TIMEZONE).date}T00:00:00.000Z`,
+        ),
+        summary: `${SIMULATED_PRESCRIPTION_NOTICE}\n${lines.join('\n')}`.slice(0, 2000),
+        validationCode: issued.validationCode,
+      },
+    });
+    return (await this.dtos([created]))[0]!;
+  }
+
   async cancel(
     ctx: AuthContext,
     doc: ExternalDocument,
@@ -122,7 +195,7 @@ export class ExternalDocumentsService {
       patientId: d.patientId,
       author: { id: d.authorUserId, name: name(d.authorUserId) },
       encounterId: d.encounterId,
-      platform: 'cfm',
+      platform: d.platform as ExternalPlatform,
       kind: d.kind,
       status: d.status,
       issuedOn: dateOnly(d.issuedOn),

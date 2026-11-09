@@ -695,3 +695,7 @@ main.content:focus {
   margin: 0;
   padding-left: 1.25rem;
 }
+
+.preline {
+  white-space: pre-line;
+}

@@ -48,6 +48,10 @@ import {
   UnitSchedulingController,
   WaitlistController,
 } from './scheduling/scheduling.controller.js';
+import {
+  PrescriptionProvider,
+  SimulatedPrescriptionProvider,
+} from './documents/prescription-provider.js';
 import { SchedulingService } from './scheduling/scheduling.service.js';
 import { SimulatedVideoMeeting, VideoMeetingProvider } from './scheduling/video-meeting.js';
 import { ProfessionalsController } from './org/professionals.controller.js';
@@ -59,6 +63,7 @@ export interface AppOverrides {
   messageSender?: MessageSender;
   languageModel?: LanguageModel;
   videoMeeting?: VideoMeetingProvider;
+  prescriptionProvider?: PrescriptionProvider;
 }
 
 @Module({})
@@ -119,6 +124,10 @@ export class AppModule {
         RemindersService,
         RemindersRunner,
         { provide: MessageSender, useValue: overrides.messageSender ?? new SimulatedSender() },
+        {
+          provide: PrescriptionProvider,
+          useValue: overrides.prescriptionProvider ?? new SimulatedPrescriptionProvider(),
+        },
         {
           provide: VideoMeetingProvider,
           useValue: overrides.videoMeeting ?? new SimulatedVideoMeeting(),
