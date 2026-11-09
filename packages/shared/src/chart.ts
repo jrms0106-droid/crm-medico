@@ -15,3 +15,45 @@ export function niceTicks(min: number, max: number): number[] {
   if (ticks.length < 2) ticks.push(Math.round((start + step) * 100) / 100);
   return ticks;
 }
+
+export interface ChartCursor {
+  /** Índice da série no gráfico. */
+  s: number;
+  /** Índice do ponto dentro da série. */
+  i: number;
+}
+
+export type ChartKeyName = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'Home' | 'End';
+
+/**
+ * Para onde vai o foco ao apertar uma tecla de navegação num gráfico. `xs` tem a posição
+ * horizontal de cada ponto, série por série. Esquerda/direita andam na mesma série; cima/baixo
+ * trocam de série e caem no ponto mais próximo na horizontal. Nunca sai dos limites.
+ */
+export function moveCursor(xs: number[][], cur: ChartCursor, key: ChartKeyName): ChartCursor {
+  const here = xs[cur.s];
+  if (!here || here.length === 0) return cur;
+  const last = here.length - 1;
+  switch (key) {
+    case 'ArrowLeft':
+      return { s: cur.s, i: Math.max(0, cur.i - 1) };
+    case 'ArrowRight':
+      return { s: cur.s, i: Math.min(last, cur.i + 1) };
+    case 'Home':
+      return { s: cur.s, i: 0 };
+    case 'End':
+      return { s: cur.s, i: last };
+    case 'ArrowUp':
+    case 'ArrowDown': {
+      const target = cur.s + (key === 'ArrowDown' ? 1 : -1);
+      const there = xs[target];
+      if (!there || there.length === 0) return cur;
+      const x = here[cur.i] ?? 0;
+      let best = 0;
+      there.forEach((tx, i) => {
+        if (Math.abs(tx - x) < Math.abs((there[best] ?? 0) - x)) best = i;
+      });
+      return { s: target, i: best };
+    }
+  }
+}

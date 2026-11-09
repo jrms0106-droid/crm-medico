@@ -573,6 +573,17 @@ main.content:focus {
   cursor: crosshair;
 }
 
+/* Foco por teclado: anel ao redor do ponto, com contraste nos dois temas. */
+.trend-chart .hit:focus {
+  outline: none;
+}
+
+.trend-chart .hit:focus-visible {
+  stroke: var(--text);
+  stroke-width: 2;
+  stroke-dasharray: 3 2;
+}
+
 .trend-chart .series-1 .line {
   stroke: var(--series-1);
 }

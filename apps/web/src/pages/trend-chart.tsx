@@ -1,5 +1,12 @@
-import { useState } from 'react';
-import { type CardiologyTrendRowDto, type ChartKey, niceTicks } from '@crm/shared';
+import { useRef, useState } from 'react';
+import {
+  type CardiologyTrendRowDto,
+  type ChartCursor,
+  type ChartKey,
+  type ChartKeyName,
+  moveCursor,
+  niceTicks,
+} from '@crm/shared';
 import { formatDate } from '../ui';
 
 interface Series {
@@ -43,11 +50,15 @@ interface Point {
 
 /**
  * Gráfico de linha em SVG, sem biblioteca. Mostra só depois de dois valores na mesma medida.
- * Passar o mouse num ponto mostra data, valor e autor abaixo do gráfico. Quem usa teclado ou
- * leitor de tela tem a descrição do gráfico e a tabela, com os mesmos valores.
+ * Passar o mouse num ponto, ou chegar nele pelo teclado, mostra data, valor e autor abaixo do
+ * gráfico. Tab entra no gráfico (um só ponto na ordem de tabulação); setas andam pelos pontos,
+ * cima/baixo trocam de série, Home/End vão ao primeiro e ao último. Cada ponto tem rótulo com
+ * data, valor e autor para leitor de tela, e a tabela abaixo tem os mesmos valores.
  */
 export function TrendChart({ spec, rows }: { spec: ChartSpec; rows: CardiologyTrendRowDto[] }) {
   const [active, setActive] = useState<{ series: Series; point: Point } | null>(null);
+  const [cursor, setCursor] = useState<ChartCursor | null>(null);
+  const hitRefs = useRef(new Map<string, SVGCircleElement>());
   const times = rows.map((r) => Date.parse(`${r.clinicalDate}T00:00:00Z`));
   const t0 = Math.min(...times);
   const t1 = Math.max(...times);
@@ -73,6 +84,13 @@ export function TrendChart({ spec, rows }: { spec: ChartSpec; rows: CardiologyTr
       return value === undefined ? [] : [{ row, value, x: x(i), y: y(value) }];
     }),
   }));
+  // O ponto que recebe o Tab: o último foco, ou o valor mais recente da primeira série com dados.
+  const firstSeries = Math.max(
+    lines.findIndex((l) => l.points.length > 0),
+    0,
+  );
+  const fallback = { s: firstSeries, i: (lines[firstSeries]?.points.length ?? 1) - 1 };
+  const stop = cursor && lines[cursor.s]?.points[cursor.i] ? cursor : fallback;
   const describe = lines
     .filter((l) => l.points.length > 0)
     .map((l) => {
@@ -98,8 +116,8 @@ export function TrendChart({ spec, rows }: { spec: ChartSpec; rows: CardiologyTr
       </figcaption>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        role="img"
-        aria-label={`${spec.title} em ${spec.unit}. ${describe}. Os valores estão na tabela abaixo.`}
+        role="group"
+        aria-label={`${spec.title} em ${spec.unit}. ${describe}. Use as setas para percorrer os pontos; os valores também estão na tabela abaixo.`}
       >
         {ticks.map((t) => (
           <g key={t} className="grid-line">
@@ -115,7 +133,7 @@ export function TrendChart({ spec, rows }: { spec: ChartSpec; rows: CardiologyTr
         <text className="axis-label" x={W - PAD.right} y={H - 8} textAnchor="end">
           {formatDate(rows[rows.length - 1]?.clinicalDate ?? '')}
         </text>
-        {lines.map(({ series, points }) => {
+        {lines.map(({ series, points }, seriesIndex) => {
           const last = points[points.length - 1];
           return (
             <g key={series.key} className={`series-${series.slot}`}>
@@ -130,17 +148,53 @@ export function TrendChart({ spec, rows }: { spec: ChartSpec; rows: CardiologyTr
                   {spec.series.length > 1 ? `${series.label} ${last.value}` : last.value}
                 </text>
               )}
-              {points.map((p) => (
-                <circle
-                  key={`hit-${p.row.recordId}`}
-                  className="hit"
-                  cx={p.x}
-                  cy={p.y}
-                  r={12}
-                  onMouseEnter={() => setActive({ series, point: p })}
-                  onMouseLeave={() => setActive(null)}
-                />
-              ))}
+              {points.map((p, i) => {
+                const here = { s: seriesIndex, i };
+                const isStop = stop.s === seriesIndex && stop.i === i;
+                return (
+                  <circle
+                    key={`hit-${p.row.recordId}`}
+                    ref={(el) => {
+                      const id = `${seriesIndex}:${i}`;
+                      if (el) hitRefs.current.set(id, el);
+                      else hitRefs.current.delete(id);
+                    }}
+                    className="hit"
+                    cx={p.x}
+                    cy={p.y}
+                    r={12}
+                    role="img"
+                    tabIndex={isStop ? 0 : -1}
+                    aria-label={`${series.label}, ponto ${i + 1} de ${points.length}: ${formatDate(p.row.clinicalDate)}, ${p.value} ${spec.unit}, ${p.row.author.name}`}
+                    onMouseEnter={() => setActive({ series, point: p })}
+                    onMouseLeave={() => setActive(null)}
+                    onFocus={() => {
+                      setCursor(here);
+                      setActive({ series, point: p });
+                    }}
+                    onBlur={() => setActive(null)}
+                    onKeyDown={(e) => {
+                      const keys = [
+                        'ArrowLeft',
+                        'ArrowRight',
+                        'ArrowUp',
+                        'ArrowDown',
+                        'Home',
+                        'End',
+                      ];
+                      if (!keys.includes(e.key)) return;
+                      e.preventDefault();
+                      const next = moveCursor(
+                        lines.map((l) => l.points.map((q) => q.x)),
+                        here,
+                        e.key as ChartKeyName,
+                      );
+                      setCursor(next);
+                      hitRefs.current.get(`${next.s}:${next.i}`)?.focus();
+                    }}
+                  />
+                );
+              })}
             </g>
           );
         })}
