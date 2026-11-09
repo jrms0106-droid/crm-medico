@@ -85,6 +85,7 @@ export class RemindersService {
         organizationId: true,
         unitId: true,
         startsAt: true,
+        meetingUrl: true,
         schedule: { select: { unit: { select: { name: true, timezone: true } } } },
         patient: {
           select: {
@@ -118,6 +119,7 @@ export class RemindersService {
             date: local.date,
             time,
             unit: unit.name,
+            meetingUrl: a.meetingUrl,
           }),
           scheduledFor: now,
           createdAt: now,

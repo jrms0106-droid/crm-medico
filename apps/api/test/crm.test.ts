@@ -109,11 +109,12 @@ async function setupClinic() {
     if (res.status !== 201) throw new Error(`Falha ao cadastrar paciente: ${res.status}`);
     return res.body.id as string;
   };
-  const book = async (patientId: string, startsAt: string) => {
+  const book = async (patientId: string, startsAt: string, modality = 'in_person') => {
     const res = await as.secretary.post('/appointments', {
       scheduleId: schedule.id,
       patientId,
       startsAt,
+      modality,
     });
     if (res.status !== 201) throw new Error(`Falha ao marcar: ${res.status}`);
     return res.body.id as string;
@@ -167,6 +168,27 @@ describe('lembretes de consulta', () => {
       expect(res.status, who).toBe(403);
       expect(errorCode(res.body)).toBe('FORBIDDEN');
     }
+  });
+
+  it('lembrete de teleconsulta leva o endereço da sala de vídeo simulada', async () => {
+    const c = await setupClinic();
+    const maria = await c.patient('Maria Fictícia da Silva', WANTS_REMINDERS);
+    const appt = await c.book(maria, '2026-03-03T14:30:00-03:00', 'telemedicine');
+    const room = (await c.as.secretary.get(`/appointments/${appt}`)).body.meetingUrl as string;
+    expect(room).toMatch(/^https:\/\/meet\.simulado\.invalid\//);
+
+    t.clock.set(MONDAY_AFTERNOON);
+    expect(await reminders.run()).toEqual({ planned: 1, sent: 1, cancelled: 0, failed: 0 });
+    expect(sender.sent).toEqual([
+      {
+        channel: 'whatsapp',
+        toNumber: '11987654321',
+        body:
+          'Olá, Maria. Lembrete: sua teleconsulta é em 03/03/2026 às 14:30, da Unidade Centro. ' +
+          `Entre na sala de vídeo por este endereço: ${room} ` +
+          'Para remarcar ou cancelar, ligue para a clínica.',
+      },
+    ]);
   });
 
   it('consulta cancelada ou autorização retirada: o lembrete na fila é cancelado', async () => {

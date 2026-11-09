@@ -33,14 +33,25 @@ export const messageCancelSchema = z.strictObject({
     .max(200, 'Máximo de 200 caracteres.'),
 });
 
-/** Texto do lembrete: só primeiro nome, data, hora e unidade. */
+/**
+ * Texto do lembrete: só primeiro nome, data, hora e unidade. Na teleconsulta (`meetingUrl`),
+ * leva também o endereço da sala de vídeo.
+ */
 export function reminderText(input: {
   firstName: string;
   date: string;
   time: string;
   unit: string;
+  meetingUrl?: string | null;
 }): string {
   const [y, m, d] = input.date.split('-');
+  if (input.meetingUrl) {
+    return (
+      `Olá, ${input.firstName}. Lembrete: sua teleconsulta é em ${d}/${m}/${y} às ${input.time}, ` +
+      `da ${input.unit}. Entre na sala de vídeo por este endereço: ${input.meetingUrl} ` +
+      `Para remarcar ou cancelar, ligue para a clínica.`
+    );
+  }
   return (
     `Olá, ${input.firstName}. Lembrete: sua consulta é em ${d}/${m}/${y} às ${input.time}, ` +
     `na ${input.unit}. Para remarcar ou cancelar, ligue para a clínica.`

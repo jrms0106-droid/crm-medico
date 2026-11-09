@@ -198,6 +198,7 @@ export function RecordPage({
                 </span>
                 <Badge tone={STATUS_TONE[r.status]}>{RECORD_STATUS_LABELS[r.status]}</Badge>
                 {r.sensitivity !== 'normal' && <Badge tone="warn">Sensível</Badge>}
+                {r.telemedicine && <Badge tone="info">Telemedicina</Badge>}
               </button>
               {r.contentHidden ? (
                 <p className="muted small">Conteúdo sensível: abrir exige justificativa.</p>
@@ -325,6 +326,12 @@ function RecordMeta({ record }: { record: RecordDto }) {
       {KIND_LABELS[record.kind]} de {formatDate(record.clinicalDate)} · {record.author.name} ·{' '}
       {FORM_LABELS[record.formVersion] ?? record.formVersion} ·{' '}
       <Badge tone={STATUS_TONE[record.status]}>{RECORD_STATUS_LABELS[record.status]}</Badge>
+      {record.telemedicine && (
+        <>
+          {' '}
+          · <Badge tone="info">Emitido por telemedicina</Badge>
+        </>
+      )}
       {record.sensitivity !== 'normal' && (
         <> · sensibilidade {SENSITIVITY_LABELS[record.sensitivity]}</>
       )}

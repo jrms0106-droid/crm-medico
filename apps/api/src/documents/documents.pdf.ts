@@ -7,6 +7,7 @@ import {
   type PrescriptionContent,
   type ReferralContent,
   type ReportContent,
+  TELEMEDICINE_NOTICE,
 } from '@crm/shared';
 
 /** AAAA-MM-DD → DD/MM/AAAA, sem passar por fuso horário. */
@@ -135,6 +136,12 @@ export function renderDocumentPdf(d: DocumentDto, fallbackPatientName: string): 
   if (place) pdf.font('Helvetica-Bold').fontSize(12).text(place, { align: 'center' });
   pdf.moveDown(0.8).font('Helvetica-Bold').fontSize(16);
   pdf.text(DOCUMENT_KIND_LABELS[d.kind].toUpperCase(), { align: 'center' });
+
+  if (d.telemedicine) {
+    pdf.moveDown(0.5).font('Helvetica-Oblique').fontSize(10).text(TELEMEDICINE_NOTICE, {
+      align: 'center',
+    });
+  }
 
   const patient = s?.patient;
   pdf.moveDown(1).font('Helvetica').fontSize(11);

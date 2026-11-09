@@ -11,6 +11,8 @@ export const DOCUMENT_KINDS = [
 ] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
+export const TELEMEDICINE_NOTICE = 'Emitido por telemedicina (Resolução CFM 2.314/2022).';
+
 export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
   prescription: 'Receita simples',
   certificate: 'Atestado',
@@ -170,6 +172,8 @@ export interface DocumentSnapshot {
   };
   patient: { fullName: string; socialName: string | null; birthDate: string };
   place: { organization: string; unit: string | null };
+  /** Presente (true) só quando emitido num atendimento por teleconsulta; entra no resumo SHA-256. */
+  telemedicine?: true;
 }
 
 export interface DocumentDto {
@@ -177,6 +181,8 @@ export interface DocumentDto {
   patientId: string;
   author: { id: string; name: string };
   encounterId: string | null;
+  /** Emitido por telemedicina (do atendimento; depois de assinado, do retrato congelado). */
+  telemedicine: boolean;
   kind: DocumentKind;
   status: DocumentStatus;
   version: number;
@@ -197,6 +203,7 @@ export interface DocumentSummaryDto {
   author: { id: string; name: string };
   kind: DocumentKind;
   status: DocumentStatus;
+  telemedicine: boolean;
   issuedOn: string | null;
   createdAt: string;
 }

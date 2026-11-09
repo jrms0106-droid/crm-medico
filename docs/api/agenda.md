@@ -51,6 +51,7 @@ Veja o [ADR 0043](../adr/0043-teleconsulta-com-sala-simulada.md).
 - O médico só inicia o atendimento de uma teleconsulta com o consentimento registrado (422).
 - O reagendamento mantém a modalidade e o consentimento, e cria sala nova.
 - O banco recusa sala ou consentimento em consulta presencial.
+- Registros e documentos do atendimento trazem `telemedicine: true`; o documento assinado congela a marca no retrato e o PDF a mostra ([ADR 0044](../adr/0044-marca-de-telemedicina-em-registros-e-documentos.md)). O lembrete por mensagem leva o endereço da sala.
 
 ## Disponibilidade
 
