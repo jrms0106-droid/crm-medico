@@ -689,6 +689,22 @@ test.describe.serial('fluxos por perfil', () => {
     ).toBeVisible();
     await expect(page.getByText('FEVE 58%')).toBeVisible();
 
+    // Evolução (ADR 0038): a ficha assinada vira uma linha da tabela, com as colunas preenchidas.
+    const trends = page.getByRole('table', {
+      name: 'Evolução dos valores da ficha de cardiologia',
+    });
+    await expect(trends.getByRole('row')).toHaveCount(2);
+    await expect(trends).toContainText('142/88');
+    await expect(trends).toContainText('26,3');
+    await expect(trends).toContainText('132');
+    await expect(trends.getByRole('columnheader', { name: /HDL/ })).toHaveCount(0);
+    const axeTrends = await new AxeBuilder({ page })
+      .include('table[aria-label="Evolução dos valores da ficha de cardiologia"]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(axeTrends.violations.map((v) => v.id)).toEqual([]);
+    await snap(page, '20-evolucao-cardiologia');
+
     await page.getByRole('button', { name: 'Encerrar atendimento' }).click();
     await expect(page.getByText('Vínculo: Atendimento encerrado')).toBeVisible();
   });

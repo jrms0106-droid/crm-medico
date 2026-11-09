@@ -15,7 +15,7 @@ import {
 } from '@crm/shared';
 import { ApiError, api, query } from '../api';
 import { ReauthDialog } from '../reauth';
-import { CardiologyEditor, CardiologyView } from './cardiology';
+import { CardiologyEditor, CardiologyTrendsPanel, CardiologyView } from './cardiology';
 import { DocumentsPanel } from './documents';
 import { ExternalDocumentsPanel } from './external-documents';
 import { type InsertedField, NotesOrganizer, RecordSummaryPanel } from './clinical-assistant';
@@ -160,6 +160,13 @@ export function RecordPage({
       )}
       {can?.viewHistory && (
         <RecordSummaryPanel session={session} patientId={patientId} onOpen={setOpenId} />
+      )}
+      {can && (can.viewHistory || can.viewOwnRecords) && (
+        <CardiologyTrendsPanel
+          patientId={patientId}
+          refreshKey={timeline.data?.map((r) => `${r.id}:${r.status}`).join(',')}
+          onOpen={setOpenId}
+        />
       )}
       <Panel title="Linha do tempo">
         <label className="check">

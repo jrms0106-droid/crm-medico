@@ -316,6 +316,96 @@ describe('ficha de cardiologia', () => {
   });
 });
 
+describe('evolução da ficha de cardiologia', () => {
+  const ficha = (cardiology: object, extra: object = {}) => ({
+    form: 'cardiology',
+    content: { cardiology },
+    ...extra,
+  });
+
+  it('o médico com vínculo vê as fichas assinadas em ordem, sem rascunho nem sensível de outro', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    await startEncounter(c, 'otherDoctor', '10:00');
+    const path = `/patients/${c.patientId}/cardiology-trends`;
+    expect((await c.as.doctor.get(path)).body).toEqual({ rows: [], withheld: 0 });
+
+    const first = await signedRecord(
+      c,
+      'doctor',
+      ficha(
+        { vitals: { systolicBp: 150, diastolicBp: 95, weightKg: 82, heightCm: 175 } },
+        { clinicalDate: '2026-01-10' },
+      ),
+    );
+    const second = await signedRecord(
+      c,
+      'otherDoctor',
+      ficha({ labs: { ldl: 98 }, symptoms: { nyhaClass: 2 } }, { clinicalDate: '2026-02-15' }),
+    );
+    await signedRecord(c, 'otherDoctor', ficha({ labs: { ldl: 70 } }, { sensitivity: 'elevated' }));
+    // Rascunho, registro genérico e ficha sem nenhum valor acompanhado não entram.
+    await c.as.doctor.post(`/patients/${c.patientId}/records`, ficha({ labs: { ldl: 60 } }));
+    await signedRecord(c, 'doctor');
+    await signedRecord(c, 'doctor', ficha({ riskFactors: { diabetes: true } }));
+
+    const res = await c.as.doctor.get(path);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      withheld: 1,
+      rows: [
+        {
+          recordId: first.id,
+          clinicalDate: '2026-01-10',
+          author: { id: c.doctor.id, name: expect.any(String) },
+          values: { bloodPressure: '150/95', weightKg: '82', bmi: '26,8' },
+        },
+        {
+          recordId: second.id,
+          clinicalDate: '2026-02-15',
+          author: { id: c.otherDoctor.id, name: expect.any(String) },
+          values: { ldl: '98', nyhaClass: 'II' },
+        },
+      ],
+    });
+    // O autor da ficha sensível a vê.
+    const own = await c.as.otherDoctor.get(path);
+    expect(own.body.withheld).toBe(0);
+    expect(own.body.rows).toHaveLength(3);
+  });
+
+  it('a ficha retificada sai e a retificação assinada entra', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const original = await signedRecord(c, 'doctor', ficha({ echo: { lvef: 85 } }));
+    const fix = await c.as.doctor.post(`/records/${original.id}/rectify`, {
+      justification: 'FEVE digitada errada.',
+      content: { cardiology: { echo: { lvef: 58 } } },
+    });
+    await finalizeAndSign(c, 'doctor', fix.body.id, 1);
+    const res = await c.as.doctor.get(`/patients/${c.patientId}/cardiology-trends`);
+    expect(
+      res.body.rows.map((r: { recordId: string; values: object }) => [r.recordId, r.values]),
+    ).toEqual([[fix.body.id, { lvef: '58' }]]);
+  });
+
+  it('nega a secretária e o administrador; médico sem vínculo vê só as próprias; 404 sem paciente', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    await signedRecord(c, 'doctor', ficha({ labs: { ldl: 120 } }));
+    const path = `/patients/${c.patientId}/cardiology-trends`;
+    expect((await c.as.secretary.get(path)).status).toBe(403);
+    expect((await c.as.admin.get(path)).status).toBe(403);
+    expect((await c.as.otherDoctor.get(path)).body).toEqual({ rows: [], withheld: 0 });
+    const missing = '0190a000-0000-7000-8000-000000000000';
+    expect((await c.as.doctor.get(`/patients/${missing}/cardiology-trends`)).status).toBe(404);
+    const denied = await t.db.auditEvent.count({
+      where: { resourceType: 'clinical_record', outcome: 'denied' },
+    });
+    expect(denied).toBeGreaterThanOrEqual(2);
+  });
+});
+
 describe('rascunho e salvamento', () => {
   it('cada gravação cria uma versão; versão desatualizada responde 409 sem gravar nada', async () => {
     const c = await setupClinic();

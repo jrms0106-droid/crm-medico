@@ -42,6 +42,14 @@ Ao criar o registro, o médico pode pedir `form: "cardiology"` ([ADR 0037](../ad
 - O bloco `cardiology` num registro do formulário genérico responde 400 `VALIDATION_FAILED`, ao criar, salvar ou retificar. Retificação e adendo herdam o formulário do original.
 - A ficha preenchida conta como conteúdo para finalizar. A leitura e a cópia FHIR mostram as mesmas linhas de texto.
 
+### Evolução dos valores
+
+`GET /patients/:id/cardiology-trends` ([ADR 0038](../adr/0038-evolucao-da-ficha-de-cardiologia.md)) devolve `{ rows, withheld }`. Cada linha é uma ficha de cardiologia **assinada**, da mais antiga para a mais recente, com `recordId`, `clinicalDate`, `author` e `values`: PA, FC, peso, IMC, NYHA, FEVE, LDL, HDL, TG, HbA1c, creatinina e NT-proBNP, em texto, só os preenchidos.
+
+- Mesmo acesso da linha do tempo: secretária e administrador recebem 403; médico sem vínculo vê só as próprias fichas; paciente inexistente é 404.
+- Ficha sensível de outro profissional fica de fora e é contada em `withheld`.
+- Rascunho, finalizado, retificado (entra a retificação assinada), arquivado e registro genérico não entram.
+
 ## Estados
 
 | Estado      | Quem vê                                | Pode ir para                                              |
