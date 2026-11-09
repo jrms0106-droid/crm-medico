@@ -131,6 +131,7 @@ describe('interruptores da IA', () => {
       expect.objectContaining({ feature: 'admin_report', enabled: false }),
       expect.objectContaining({ feature: 'record_draft', enabled: false }),
       expect.objectContaining({ feature: 'record_summary', enabled: false }),
+      expect.objectContaining({ feature: 'report_reading', enabled: false }),
     ]);
     const res = await c.as.secretary.post('/ai/request-triage', { text: 'Quero remarcar.' });
     expect(res.status).toBe(403);

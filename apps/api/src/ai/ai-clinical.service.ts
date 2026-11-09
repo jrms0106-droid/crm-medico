@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   AI_CLINICAL_NOTICE,
+  AI_REPORT_NOTICE,
   AI_RECORD_FIELD_LABELS,
   AI_RECORD_FIELDS,
   type AiRecordField,
@@ -11,8 +12,17 @@ import {
   type RecordDraftSuggestionDto,
   type RecordSummaryItemDto,
   type RecordSummarySuggestionDto,
+  REPORT_FIELD_INFO,
+  REPORT_MAX_NUMBERS,
+  type ReportField,
+  type ReportReadingSuggestionDto,
+  type ReportSuggestionDto,
+  extractNumbers,
+  fitsReportField,
   recordDraftOutputSchema,
   recordSummaryOutputSchema,
+  reportExcerpt,
+  reportReadingOutputSchema,
   splitSentences,
 } from '@crm/shared';
 import { AppError } from '../common/app-error.js';
@@ -24,6 +34,7 @@ import {
   LanguageModel,
   type ModelRequest,
   type RecordNotesFacts,
+  type ReportFacts,
   type RecordSummaryFacts,
 } from './language-model.js';
 
@@ -120,6 +131,81 @@ export class AiClinicalService {
       unassigned,
       model: this.ai.modelInfo(row),
       notice: AI_CLINICAL_NOTICE,
+    };
+  }
+
+  /**
+   * Leitura de laudo (ADR 0042): o sistema acha os números do texto e o modelo só aponta qual
+   * número vai para qual campo. O valor mostrado é o do laudo; o que não cabe no campo (faixa ou
+   * casas decimais da ficha) é mostrado à parte e não é sugerido.
+   */
+  async reportReading(
+    ctx: AuthContext,
+    patientId: string,
+    text: string,
+  ): Promise<ReportReadingSuggestionDto> {
+    await this.ai.requireEnabled(ctx.user.organizationId, 'report_reading');
+    const numbers = extractNumbers(text);
+    if (numbers.length > REPORT_MAX_NUMBERS) {
+      throw new AppError(
+        422,
+        ErrorCode.BUSINESS_RULE_VIOLATION,
+        `O laudo tem ${numbers.length} números; o limite é ${REPORT_MAX_NUMBERS}. Cole só a parte com os resultados.`,
+      );
+    }
+    const facts: ReportFacts = {
+      numbers: numbers.map((n, i) => ({
+        code: n.code,
+        raw: n.raw,
+        before: text.slice(Math.max(numbers[i - 1]?.end ?? 0, n.start - 60), n.start),
+      })),
+    };
+    const fields = { facts: JSON.stringify(facts) };
+    const request: ModelRequest = {
+      feature: 'report_reading',
+      system: CLINICAL_GUARD,
+      prompt:
+        'Os números do laudo vêm numerados (N1, N2...) com o texto que vem antes de cada um. ' +
+        'Diga qual número corresponde a cada campo da ficha e responda só com JSON no formato ' +
+        '{"values": [{"field": "echo.lvef", "ref": "N3"}]}. Campos possíveis: ' +
+        `${Object.keys(REPORT_FIELD_INFO).join(', ')}. Cada campo no máximo uma vez; deixe de ` +
+        `fora o que não tiver certeza.\n${block(fields)}`,
+      fields,
+    };
+    const out = reportReadingOutputSchema.safeParse(parseJson(await this.model.complete(request)));
+    if (!out.success) throw invalidOutput();
+
+    // Conferência: código que existe e cada campo uma vez só; o valor é sempre o do laudo.
+    const byCode = new Map(numbers.map((n) => [n.code, n]));
+    const seen = new Set<ReportField>();
+    const suggestions: ReportSuggestionDto[] = [];
+    const outOfRange: ReportSuggestionDto[] = [];
+    for (const { field, ref } of out.data.values) {
+      const n = byCode.get(ref);
+      if (!n || seen.has(field)) throw invalidOutput();
+      seen.add(field);
+      const item = {
+        field,
+        ...REPORT_FIELD_INFO[field],
+        value: n.value,
+        raw: n.raw,
+        excerpt: reportExcerpt(text, n),
+      };
+      (fitsReportField(field, n.value) ? suggestions : outOfRange).push(item);
+    }
+    // Dado clínico: o histórico guarda só contagens, nunca o laudo nem os valores.
+    const row = await this.ai.log(ctx, request, 'report_reading', '', {
+      patientId,
+      numbers: numbers.length,
+      suggested: suggestions.length,
+      outOfRange: outOfRange.length,
+    });
+    return {
+      requestId: row.id,
+      suggestions,
+      outOfRange,
+      model: this.ai.modelInfo(row),
+      notice: AI_REPORT_NOTICE,
     };
   }
 

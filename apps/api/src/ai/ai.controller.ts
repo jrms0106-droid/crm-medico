@@ -21,6 +21,7 @@ import {
   ErrorCode,
   type MessageDraftDto,
   type RecordDraftSuggestionDto,
+  type ReportReadingSuggestionDto,
   type RecordSummarySuggestionDto,
   type RequestTriageDto,
   type ScheduleSuggestionsDto,
@@ -29,6 +30,7 @@ import {
   aiFeatureToggleSchema,
   messageDraftSchema,
   recordDraftSuggestionSchema,
+  reportReadingSchema,
   recordSummarySuggestionSchema,
   requestTriageSchema,
   scheduleSuggestionsSchema,
@@ -198,6 +200,28 @@ export class AiController {
       await this.care.accessContext(ctx.user.organizationId, ctx.user.id, input.patientId),
     );
     return this.clinical.recordDraft(ctx, input.patientId, input.notes);
+  }
+
+  /**
+   * Leitura de laudo: mesma regra de organizar anotações (só o médico que pode criar registro
+   * para o paciente), porque os valores vão para um rascunho.
+   */
+  @Post('clinical/report-reading')
+  @HttpCode(200)
+  async reportReading(
+    @Auth() ctx: AuthContext,
+    @Body() body: unknown,
+  ): Promise<ReportReadingSuggestionDto> {
+    await this.authz.authorize(ctx, 'create', { type: 'ai_clinical', id: 'report_reading' });
+    const input = parseBody(reportReadingSchema, body);
+    await this.requirePatient(ctx, 'create', input.patientId);
+    await this.authz.authorize(
+      ctx,
+      'create',
+      { type: 'clinical_record', patientId: input.patientId },
+      await this.care.accessContext(ctx.user.organizationId, ctx.user.id, input.patientId),
+    );
+    return this.clinical.reportReading(ctx, input.patientId, input.text);
   }
 
   /**

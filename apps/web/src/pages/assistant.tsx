@@ -302,6 +302,7 @@ const FEATURE_SHORT: Record<AiFeature, string> = {
   admin_report: 'Relatório',
   record_draft: 'Anotações (prontuário)',
   record_summary: 'Resumo (prontuário)',
+  report_reading: 'Laudo (ficha)',
 };
 
 function HistoryTable({ rows, showOutput }: { rows: AiRequestDto[]; showOutput: boolean }) {

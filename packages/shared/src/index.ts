@@ -17,3 +17,4 @@ export * from './privacy.js';
 export * from './crm.js';
 export * from './imports.js';
 export * from './ai.js';
+export * from './report-reading.js';

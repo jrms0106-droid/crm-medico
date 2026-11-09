@@ -45,6 +45,15 @@ function NumberField({
 }) {
   const [text, setText] = useState(value === undefined ? '' : String(value).replace('.', ','));
   const errorId = useId();
+  // Valor que mudou por fora (por exemplo, colocado pela leitura de laudo): a tela acompanha.
+  // Ajuste durante a renderização, como a documentação do React recomenda, sem efeito.
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    if (parseNumberInput(text) !== value) {
+      setText(value === undefined ? '' : String(value).replace('.', ','));
+    }
+  }
   const invalid = text.trim() !== '' && parseNumberInput(text) === undefined;
   return (
     <label className="field">

@@ -591,6 +591,9 @@ test.describe.serial('fluxos por perfil', () => {
     const summarySwitch = ai.getByRole('listitem').filter({ hasText: 'Resumo do prontuário' });
     await summarySwitch.getByRole('button', { name: 'Ligar' }).click();
     await expect(summarySwitch).toContainText('Ligado');
+    const reportSwitch = ai.getByRole('listitem').filter({ hasText: 'Ler laudo' });
+    await reportSwitch.getByRole('button', { name: 'Ligar' }).click();
+    await expect(reportSwitch).toContainText('Ligado');
     await logout(page);
 
     // Nova consulta da mesma paciente, para o médico ter um atendimento iniciado.
@@ -682,6 +685,28 @@ test.describe.serial('fluxos por perfil', () => {
     await ficha.getByLabel('FEVE (%)').fill('58');
     await expect(ficha.getByText('Não é um número; este campo não será salvo.')).toHaveCount(0);
     await ficha.getByLabel('LDL (mg/dL)').fill('132');
+    // Leitura de laudo (ADR 0042): números do laudo, com o trecho, entram só depois de marcados;
+    // o que não cabe no campo aparece à parte e não substitui o valor digitado.
+    await page.getByRole('button', { name: 'Ler laudo e sugerir valores' }).click();
+    await page
+      .getByLabel('Texto do laudo (ecocardiograma ou exames)')
+      .fill('Laboratório (fictício): glicemia 98 mg/dL; creatinina 0,9 mg/dL. FEVE 580%.');
+    await page.getByRole('button', { name: 'Sugerir valores' }).click();
+    const reading = page.getByLabel('Valores sugeridos do laudo');
+    await expect(reading.getByText(/não interpreta o laudo/)).toBeVisible();
+    await expect(reading.getByRole('row', { name: /Creatinina/ })).toContainText('0,9 mg/dL');
+    await expect(reading.getByText(/FEVE: 580 %/)).toBeVisible();
+    const axeReading = await new AxeBuilder({ page })
+      .include('[aria-label="Valores sugeridos do laudo"]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(axeReading.violations.map((v) => v.id)).toEqual([]);
+    await snap(page, '19b-leitura-de-laudo');
+    await reading.getByRole('button', { name: 'Usar os valores marcados' }).click();
+    await expect(page.getByText(/2 valor\(es\) colocado/)).toBeVisible();
+    await expect(ficha.getByLabel('Creatinina (mg/dL)')).toHaveValue('0,9');
+    await expect(ficha.getByLabel('Glicemia de jejum (mg/dL)')).toHaveValue('98');
+    await expect(ficha.getByLabel('FEVE (%)')).toHaveValue('58');
     const axe = await new AxeBuilder({ page })
       .include('[aria-label="Ficha de cardiologia"]')
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

@@ -34,6 +34,7 @@ transferência internacional, uso para treinamento e enquadramento regulatório.
 | ------------------------------- | ---------------- | -------- | -------------------------------------------------------------------------------------- |
 | Organizar anotações no registro | `record_draft`   | médico   | distribui as frases das anotações do médico entre motivo, anamnese, exame e conduta    |
 | Resumo do prontuário com fontes | `record_summary` | médico   | escolhe os trechos principais dos registros assinados, cada um com data, autor e fonte |
+| Ler laudo e sugerir valores     | `report_reading` | médico   | aponta números do laudo colado para campos da ficha de cardiologia (ADR 0042)          |
 
 Cada uma tem um interruptor próprio, **desligado por padrão**, que só o administrador liga ou
 desliga (com senha e código), como no nível 1.
@@ -72,6 +73,25 @@ Entrada: o paciente.
    autor do registro de onde veio, e um botão para abrir esse registro.
 
 O resumo não é um registro: ele não é guardado e não entra no prontuário.
+
+### Ler laudo e sugerir valores
+
+Rota `POST /ai/clinical/report-reading`, com `patientId` e `text` (até 8.000 caracteres). Mesmas
+permissões de organizar anotações. Detalhes no [ADR 0042](../adr/0042-ia-le-laudo-e-aponta-numeros.md).
+
+1. O sistema acha os números do texto (até 200) e numera cada um `N1`, `N2`…, com o trecho que
+   vem antes.
+2. O modelo devolve só pares campo e código (`{"values": [{"field": "echo.lvef", "ref": "N3"}]}`).
+   Campos possíveis: FEVE, DDVE, volume indexado do AE e PSAP do ecocardiograma; colesterol total,
+   LDL, HDL, triglicerídeos, glicemia de jejum, hemoglobina glicada, creatinina, potássio e
+   NT-proBNP dos exames.
+3. O sistema confere os códigos (inexistente ou campo repetido: 502) e passa cada valor pela faixa
+   da ficha. A resposta traz `suggestions` (campo, valor como está no laudo, trecho) e
+   `outOfRange` (o que não cabe no campo; não é sugerido).
+4. Na tela, o médico marca o que quer usar; os valores vão para a ficha aberta, e só entram no
+   prontuário quando ele salva e assina.
+
+O histórico guarda só as contagens (números achados, sugeridos e fora da faixa).
 
 ## Permissões
 
