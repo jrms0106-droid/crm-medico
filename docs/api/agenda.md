@@ -42,6 +42,16 @@ O motivo clínico da consulta **não** fica na agenda. O campo `notes` serve só
 6. O mesmo paciente não pode ter duas consultas ativas sobrepostas, em qualquer agenda (409 `PATIENT_DOUBLE_BOOKED`).
 7. O retorno precisa apontar uma consulta anterior do mesmo paciente.
 
+## Teleconsulta
+
+Veja o [ADR 0043](../adr/0043-teleconsulta-com-sala-simulada.md).
+
+- A consulta tem `modality`: `in_person` (padrão) ou `telemedicine`. Ao marcar uma teleconsulta, o sistema pede uma sala de vídeo ao adaptador e grava o endereço em `meetingUrl`. **Hoje o único adaptador é o simulado**: o endereço fica em `meet.simulado.invalid` e não abre vídeo nenhum. O fornecedor recebe só o código da consulta e os horários, nunca o nome do paciente.
+- Antes do atendimento, a secretária lê o termo ao paciente e registra o consentimento (`POST /appointments/:id/tele-consent`). Fica gravado quem registrou, quando e a versão do termo, com o evento `tele_consent` no histórico. O texto do termo está em `TELE_CONSENT_TERM` e ainda é provisório ([a conferir](../revisao/a-conferir.md)).
+- O médico só inicia o atendimento de uma teleconsulta com o consentimento registrado (422).
+- O reagendamento mantém a modalidade e o consentimento, e cria sala nova.
+- O banco recusa sala ou consentimento em consulta presencial.
+
 ## Disponibilidade
 
 `GET /schedules/:id/availability?date=AAAA-MM-DD` devolve os horários livres do dia na duração padrão. São as faixas de atendimento menos os bloqueios, as consultas ativas que não são encaixe e os horários que já passaram.
@@ -60,27 +70,28 @@ Toda decisão é auditada, com a unidade e, quando houver, o paciente.
 
 ## Endpoints (`/api/v1`, sessão `active`)
 
-| Método e rota                                | Permissão            | Corpo / parâmetros                                                                                    | Resposta                                                           |
-| -------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `GET /units/:unitId/schedules`               | `schedule` view      | —                                                                                                     | 200 `Schedule[]`                                                   |
-| `POST /units/:unitId/schedules`              | `schedule` create    | `{ professionalId, slotMinutes? }`                                                                    | 201 `Schedule`; 409 se já existe; 422 profissional fora da unidade |
-| `PATCH /schedules/:id`                       | `schedule` edit      | `{ slotMinutes?, active? }`                                                                           | 200 `Schedule`                                                     |
-| `PUT /schedules/:id/rules`                   | `schedule` edit      | `[{ weekday (0=domingo), start "HH:MM", end "HH:MM" }]`                                               | 200 `Schedule`                                                     |
-| `POST /schedules/:id/blocks`                 | `schedule` edit      | `{ startsAt, endsAt, reason }`                                                                        | 201 `Block`; 409 `BLOCK_HAS_APPOINTMENTS`                          |
-| `POST /schedules/:id/blocks/:blockId/remove` | `schedule` edit      | —                                                                                                     | 204                                                                |
-| `GET /schedules/:id/availability`            | `schedule` view      | `date`                                                                                                | 200 `{ startsAt, endsAt }[]`                                       |
-| `GET /schedules/:id/appointments`            | `appointment` view   | `from`, `to` (até 31 dias)                                                                            | 200 `Appointment[]`                                                |
-| `POST /appointments`                         | `appointment` create | `{ scheduleId, patientId, startsAt, durationMinutes?, kind?, returnOfId?, notes?, waitlistEntryId? }` | 201 `Appointment`                                                  |
-| `GET /appointments/:id`                      | `appointment` view   | —                                                                                                     | 200 `Appointment`                                                  |
-| `GET /appointments/:id/history`              | `appointment` view   | —                                                                                                     | 200 `AppointmentEvent[]`                                           |
-| `POST /appointments/:id/confirm`             | `appointment` edit   | —                                                                                                     | 200                                                                |
-| `POST /appointments/:id/check-in`            | `appointment` edit   | —                                                                                                     | 200                                                                |
-| `POST /appointments/:id/no-show`             | `appointment` edit   | —                                                                                                     | 200                                                                |
-| `POST /appointments/:id/cancel`              | `appointment` edit   | `{ reason, requestedBy }`                                                                             | 200                                                                |
-| `POST /appointments/:id/reschedule`          | `appointment` edit   | `{ startsAt, scheduleId?, durationMinutes? }`                                                         | 201 nova `Appointment`                                             |
-| `GET /units/:unitId/waitlist`                | `appointment` view   | —                                                                                                     | 200 `WaitlistEntry[]` (só as que aguardam)                         |
-| `POST /units/:unitId/waitlist`               | `appointment` create | `{ patientId, professionalId?, preference? }`                                                         | 201                                                                |
-| `POST /waitlist/:id/remove`                  | `appointment` edit   | `{ reason }`                                                                                          | 204                                                                |
+| Método e rota                                | Permissão            | Corpo / parâmetros                                                                                               | Resposta                                                           |
+| -------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `GET /units/:unitId/schedules`               | `schedule` view      | —                                                                                                                | 200 `Schedule[]`                                                   |
+| `POST /units/:unitId/schedules`              | `schedule` create    | `{ professionalId, slotMinutes? }`                                                                               | 201 `Schedule`; 409 se já existe; 422 profissional fora da unidade |
+| `PATCH /schedules/:id`                       | `schedule` edit      | `{ slotMinutes?, active? }`                                                                                      | 200 `Schedule`                                                     |
+| `PUT /schedules/:id/rules`                   | `schedule` edit      | `[{ weekday (0=domingo), start "HH:MM", end "HH:MM" }]`                                                          | 200 `Schedule`                                                     |
+| `POST /schedules/:id/blocks`                 | `schedule` edit      | `{ startsAt, endsAt, reason }`                                                                                   | 201 `Block`; 409 `BLOCK_HAS_APPOINTMENTS`                          |
+| `POST /schedules/:id/blocks/:blockId/remove` | `schedule` edit      | —                                                                                                                | 204                                                                |
+| `GET /schedules/:id/availability`            | `schedule` view      | `date`                                                                                                           | 200 `{ startsAt, endsAt }[]`                                       |
+| `GET /schedules/:id/appointments`            | `appointment` view   | `from`, `to` (até 31 dias)                                                                                       | 200 `Appointment[]`                                                |
+| `POST /appointments`                         | `appointment` create | `{ scheduleId, patientId, startsAt, durationMinutes?, kind?, modality?, returnOfId?, notes?, waitlistEntryId? }` | 201 `Appointment`                                                  |
+| `GET /appointments/:id`                      | `appointment` view   | —                                                                                                                | 200 `Appointment`                                                  |
+| `GET /appointments/:id/history`              | `appointment` view   | —                                                                                                                | 200 `AppointmentEvent[]`                                           |
+| `POST /appointments/:id/confirm`             | `appointment` edit   | —                                                                                                                | 200                                                                |
+| `POST /appointments/:id/check-in`            | `appointment` edit   | —                                                                                                                | 200                                                                |
+| `POST /appointments/:id/no-show`             | `appointment` edit   | —                                                                                                                | 200                                                                |
+| `POST /appointments/:id/cancel`              | `appointment` edit   | `{ reason, requestedBy }`                                                                                        | 200                                                                |
+| `POST /appointments/:id/reschedule`          | `appointment` edit   | `{ startsAt, scheduleId?, durationMinutes? }`                                                                    | 201 nova `Appointment`                                             |
+| `POST /appointments/:id/tele-consent`        | `appointment` edit   | `{ version: "teleconsulta-v1", patientAgreed: true }`                                                            | 200; 409 se já registrado ou consulta inativa; 422 se presencial   |
+| `GET /units/:unitId/waitlist`                | `appointment` view   | —                                                                                                                | 200 `WaitlistEntry[]` (só as que aguardam)                         |
+| `POST /units/:unitId/waitlist`               | `appointment` create | `{ patientId, professionalId?, preference? }`                                                                    | 201                                                                |
+| `POST /waitlist/:id/remove`                  | `appointment` edit   | `{ reason }`                                                                                                     | 204                                                                |
 
 - Horários de entrada e saída em ISO 8601 com fuso (`2026-03-10T09:00:00-03:00`); as respostas vêm em UTC.
 - Transição de estado inválida devolve 409 `INVALID_STATE_TRANSITION`.

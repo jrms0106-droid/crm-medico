@@ -137,6 +137,66 @@ test.describe.serial('fluxos por perfil', () => {
     await snap(page, '1-agenda-secretaria');
   });
 
+  test('teleconsulta: sala simulada, consentimento antes do atendimento', async ({ page }) => {
+    const TELE_PATIENT = `Teresa Teleconsulta Fictícia ${Date.now()}`;
+    await login(page, 'secretary');
+    await menu(page).getByRole('link', { name: 'Pacientes', exact: true }).click();
+    await page.getByRole('button', { name: 'Novo paciente' }).click();
+    await page.getByLabel('Nome completo').fill(TELE_PATIENT);
+    await page.getByLabel('Data de nascimento').fill('1979-09-03');
+    await page.getByLabel('Telefone com DDD').fill('11987650011');
+    await page.getByRole('button', { name: 'Cadastrar' }).click();
+    await expect(page.getByRole('heading', { name: TELE_PATIENT })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Agendar consulta' }).click();
+    await page.locator('.slot').first().click();
+    await page.getByLabel('Modalidade').selectOption('telemedicine');
+    await expect(page.getByText(/sala de vídeo é criada ao marcar/)).toBeVisible();
+    await page.getByRole('button', { name: 'Agendar' }).click();
+    await expect(page.getByRole('status')).toContainText('Teleconsulta marcada');
+
+    const row = page.getByRole('row', { name: new RegExp(TELE_PATIENT) });
+    await expect(row).toContainText('Teleconsulta');
+    await expect(row).toContainText('sem consentimento');
+    await expect(row.getByRole('link', { name: 'Abrir sala de vídeo (simulada)' })).toHaveAttribute(
+      'href',
+      /^https:\/\/meet\.simulado\.invalid\//,
+    );
+    await row.getByRole('button', { name: 'Registrar chegada' }).click();
+    await expect(row).toContainText('Paciente chegou');
+    await logout(page);
+
+    // Sem consentimento, o médico não consegue iniciar.
+    await login(page, 'doctor');
+    await menu(page).getByRole('link', { name: 'Agenda' }).click();
+    const doctorRow = page.getByRole('row', { name: new RegExp(TELE_PATIENT) });
+    await expect(doctorRow.getByRole('button', { name: 'Iniciar atendimento' })).toBeDisabled();
+    await logout(page);
+
+    await login(page, 'secretary');
+    await menu(page).getByRole('link', { name: 'Agenda' }).click();
+    const secretaryRow = page.getByRole('row', { name: new RegExp(TELE_PATIENT) });
+    await secretaryRow.getByRole('button', { name: 'Registrar consentimento' }).click();
+    const form = page.getByRole('form', { name: 'Consentimento para teleconsulta' });
+    await expect(form).toContainText('consulta será feita a distância');
+    const submit = form.getByRole('button', { name: 'Registrar consentimento' });
+    await expect(submit).toBeDisabled();
+    await form.getByLabel(/ouviu o termo e concordou/).check();
+    await snap(page, '25-teleconsulta-consentimento');
+    await submit.click();
+    await expect(form).toHaveCount(0);
+    await expect(secretaryRow).not.toContainText('sem consentimento');
+    await logout(page);
+
+    await login(page, 'doctor');
+    await menu(page).getByRole('link', { name: 'Agenda' }).click();
+    await expect(
+      page
+        .getByRole('row', { name: new RegExp(TELE_PATIENT) })
+        .getByRole('button', { name: 'Iniciar atendimento' }),
+    ).toBeEnabled();
+  });
+
   test('médico atende, registra e assina o prontuário e uma receita', async ({ page }) => {
     await login(page, 'doctor');
     await menu(page).getByRole('link', { name: 'Agenda' }).click();

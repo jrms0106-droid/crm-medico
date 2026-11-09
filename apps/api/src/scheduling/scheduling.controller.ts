@@ -26,6 +26,7 @@ import {
   scheduleCreateSchema,
   scheduleRulesSchema,
   scheduleUpdateSchema,
+  teleConsentSchema,
   waitlistCreateSchema,
   waitlistRemoveSchema,
 } from '@crm/shared';
@@ -286,6 +287,18 @@ export class AppointmentsController {
   ): Promise<AppointmentDto> {
     const { row } = await this.load(ctx, 'edit', id);
     return this.scheduling.cancel(row, ctx.user.id, parseBody(appointmentCancelSchema, body));
+  }
+
+  @Post(':id/tele-consent')
+  @HttpCode(200)
+  async teleConsent(
+    @Auth() ctx: AuthContext,
+    @Param('id', uuid) id: string,
+    @Body() body: unknown,
+  ): Promise<AppointmentDto> {
+    const { row } = await this.load(ctx, 'edit', id);
+    parseBody(teleConsentSchema, body);
+    return this.scheduling.recordTeleConsent(row, ctx.user.id);
   }
 
   @Post(':id/reschedule')

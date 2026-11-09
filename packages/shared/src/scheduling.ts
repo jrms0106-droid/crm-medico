@@ -3,6 +3,28 @@ import { z } from 'zod';
 export const APPOINTMENT_KINDS = ['regular', 'return', 'fit_in'] as const;
 export type AppointmentKind = (typeof APPOINTMENT_KINDS)[number];
 
+export const APPOINTMENT_MODALITIES = ['in_person', 'telemedicine'] as const;
+export type AppointmentModality = (typeof APPOINTMENT_MODALITIES)[number];
+
+export const APPOINTMENT_MODALITY_LABELS: Record<AppointmentModality, string> = {
+  in_person: 'Presencial',
+  telemedicine: 'Teleconsulta',
+};
+
+/**
+ * Versão e texto do termo de consentimento da teleconsulta (ADR 0043). Texto provisório, com
+ * base na Resolução CFM 2.314/2022; está em docs/revisao/a-conferir.md para revisão do médico
+ * responsável e de quem cuida da parte jurídica antes de qualquer uso real.
+ */
+export const TELE_CONSENT_VERSION = 'teleconsulta-v1';
+export const TELE_CONSENT_TERM = [
+  'Fui informado(a) de que esta consulta será feita a distância, por vídeo, e concordo com isso.',
+  'Sei que o médico pode concluir que preciso de uma consulta presencial e que, nesse caso, ela será marcada.',
+  'Sei que o atendimento será registrado no meu prontuário, como numa consulta presencial, e que os dados são protegidos pela LGPD.',
+  'Sei que não devo gravar a consulta sem a concordância do médico, e que o médico também não a grava sem a minha.',
+  'Posso desistir da teleconsulta a qualquer momento e pedir atendimento presencial.',
+] as const;
+
 export const APPOINTMENT_STATUSES = [
   'scheduled',
   'confirmed',
@@ -117,6 +139,7 @@ export const appointmentCreateSchema = z
     startsAt: instant,
     durationMinutes: duration.optional(),
     kind: z.enum(APPOINTMENT_KINDS).default('regular'),
+    modality: z.enum(APPOINTMENT_MODALITIES).default('in_person'),
     returnOfId: id.optional(),
     notes: shortText(1, 200).optional(),
     waitlistEntryId: id.optional(),
@@ -136,6 +159,12 @@ export const appointmentRescheduleSchema = z.strictObject({
   startsAt: instant,
   scheduleId: id.optional(),
   durationMinutes: duration.optional(),
+});
+
+/** A clínica confirma que leu o termo ao paciente e que ele concordou. */
+export const teleConsentSchema = z.strictObject({
+  version: z.literal(TELE_CONSENT_VERSION, 'Versão do termo desatualizada; recarregue a página.'),
+  patientAgreed: z.literal(true, 'Confirme que o paciente concordou com o termo.'),
 });
 
 export const appointmentRangeSchema = z
@@ -178,6 +207,10 @@ export interface AppointmentDto {
   startsAt: string;
   endsAt: string;
   kind: AppointmentKind;
+  modality: AppointmentModality;
+  /** Só na teleconsulta. */
+  meetingUrl: string | null;
+  teleConsent: { at: string; byUserId: string; version: string } | null;
   status: AppointmentStatus;
   notes: string | null;
   returnOfId: string | null;

@@ -148,6 +148,13 @@ export class CareService {
         'O atendimento só começa depois que a recepção marca a chegada do paciente.',
       );
     }
+    if (appointment.modality === 'telemedicine' && !appointment.teleConsentAt) {
+      throw new AppError(
+        422,
+        ErrorCode.BUSINESS_RULE_VIOLATION,
+        'A teleconsulta só começa depois de registrado o consentimento do paciente.',
+      );
+    }
     const existing = await this.prisma.encounter.count({
       where: { appointmentId: appointment.id },
     });

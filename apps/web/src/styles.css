@@ -684,3 +684,14 @@ main.content:focus {
     break-inside: avoid;
   }
 }
+
+.tele-consent {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 48rem;
+}
+
+.tele-consent ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
