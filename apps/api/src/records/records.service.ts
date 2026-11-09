@@ -455,12 +455,14 @@ export class RecordsService {
   }
 
   /** Fichas de cardiologia assinadas do paciente, antes do filtro da política (ADR 0038). */
+  /** As 500 fichas assinadas mais recentes, em ordem cronológica (as mais antigas saem primeiro). */
   async cardiologyCandidates(organizationId: string, patientId: string): Promise<ClinicalRecord[]> {
-    return this.prisma.clinicalRecord.findMany({
+    const rows = await this.prisma.clinicalRecord.findMany({
       where: { organizationId, patientId, status: 'signed', formVersion: CARDIOLOGY_FORM_VERSION },
-      orderBy: [{ clinicalDate: 'asc' }, { signedAt: 'asc' }],
+      orderBy: [{ clinicalDate: 'desc' }, { signedAt: 'desc' }],
       take: 500,
     });
+    return rows.reverse();
   }
 
   async trendRows(rows: ClinicalRecord[]): Promise<CardiologyTrendRowDto[]> {
