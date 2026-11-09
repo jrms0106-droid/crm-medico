@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { errorResponseSchema } from '@crm/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { PrescriptionProvider } from '../src/documents/prescription-provider.js';
 import {
   Client,
   type TestApp,
@@ -249,5 +250,122 @@ describe('registro de documento emitido no CFM', () => {
     expect((await t.db.externalDocument.findUniqueOrThrow({ where: { id } })).summary).toBe(
       RECEITA.summary,
     );
+  });
+});
+
+describe('receita pela Memed (simulada)', () => {
+  const MEMED = {
+    items: [
+      { medication: 'Paracetamol 750 mg (fictício)', instructions: '1 comprimido a cada 8 horas.' },
+      { medication: 'Dipirona 500 mg (fictício)', instructions: '1 comprimido se febre.' },
+    ],
+  };
+  const memedPath = (c: Clinic) => `${path(c)}/memed`;
+
+  it('médico em atendimento emite; o registro leva o aviso de simulada e o código SIMULADO', async () => {
+    const c = await setupClinic();
+    const encounterId = await startEncounter(c, 'doctor', '09:00');
+    const res = await c.as.doctor.post(memedPath(c), MEMED);
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      patientId: c.patientId,
+      author: { id: c.doctor.id },
+      encounterId,
+      platform: 'memed',
+      kind: 'prescription',
+      status: 'registered',
+      issuedOn: '2026-03-03',
+    });
+    expect(res.body.validationCode).toMatch(/^SIMULADO-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    expect(res.body.summary).toContain('Receita simulada, sem validade legal');
+    expect(res.body.summary).toContain(
+      '1. Paracetamol 750 mg (fictício): 1 comprimido a cada 8 horas.',
+    );
+    expect(res.body.summary).toContain('2. Dipirona 500 mg (fictício)');
+    const list = await c.as.doctor.get(path(c));
+    expect(list.body.map((d: { platform: string }) => d.platform)).toEqual(['memed']);
+  });
+
+  it('o adaptador recebe só prescritor, nome, nascimento e itens', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const calls: unknown[] = [];
+    const original = t.app.get(PrescriptionProvider);
+    const spy = original.issue.bind(original);
+    original.issue = (request) => {
+      calls.push(request);
+      return spy(request);
+    };
+    try {
+      expect((await c.as.doctor.post(memedPath(c), MEMED)).status).toBe(201);
+    } finally {
+      original.issue = spy;
+    }
+    expect(calls).toHaveLength(1);
+    const request = calls[0] as Record<string, Record<string, unknown>>;
+    expect(Object.keys(request).sort()).toEqual(['items', 'patient', 'prescriber']);
+    expect(Object.keys(request.patient ?? {}).sort()).toEqual(['birthDate', 'fullName']);
+    expect(request.prescriber?.crm).toBe('CRM/SP 111111');
+  });
+
+  it('recusa lista vazia, mais de 10 itens, item curto, campo a mais e registro profissional inativo', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const bad = [
+      { items: [] },
+      { items: Array.from({ length: 11 }, () => MEMED.items[0]) },
+      { items: [{ medication: 'Ab', instructions: '1 por dia' }] },
+      { items: [MEMED.items[0]], kind: 'controlled_prescription' },
+      { items: [{ ...MEMED.items[0], extra: 1 }] },
+    ];
+    for (const body of bad) expect((await c.as.doctor.post(memedPath(c), body)).status).toBe(400);
+    expect(await t.db.externalDocument.count()).toBe(0);
+    await t.db.professional.updateMany({ data: { active: false } });
+    expect((await c.as.doctor.post(memedPath(c), MEMED)).status).toBe(422);
+  });
+
+  it('secretária, administrador e médico sem vínculo são barrados; outra organização dá 404', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    for (const who of ['secretary', 'admin', 'otherDoctor'] as const) {
+      expect((await c.as[who].post(memedPath(c), MEMED)).status, who).toBe(403);
+    }
+    const other = await setupClinic();
+    expect((await other.as.doctor.post(memedPath(c), MEMED)).status).toBe(404);
+    expect(await t.db.externalDocument.count()).toBe(0);
+    const denied = await t.db.auditEvent.count({
+      where: { resourceType: 'medical_document', outcome: 'denied' },
+    });
+    expect(denied).toBeGreaterThanOrEqual(3);
+  });
+
+  it('falha do fornecedor não grava nada; o banco só aceita cfm e memed', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const original = t.app.get(PrescriptionProvider);
+    const spy = original.issue.bind(original);
+    original.issue = () => Promise.reject(new Error('fornecedor fora do ar'));
+    try {
+      expect((await c.as.doctor.post(memedPath(c), MEMED)).status).toBe(500);
+    } finally {
+      original.issue = spy;
+    }
+    expect(await t.db.externalDocument.count()).toBe(0);
+    const created = await c.as.doctor.post(memedPath(c), MEMED);
+    expect(created.status).toBe(201);
+    const row = await t.db.externalDocument.findUniqueOrThrow({ where: { id: created.body.id } });
+    await expect(
+      t.db.externalDocument.create({
+        data: {
+          organizationId: row.organizationId,
+          patientId: row.patientId,
+          authorUserId: row.authorUserId,
+          kind: row.kind,
+          issuedOn: row.issuedOn,
+          summary: row.summary,
+          platform: 'outra',
+        },
+      }),
+    ).rejects.toThrow(/external_documents_platform_known/);
   });
 });

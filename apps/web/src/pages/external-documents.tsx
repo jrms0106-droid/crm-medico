@@ -4,7 +4,9 @@ import {
   EXTERNAL_DOCUMENT_KINDS,
   EXTERNAL_DOCUMENT_MIN_DATE,
   EXTERNAL_DOCUMENT_STATUS_LABELS,
+  EXTERNAL_PLATFORM_LABELS,
   type ExternalDocumentDto,
+  SIMULATED_PRESCRIPTION_NOTICE,
   type SessionInfo,
 } from '@crm/shared';
 import { api } from '../api';
@@ -29,6 +31,7 @@ export function ExternalDocumentsPanel({
   const path = `/patients/${patientId}/external-documents`;
   const list = useLoad(() => api.get<ExternalDocumentDto[]>(path), [path]);
   const [adding, setAdding] = useState(false);
+  const [memedRows, setMemedRows] = useState(0);
   const [cancelling, setCancelling] = useState<string | null>(null);
 
   const create = useSubmit(async (data) => {
@@ -39,6 +42,17 @@ export function ExternalDocumentsPanel({
       validationCode: text(data, 'validationCode'),
     });
     setAdding(false);
+    list.reload();
+  });
+
+  const memed = useSubmit(async (data) => {
+    await api.post<ExternalDocumentDto>(`${path}/memed`, {
+      items: data.getAll('medication').map((medication, i) => ({
+        medication: String(medication),
+        instructions: String(data.getAll('instructions')[i] ?? ''),
+      })),
+    });
+    setMemedRows(0);
     list.reload();
   });
 
@@ -57,12 +71,51 @@ export function ExternalDocumentsPanel({
         </a>
         , que é gratuita. Aqui você só registra o que emitiu lá. O CRM não confere o código.
       </Notice>
-      {canCreate && !adding && (
+      {canCreate && !adding && memedRows === 0 && (
         <div className="actions">
+          <button type="button" onClick={() => setMemedRows(1)}>
+            Prescrever com Memed (simulado)
+          </button>
           <button type="button" className="secondary" onClick={() => setAdding(true)}>
             Registrar documento emitido no CFM
           </button>
         </div>
+      )}
+      {memedRows > 0 && (
+        <form aria-label="Prescrever com Memed (simulado)" onSubmit={memed.onSubmit}>
+          <Notice kind="warn">{SIMULATED_PRESCRIPTION_NOTICE}</Notice>
+          {Array.from({ length: memedRows }, (_, i) => (
+            <fieldset key={i}>
+              <legend>Medicamento {i + 1}</legend>
+              <label className="field">
+                <span>Medicamento {i + 1}</span>
+                <input name="medication" required minLength={3} maxLength={200} />
+              </label>
+              <label className="field">
+                <span>Posologia {i + 1}</span>
+                <input name="instructions" required minLength={3} maxLength={300} />
+              </label>
+            </fieldset>
+          ))}
+          <Alert message={memed.error} />
+          <div className="actions">
+            {memedRows < 10 && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setMemedRows((n) => n + 1)}
+              >
+                Adicionar medicamento
+              </button>
+            )}
+            <button type="submit" disabled={memed.busy}>
+              {memed.busy ? 'Emitindo…' : 'Emitir receita simulada'}
+            </button>
+            <button type="button" className="secondary" onClick={() => setMemedRows(0)}>
+              Cancelar
+            </button>
+          </div>
+        </form>
       )}
       {adding && (
         <form aria-label="Registrar documento emitido no CFM" onSubmit={create.onSubmit}>
@@ -116,14 +169,19 @@ export function ExternalDocumentsPanel({
           <li key={d.id}>
             <div className="entry">
               <span>
-                {formatDate(d.issuedOn)} · {EXTERNAL_DOCUMENT_KIND_LABELS[d.kind]} · {d.author.name}
+                {formatDate(d.issuedOn)} · {EXTERNAL_DOCUMENT_KIND_LABELS[d.kind]} · {d.author.name}{' '}
+                · {EXTERNAL_PLATFORM_LABELS[d.platform]}
               </span>
               <Badge tone={d.status === 'registered' ? 'ok' : 'warn'}>
                 {EXTERNAL_DOCUMENT_STATUS_LABELS[d.status]}
               </Badge>
             </div>
-            <p className="small">{d.summary}</p>
-            {d.validationCode && <p className="small">Código no CFM: {d.validationCode}</p>}
+            <p className="small preline">{d.summary}</p>
+            {d.validationCode && (
+              <p className="small">
+                Código {d.platform === 'cfm' ? 'no CFM' : 'da receita simulada'}: {d.validationCode}
+              </p>
+            )}
             {d.cancelReason && <p className="small">Motivo do cancelamento: {d.cancelReason}</p>}
             {d.status === 'registered' &&
               d.author.id === session.user.id &&
@@ -135,8 +193,8 @@ export function ExternalDocumentsPanel({
             {cancelling === d.id && (
               <form aria-label="Cancelar registro" onSubmit={cancel.onSubmit}>
                 <p className="small">
-                  Isto cancela só o registro no CRM. Para cancelar o documento, use a plataforma do
-                  CFM.
+                  Isto cancela só o registro no CRM. Para cancelar um documento do CFM, use a
+                  plataforma do CFM.
                 </p>
                 <label className="field">
                   <span>Motivo (mínimo 10 caracteres)</span>

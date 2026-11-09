@@ -50,13 +50,18 @@ assistencial ([documentos.md](documentos.md), "Quem pode o quê"):
 
 ## Endpoints (`/api/v1`, sessão `active`)
 
-| Método e rota                           | O que faz                                                       |
-| --------------------------------------- | --------------------------------------------------------------- |
-| `POST /patients/:id/external-documents` | registra `{ kind, issuedOn, summary, validationCode? }` (201)   |
-| `GET /patients/:id/external-documents`  | lista os registros visíveis, do mais recente para o mais antigo |
-| `POST /external-documents/:id/cancel`   | cancela o registro `{ reason }`                                 |
+| Método e rota                                 | O que faz                                                                                                                                  |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /patients/:id/external-documents`       | registra `{ kind, issuedOn, summary, validationCode? }` (201)                                                                              |
+| `GET /patients/:id/external-documents`        | lista os registros visíveis, do mais recente para o mais antigo                                                                            |
+| `POST /patients/:id/external-documents/memed` | emite receita simples **simulada** `{ items: [{ medication, instructions }] }`, de 1 a 10 itens, e a registra com `platform = memed` (201) |
+| `POST /external-documents/:id/cancel`         | cancela o registro `{ reason }`                                                                                                            |
 
 Toda rota tem teste de acesso permitido e negado (`apps/api/test/external-documents.test.ts`).
+
+## Receita pela Memed (simulada)
+
+Veja o [ADR 0045](../adr/0045-prescricao-memed-simulada.md). A rota `.../external-documents/memed` pede a receita ao adaptador de prescrição e registra o resultado com a plataforma `memed`. **Hoje o único adaptador é o simulado:** nada sai do sistema, o código é `SIMULADO-XXXX-XXXX` e o resumo começa com "Receita simulada, sem validade legal". Mesma permissão e mesmo vínculo do registro comum; secretária e administrador recebem 403. O adaptador recebe só prescritor, nome e nascimento do paciente e os itens. Se o adaptador falhar, nada é gravado.
 
 ## Limites conhecidos
 

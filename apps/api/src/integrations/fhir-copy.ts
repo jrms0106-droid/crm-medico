@@ -36,6 +36,8 @@ const RECORD_ID = 'urn:crm-medico:registro';
 const EXTERNAL_ID = 'urn:crm-medico:documento-externo';
 const CFM_CODE = 'urn:crm-medico:cfm:codigo-de-validacao';
 const CFM_PLATFORM = 'Plataforma de Prescrição Eletrônica do CFM';
+const MEMED_CODE = 'urn:crm-medico:memed-simulada:codigo';
+const MEMED_PLATFORM = 'Memed (simulada, sem validade legal)';
 const XHTML = 'http://www.w3.org/1999/xhtml';
 
 const RECORD_TYPE: Record<RecordKind, { code: string; display: string; title: string }> = {
@@ -289,19 +291,25 @@ function documentReference(d: DocumentDto, subject: Reference): DocumentReferenc
  */
 function externalDocumentReference(d: ExternalDocumentDto, subject: Reference): DocumentReference {
   const label = EXTERNAL_DOCUMENT_KIND_LABELS[d.kind];
+  const memed = d.platform === 'memed';
+  const platform = memed ? MEMED_PLATFORM : CFM_PLATFORM;
   const identifier: Identifier[] = [{ system: EXTERNAL_ID, value: d.id }];
-  if (d.validationCode) identifier.push({ system: CFM_CODE, value: d.validationCode });
+  if (d.validationCode) {
+    identifier.push({ system: memed ? MEMED_CODE : CFM_CODE, value: d.validationCode });
+  }
   return {
     resourceType: 'DocumentReference',
     identifier,
     status: 'current',
     docStatus: 'final',
     type: { text: label },
-    category: [{ text: `Emitido na ${CFM_PLATFORM}` }],
+    category: [{ text: `Emitido na ${platform}` }],
     subject,
     date: `${d.issuedOn}T00:00:00Z`,
     author: [ref(d.author.id, d.author.name)],
-    description: `${label} emitido na ${CFM_PLATFORM}. O documento assinado fica na plataforma.`,
+    description: memed
+      ? `${label} simulada pela ${platform}. Não existe documento assinado em nenhuma plataforma.`
+      : `${label} emitido na ${platform}. O documento assinado fica na plataforma.`,
     content: [
       {
         attachment: {

@@ -20,6 +20,19 @@ export const EXTERNAL_DOCUMENT_KIND_LABELS: Record<ExternalDocumentKind, string>
   other: 'Outro documento',
 };
 
+/** Onde o documento foi emitido. A Memed hoje é só simulada (ADR 0045). */
+export const EXTERNAL_PLATFORMS = ['cfm', 'memed'] as const;
+export type ExternalPlatform = (typeof EXTERNAL_PLATFORMS)[number];
+
+export const EXTERNAL_PLATFORM_LABELS: Record<ExternalPlatform, string> = {
+  cfm: 'CFM',
+  memed: 'Memed (simulada)',
+};
+
+/** Aviso que acompanha toda receita simulada, também gravado no resumo. */
+export const SIMULATED_PRESCRIPTION_NOTICE =
+  'Receita simulada, sem validade legal: nenhuma plataforma foi contratada.';
+
 export const EXTERNAL_DOCUMENT_STATUSES = ['registered', 'cancelled'] as const;
 export type ExternalDocumentStatus = (typeof EXTERNAL_DOCUMENT_STATUSES)[number];
 
@@ -53,6 +66,28 @@ export const externalDocumentCreateSchema = z.strictObject({
 });
 export type ExternalDocumentCreateInput = z.infer<typeof externalDocumentCreateSchema>;
 
+const prescriptionItem = z.strictObject({
+  medication: z
+    .string()
+    .trim()
+    .min(3, 'Informe o medicamento (ao menos 3 caracteres).')
+    .max(200, 'Máximo de 200 caracteres.'),
+  instructions: z
+    .string()
+    .trim()
+    .min(3, 'Informe a posologia (ao menos 3 caracteres).')
+    .max(300, 'Máximo de 300 caracteres.'),
+});
+
+/** Receita simples feita pelo adaptador de prescrição (hoje só o simulado). */
+export const memedPrescriptionSchema = z.strictObject({
+  items: z
+    .array(prescriptionItem)
+    .min(1, 'Informe ao menos um medicamento.')
+    .max(10, 'No máximo 10 medicamentos.'),
+});
+export type MemedPrescriptionInput = z.infer<typeof memedPrescriptionSchema>;
+
 export const externalDocumentCancelSchema = z.strictObject({
   reason: z
     .string()
@@ -66,7 +101,7 @@ export interface ExternalDocumentDto {
   patientId: string;
   author: { id: string; name: string };
   encounterId: string | null;
-  platform: 'cfm';
+  platform: ExternalPlatform;
   kind: ExternalDocumentKind;
   status: ExternalDocumentStatus;
   issuedOn: string;

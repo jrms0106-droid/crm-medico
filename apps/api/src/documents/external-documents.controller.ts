@@ -13,6 +13,7 @@ import {
   type ExternalDocumentDto,
   externalDocumentCancelSchema,
   externalDocumentCreateSchema,
+  memedPrescriptionSchema,
 } from '@crm/shared';
 import { AuthorizationService } from '../authz/authorization.service.js';
 import { parseBody } from '../common/validation.js';
@@ -52,6 +53,22 @@ export class ExternalDocumentsController {
       await this.context(ctx, patientId),
     );
     return this.external.create(ctx, patientId, parseBody(externalDocumentCreateSchema, body));
+  }
+
+  @Post('patients/:id/external-documents/memed')
+  async createMemed(
+    @Auth() ctx: AuthContext,
+    @Param('id', uuid) patientId: string,
+    @Body() body: unknown,
+  ): Promise<ExternalDocumentDto> {
+    await this.requirePatient(ctx, 'create', patientId);
+    await this.authz.authorize(
+      ctx,
+      'create',
+      { type: TYPE, patientId },
+      await this.context(ctx, patientId),
+    );
+    return this.external.createMemed(ctx, patientId, parseBody(memedPrescriptionSchema, body));
   }
 
   @Get('patients/:id/external-documents')
