@@ -17,4 +17,4 @@ Escopo: PRs #49 (ficha), #50 (evolução) e #51 (gráficos). Data: 2026-11-09. R
 
 ## Fica para a fila
 
-- Gráficos acessíveis por teclado (próximo item da fila automática).
+

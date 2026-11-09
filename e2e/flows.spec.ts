@@ -725,12 +725,38 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(page.getByText('Conteúdo íntegro.')).toBeVisible();
     await expect(trends.getByRole('row')).toHaveCount(3);
     await expect(
-      page.getByRole('img', { name: /^Pressão arterial em mmHg\. Sistólica: de 142 .* a 128 / }),
+      page.getByRole('group', { name: /^Pressão arterial em mmHg\. Sistólica: de 142 .* a 128 / }),
     ).toBeVisible();
     await expect(
-      page.getByRole('img', { name: /^LDL em mg\/dL\. LDL: de 132 .* a 96 / }),
+      page.getByRole('group', { name: /^LDL em mg\/dL\. LDL: de 132 .* a 96 / }),
     ).toBeVisible();
-    await expect(page.getByRole('img', { name: /^FEVE/ })).toHaveCount(0);
+    await expect(page.getByRole('group', { name: /^FEVE em/ })).toHaveCount(0);
+    // Teclado (ADR 0040): Tab entra no gráfico no valor mais recente; setas percorrem os pontos
+    // e trocam de série; a leitura (data, valor, autor) aparece sem mouse.
+    const pa = page.getByRole('group', { name: /^Pressão arterial em mmHg/ });
+    const ldlChart = page.getByRole('group', { name: /^LDL em mg\/dL/ });
+    await ldlChart.getByRole('img').last().focus();
+    await expect(ldlChart.getByRole('img').last()).toBeFocused();
+    await expect(ldlChart.getByRole('img').last()).toHaveAttribute(
+      'aria-label',
+      /^LDL, ponto 2 de 2: .*96 mg\/dL/,
+    );
+    await page.keyboard.press('ArrowLeft');
+    await expect(ldlChart.getByRole('img').first()).toBeFocused();
+    await expect(ldlChart.locator('xpath=following-sibling::p')).toContainText('132 mg/dL');
+    await page.keyboard.press('ArrowRight');
+    await expect(ldlChart.getByRole('img').last()).toBeFocused();
+    await pa.getByRole('img').first().focus();
+    await expect(pa.getByRole('img').first()).toHaveAttribute(
+      'aria-label',
+      /^Sistólica, ponto 1 de 2/,
+    );
+    await page.keyboard.press('ArrowDown');
+    await expect(pa.getByRole('img', { name: /^Diastólica, ponto 1 de 2/ })).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(pa.getByRole('img', { name: /^Diastólica, ponto 2 de 2/ })).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(pa.getByRole('img', { name: /^Sistólica, ponto 2 de 2/ })).toBeFocused();
     const axeCharts = await new AxeBuilder({ page })
       .include('.trend-charts')
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
