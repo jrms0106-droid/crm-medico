@@ -14,7 +14,7 @@ import {
   cardiologyFacts,
 } from '@crm/shared';
 import { api } from '../api';
-import { Alert, Panel, formatDate, useLoad } from '../ui';
+import { Alert, Panel, formatDate, formatDateTime, useLoad } from '../ui';
 import { TrendCharts } from './trend-chart';
 
 type Section = 'riskFactors' | 'history' | 'symptoms' | 'vitals' | 'ecg' | 'echo' | 'labs';
@@ -380,15 +380,38 @@ export function CardiologyView({ value }: { value: CardiologyContent | undefined
  * Evolução dos valores da ficha nas consultas assinadas (ADR 0038). Some quando o paciente não
  * tem ficha de cardiologia assinada; mostra só as colunas que têm algum valor.
  */
+/**
+ * Imprime só a evolução (ADR 0041): marca o corpo da página, abre a impressão do navegador e
+ * desmarca ao terminar. O que sai na folha é decidido pelo CSS de impressão.
+ */
+function usePrintTrends() {
+  const [printedAt, setPrintedAt] = useState<string | null>(null);
+  const print = () => {
+    setPrintedAt(formatDateTime(new Date().toISOString()));
+    document.body.classList.add('print-trend');
+    const done = () => document.body.classList.remove('print-trend');
+    window.addEventListener('afterprint', done, { once: true });
+    // Espera o React pintar o cabeçalho com a hora antes de abrir a impressão.
+    requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+  };
+  return { printedAt, print };
+}
+
 export function CardiologyTrendsPanel({
   patientId,
+  patient,
+  printedBy,
   refreshKey,
   onOpen,
 }: {
   patientId: string;
+  /** Nome exibido e nascimento, para o cabeçalho da impressão; sem eles, não há botão. */
+  patient: { displayName: string; birthDate: string } | undefined;
+  printedBy: string;
   refreshKey: unknown;
   onOpen: (recordId: string) => void;
 }) {
+  const { printedAt, print } = usePrintTrends();
   const trends = useLoad(
     () => api.get<CardiologyTrendsDto>(`/patients/${patientId}/cardiology-trends`),
     [patientId, refreshKey],
@@ -398,55 +421,75 @@ export function CardiologyTrendsPanel({
   if (!data || (data.rows.length === 0 && data.withheld === 0)) return null;
   const columns = TREND_COLUMNS.filter((col) => data.rows.some((r) => r.values[col.key]));
   return (
-    <Panel title="Evolução da cardiologia">
-      <p className="muted small">
-        Valores das fichas de cardiologia assinadas, da mais antiga para a mais recente. O sistema
-        não interpreta os valores.
-      </p>
-      {data.withheld > 0 && (
-        <p className="muted small">
-          {data.withheld} ficha(s) sensível(is) de outro profissional ficaram de fora.
-        </p>
-      )}
-      <TrendCharts rows={data.rows} />
-      {data.rows.length > 0 && (
-        <div className="table-scroll">
-          <table aria-label="Evolução dos valores da ficha de cardiologia">
-            <thead>
-              <tr>
-                <th scope="col">Data</th>
-                {columns.map((col) => (
-                  <th key={col.key} scope="col">
-                    {col.label}
-                    {col.unit && <span className="muted small"> ({col.unit})</span>}
-                  </th>
-                ))}
-                <th scope="col">Registro</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((row) => (
-                <tr key={row.recordId}>
-                  <th scope="row">{formatDate(row.clinicalDate)}</th>
-                  {columns.map((col) => (
-                    <td key={col.key}>{row.values[col.key] ?? '—'}</td>
-                  ))}
-                  <td>
-                    <button
-                      type="button"
-                      className="link"
-                      aria-label={`Abrir o registro de ${formatDate(row.clinicalDate)}, de ${row.author.name}`}
-                      onClick={() => onOpen(row.recordId)}
-                    >
-                      Abrir
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="print-area">
+      <Panel title="Evolução da cardiologia">
+        <div className="print-only" data-testid="print-header">
+          <p>
+            <strong>{patient?.displayName}</strong>
+            {patient && <> · nascimento {formatDate(patient.birthDate)}</>}
+          </p>
+          <p>
+            Impresso em {printedAt ?? ''} por {printedBy}
+          </p>
         </div>
-      )}
-    </Panel>
+        {patient && (
+          <p className="no-print">
+            <button type="button" onClick={print}>
+              Imprimir evolução
+            </button>
+          </p>
+        )}
+        <p className="muted small">
+          Valores das fichas de cardiologia assinadas, da mais antiga para a mais recente. O sistema
+          não interpreta os valores.
+        </p>
+        {data.withheld > 0 && (
+          <p className="muted small">
+            {data.withheld} ficha(s) sensível(is) de outro profissional ficaram de fora.
+          </p>
+        )}
+        <TrendCharts rows={data.rows} />
+        {data.rows.length > 0 && (
+          <div className="table-scroll">
+            <table aria-label="Evolução dos valores da ficha de cardiologia">
+              <thead>
+                <tr>
+                  <th scope="col">Data</th>
+                  {columns.map((col) => (
+                    <th key={col.key} scope="col">
+                      {col.label}
+                      {col.unit && <span className="muted small"> ({col.unit})</span>}
+                    </th>
+                  ))}
+                  <th scope="col" className="no-print">
+                    Registro
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((row) => (
+                  <tr key={row.recordId}>
+                    <th scope="row">{formatDate(row.clinicalDate)}</th>
+                    {columns.map((col) => (
+                      <td key={col.key}>{row.values[col.key] ?? '—'}</td>
+                    ))}
+                    <td className="no-print">
+                      <button
+                        type="button"
+                        className="link"
+                        aria-label={`Abrir o registro de ${formatDate(row.clinicalDate)}, de ${row.author.name}`}
+                        onClick={() => onOpen(row.recordId)}
+                      >
+                        Abrir
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+    </div>
   );
 }
