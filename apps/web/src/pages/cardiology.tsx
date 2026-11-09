@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import {
   CHEST_PAIN_LABELS,
+  parseNumberInput,
   type CardiologyContent,
   type CardiologyTrendsDto,
   TREND_COLUMNS,
@@ -43,6 +44,8 @@ function NumberField({
   decimal?: boolean;
 }) {
   const [text, setText] = useState(value === undefined ? '' : String(value).replace('.', ','));
+  const errorId = useId();
+  const invalid = text.trim() !== '' && parseNumberInput(text) === undefined;
   return (
     <label className="field">
       <span>
@@ -51,14 +54,20 @@ function NumberField({
       <input
         inputMode={decimal ? 'decimal' : 'numeric'}
         value={text}
+        aria-invalid={invalid || undefined}
+        aria-describedby={invalid ? errorId : undefined}
         onChange={(e) => {
-          const raw = e.target.value;
-          setText(raw);
-          const normalized = raw.trim().replace(',', '.');
-          if (normalized === '') onChange(undefined);
-          else if (/^\d+(\.\d*)?$/.test(normalized)) onChange(Number(normalized));
+          setText(e.target.value);
+          // Texto que não é número não guarda o valor anterior: o campo fica vazio na ficha
+          // e o aviso diz isso, para o que está salvo nunca diferir do que aparece.
+          onChange(parseNumberInput(e.target.value));
         }}
       />
+      {invalid && (
+        <span id={errorId} className="error small">
+          Não é um número; este campo não será salvo.
+        </span>
+      )}
     </label>
   );
 }

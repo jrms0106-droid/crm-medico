@@ -669,7 +669,12 @@ test.describe.serial('fluxos por perfil', () => {
     await ficha.getByLabel('Peso (kg)').fill('80,5');
     await ficha.getByLabel('Altura (cm)').fill('175');
     await expect(ficha.getByText('IMC calculado: 26,3 kg/m²')).toBeVisible();
+    // Texto que não é número avisa e não fica guardado (revisão dos PRs #49–#51).
+    await ficha.getByLabel('FEVE (%)').fill('5a');
+    await expect(ficha.getByText('Não é um número; este campo não será salvo.')).toBeVisible();
+    await expect(ficha.getByLabel('FEVE (%)')).toHaveAttribute('aria-invalid', 'true');
     await ficha.getByLabel('FEVE (%)').fill('58');
+    await expect(ficha.getByText('Não é um número; este campo não será salvo.')).toHaveCount(0);
     await ficha.getByLabel('LDL (mg/dL)').fill('132');
     const axe = await new AxeBuilder({ page })
       .include('[aria-label="Ficha de cardiologia"]')

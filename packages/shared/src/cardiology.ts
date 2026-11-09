@@ -318,3 +318,12 @@ export interface CardiologyTrendsDto {
   /** Fichas sensíveis de outros profissionais, que ficaram de fora. */
   withheld: number;
 }
+
+/**
+ * Lê o número digitado num campo da ficha: aceita vírgula ou ponto decimal (e o separador no
+ * fim, enquanto se digita). Qualquer outro texto vira undefined, para não guardar valor antigo.
+ */
+export function parseNumberInput(raw: string): number | undefined {
+  const normalized = raw.trim().replace(',', '.');
+  return /^\d+(\.\d*)?$/.test(normalized) ? Number(normalized) : undefined;
+}

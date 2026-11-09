@@ -4,6 +4,7 @@ import {
   cardiologyFacts,
   cardiologySchema,
   chartNumbers,
+  parseNumberInput,
   trendValues,
 } from './cardiology.js';
 import { hasContent, recordContentSchema, recordCreateSchema } from './records.js';
@@ -111,5 +112,16 @@ describe('ficha de cardiologia', () => {
       chartNumbers({ vitals: { systolicBp: 140, heartRate: 70 }, echo: { lvef: 55 } }),
     ).toEqual({ systolicBp: 140, lvef: 55 });
     expect(chartNumbers(undefined)).toEqual({});
+  });
+
+  it('lê o número digitado com vírgula ou ponto e recusa o resto', () => {
+    expect(parseNumberInput('80,5')).toBe(80.5);
+    expect(parseNumberInput(' 72 ')).toBe(72);
+    expect(parseNumberInput('1.25')).toBe(1.25);
+    expect(parseNumberInput('12,')).toBe(12);
+    expect(parseNumberInput('12a')).toBeUndefined();
+    expect(parseNumberInput('-5')).toBeUndefined();
+    expect(parseNumberInput('1.234,5')).toBeUndefined();
+    expect(parseNumberInput('')).toBeUndefined();
   });
 });
