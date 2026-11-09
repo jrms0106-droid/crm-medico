@@ -10,6 +10,7 @@ import {
   type RecordStatus,
   type RecordSummaryDto,
   type RecordVersionDto,
+  chartNumbers,
   hasContent,
   trendValues,
   type recordCorrectionSchema,
@@ -470,6 +471,7 @@ export class RecordsService {
         clinicalDate: dateOnly(r.clinicalDate),
         author: name(r.authorUserId),
         values: trendValues((r.content as RecordContent).cardiology),
+        numbers: chartNumbers((r.content as RecordContent).cardiology),
       }))
       .filter((row) => Object.keys(row.values).length > 0);
   }

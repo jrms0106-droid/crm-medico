@@ -705,6 +705,34 @@ test.describe.serial('fluxos por perfil', () => {
     expect(axeTrends.violations.map((v) => v.id)).toEqual([]);
     await snap(page, '20-evolucao-cardiologia');
 
+    // Gráficos (ADR 0039): com a segunda ficha assinada, PA e LDL ganham gráfico; FEVE, com um
+    // só valor, fica só na tabela.
+    await page.getByRole('button', { name: 'Nova ficha de cardiologia' }).click();
+    const ficha2 = page.getByRole('group', { name: 'Ficha de cardiologia' });
+    await ficha2.getByLabel('PA sistólica (mmHg)').fill('128');
+    await ficha2.getByLabel('PA diastólica (mmHg)').fill('80');
+    await ficha2.getByLabel('LDL (mg/dL)').fill('96');
+    await page.getByRole('button', { name: 'Finalizar' }).click();
+    await page.getByRole('button', { name: 'Assinar' }).click();
+    await page.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await page.getByLabel('Código de 6 dígitos').fill(await nextCode('doctor'));
+    await page.getByRole('button', { name: 'Confirmar e assinar' }).click();
+    await expect(page.getByText('Conteúdo íntegro.')).toBeVisible();
+    await expect(trends.getByRole('row')).toHaveCount(3);
+    await expect(
+      page.getByRole('img', { name: /^Pressão arterial em mmHg\. Sistólica: de 142 .* a 128 / }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('img', { name: /^LDL em mg\/dL\. LDL: de 132 .* a 96 / }),
+    ).toBeVisible();
+    await expect(page.getByRole('img', { name: /^FEVE/ })).toHaveCount(0);
+    const axeCharts = await new AxeBuilder({ page })
+      .include('.trend-charts')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(axeCharts.violations.map((v) => v.id)).toEqual([]);
+    await snap(page, '21-graficos-cardiologia');
+
     await page.getByRole('button', { name: 'Encerrar atendimento' }).click();
     await expect(page.getByText('Vínculo: Atendimento encerrado')).toBeVisible();
   });

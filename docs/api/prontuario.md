@@ -44,7 +44,7 @@ Ao criar o registro, o médico pode pedir `form: "cardiology"` ([ADR 0037](../ad
 
 ### Evolução dos valores
 
-`GET /patients/:id/cardiology-trends` ([ADR 0038](../adr/0038-evolucao-da-ficha-de-cardiologia.md)) devolve `{ rows, withheld }`. Cada linha é uma ficha de cardiologia **assinada**, da mais antiga para a mais recente, com `recordId`, `clinicalDate`, `author` e `values`: PA, FC, peso, IMC, NYHA, FEVE, LDL, HDL, TG, HbA1c, creatinina e NT-proBNP, em texto, só os preenchidos.
+`GET /patients/:id/cardiology-trends` ([ADR 0038](../adr/0038-evolucao-da-ficha-de-cardiologia.md)) devolve `{ rows, withheld }`. Cada linha é uma ficha de cardiologia **assinada**, da mais antiga para a mais recente, com `recordId`, `clinicalDate`, `author` e `values`: PA, FC, peso, IMC, NYHA, FEVE, LDL, HDL, TG, HbA1c, creatinina e NT-proBNP, em texto, só os preenchidos. `numbers` traz os números dos gráficos ([ADR 0039](../adr/0039-graficos-da-evolucao-da-cardiologia.md)): `systolicBp`, `diastolicBp`, `ldl` e `lvef`.
 
 - Mesmo acesso da linha do tempo: secretária e administrador recebem 403; médico sem vínculo vê só as próprias fichas; paciente inexistente é 404.
 - Ficha sensível de outro profissional fica de fora e é contada em `withheld`.

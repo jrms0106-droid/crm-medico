@@ -14,6 +14,7 @@ import {
 } from '@crm/shared';
 import { api } from '../api';
 import { Alert, Panel, formatDate, useLoad } from '../ui';
+import { TrendCharts } from './trend-chart';
 
 type Section = 'riskFactors' | 'history' | 'symptoms' | 'vitals' | 'ecg' | 'echo' | 'labs';
 type SectionValue<S extends Section> = NonNullable<CardiologyContent[S]>;
@@ -398,6 +399,7 @@ export function CardiologyTrendsPanel({
           {data.withheld} ficha(s) sensível(is) de outro profissional ficaram de fora.
         </p>
       )}
+      <TrendCharts rows={data.rows} />
       {data.rows.length > 0 && (
         <div className="table-scroll">
           <table aria-label="Evolução dos valores da ficha de cardiologia">

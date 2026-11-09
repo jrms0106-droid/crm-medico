@@ -507,3 +507,108 @@ main.content:focus {
 .table-scroll {
   overflow-x: auto;
 }
+
+/* Gráficos da evolução (ADR 0039): cores das séries validadas para daltonismo, nos dois temas. */
+.trend-charts {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .trend-charts {
+    --series-1: #3987e5;
+    --series-2: #d95926;
+  }
+}
+
+.trend-chart {
+  margin: 0;
+}
+
+.trend-chart figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+}
+
+.trend-chart svg {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  overflow: visible;
+}
+
+.trend-chart .grid-line line {
+  stroke: rgb(127 127 127 / 25%);
+  stroke-width: 1;
+}
+
+.trend-chart text {
+  fill: var(--muted);
+  font-size: 10px;
+}
+
+.trend-chart .direct-label {
+  fill: var(--text);
+}
+
+.trend-chart .line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.trend-chart .dot {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.trend-chart .hit {
+  fill: transparent;
+  cursor: crosshair;
+}
+
+.trend-chart .series-1 .line {
+  stroke: var(--series-1);
+}
+
+.trend-chart .series-1 .dot,
+.legend .series-1 {
+  fill: var(--series-1);
+  background: var(--series-1);
+}
+
+.trend-chart .series-2 .line {
+  stroke: var(--series-2);
+}
+
+.trend-chart .series-2 .dot,
+.legend .series-2 {
+  fill: var(--series-2);
+  background: var(--series-2);
+}
+
+.legend {
+  display: inline-flex;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.legend .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.chart-readout {
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--muted);
+}
