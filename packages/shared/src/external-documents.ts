@@ -79,13 +79,29 @@ const prescriptionItem = z.strictObject({
     .max(300, 'Máximo de 300 caracteres.'),
 });
 
-/** Receita simples feita pelo adaptador de prescrição (hoje só o simulado). */
-export const memedPrescriptionSchema = z.strictObject({
-  items: z
-    .array(prescriptionItem)
-    .min(1, 'Informe ao menos um medicamento.')
-    .max(10, 'No máximo 10 medicamentos.'),
-});
+type PrescriptionItem = z.infer<typeof prescriptionItem>;
+
+/** Texto gravado no registro da receita simulada: o aviso e um item por linha. */
+export function memedPrescriptionSummary(items: PrescriptionItem[]): string {
+  const lines = items.map((i, n) => `${n + 1}. ${i.medication}: ${i.instructions}`);
+  return `${SIMULATED_PRESCRIPTION_NOTICE}\n${lines.join('\n')}`;
+}
+
+/**
+ * Receita simples feita pelo adaptador de prescrição (hoje só o simulado). O texto gravado cabe
+ * em 2.000 caracteres; receita maior é recusada em vez de ser cortada em silêncio.
+ */
+export const memedPrescriptionSchema = z
+  .strictObject({
+    items: z
+      .array(prescriptionItem)
+      .min(1, 'Informe ao menos um medicamento.')
+      .max(10, 'No máximo 10 medicamentos.'),
+  })
+  .refine((r) => memedPrescriptionSummary(r.items).length <= 2000, {
+    message: 'A receita ficou longa demais (máximo de 2.000 caracteres no total). Reduza o texto.',
+    path: ['items'],
+  });
 export type MemedPrescriptionInput = z.infer<typeof memedPrescriptionSchema>;
 
 export const externalDocumentCancelSchema = z.strictObject({

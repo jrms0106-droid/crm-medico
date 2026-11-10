@@ -5,7 +5,7 @@ import {
   type ExternalDocumentDto,
   type ExternalPlatform,
   type MemedPrescriptionInput,
-  SIMULATED_PRESCRIPTION_NOTICE,
+  memedPrescriptionSummary,
 } from '@crm/shared';
 import { AppError } from '../common/app-error.js';
 import { Clock } from '../common/clock.js';
@@ -131,7 +131,6 @@ export class ExternalDocumentsService {
       patient: { fullName: patient.fullName, birthDate: dateOnly(patient.birthDate) },
       items: input.items,
     });
-    const lines = input.items.map((i, n) => `${n + 1}. ${i.medication}: ${i.instructions}`);
     const created = await this.prisma.externalDocument.create({
       data: {
         organizationId: org,
@@ -144,7 +143,7 @@ export class ExternalDocumentsService {
         issuedOn: new Date(
           `${toLocal(this.clock.now(), unit?.timezone ?? DEFAULT_TIMEZONE).date}T00:00:00.000Z`,
         ),
-        summary: `${SIMULATED_PRESCRIPTION_NOTICE}\n${lines.join('\n')}`.slice(0, 2000),
+        summary: memedPrescriptionSummary(input.items),
         validationCode: issued.validationCode,
       },
     });

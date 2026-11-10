@@ -11,6 +11,7 @@ import {
   startTestApp,
 } from './helpers.js';
 import { isOverlapViolation } from '../src/scheduling/scheduling.service.js';
+import { VideoMeetingProvider } from '../src/scheduling/video-meeting.js';
 
 let t: TestApp;
 
@@ -732,6 +733,22 @@ describe('teleconsulta', () => {
       teleConsent: { version: 'teleconsulta-v1' },
     });
     expect(moved.body.meetingUrl).not.toBe(second.body.meetingUrl);
+  });
+
+  it('endereço de sala que não é https é recusado e a consulta não é gravada', async () => {
+    const c = await setupClinic();
+    const provider = t.app.get(VideoMeetingProvider);
+    const original = provider.createMeeting.bind(provider);
+    try {
+      for (const url of ['javascript:alert(1)', 'http://sala.exemplo/abc', 'https://a b']) {
+        provider.createMeeting = () => Promise.resolve(url);
+        expect((await book(c, { modality: 'telemedicine' })).status).toBe(500);
+      }
+    } finally {
+      provider.createMeeting = original;
+    }
+    expect(await t.db.appointment.count()).toBe(0);
+    expect((await book(c, { modality: 'telemedicine' })).status).toBe(201);
   });
 
   it('o banco recusa sala ou consentimento em consulta presencial', async () => {

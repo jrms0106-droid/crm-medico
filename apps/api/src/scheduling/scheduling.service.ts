@@ -784,6 +784,10 @@ export class SchedulingService {
         startsAt,
         endsAt,
       });
+      // O endereço vira link na tela: só aceita https, venha de onde vier.
+      if (!/^https:\/\/[^\s]+$/.test(meetingUrl) || meetingUrl.length > 300) {
+        throw new Error('O fornecedor de vídeo devolveu um endereço de sala inválido.');
+      }
       await tx.appointment.update({ where: { id: created.id }, data: { meetingUrl } });
     }
     await tx.appointmentEvent.create({
