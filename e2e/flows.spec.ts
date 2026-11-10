@@ -182,6 +182,11 @@ test.describe.serial('fluxos por perfil', () => {
     const submit = form.getByRole('button', { name: 'Registrar consentimento' });
     await expect(submit).toBeDisabled();
     await form.getByLabel(/ouviu o termo e concordou/).check();
+    const axeConsent = await new AxeBuilder({ page })
+      .include('[aria-label="Consentimento para teleconsulta"]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(axeConsent.violations.map((v) => v.id)).toEqual([]);
     await snap(page, '25-teleconsulta-consentimento');
     await submit.click();
     await expect(form).toHaveCount(0);
@@ -267,6 +272,11 @@ test.describe.serial('fluxos por perfil', () => {
     await memedForm.getByRole('button', { name: 'Adicionar medicamento' }).click();
     await memedForm.getByLabel('Medicamento 2', { exact: true }).fill('Dipirona 500 mg (fictício)');
     await memedForm.getByLabel('Posologia 2').fill('1 comprimido se febre.');
+    const axeMemed = await new AxeBuilder({ page })
+      .include('[aria-label="Prescrever com Memed (simulado)"]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(axeMemed.violations.map((v) => v.id)).toEqual([]);
     await snap(page, '26-receita-memed-simulada-formulario');
     await memedForm.getByRole('button', { name: 'Emitir receita simulada' }).click();
     await expect(cfm.locator('.timeline')).toContainText('Memed (simulada)');
