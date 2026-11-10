@@ -23,5 +23,5 @@ Revisão feita pelo Claude em 2026-11-10 sobre o que entrou nos PRs #56 (telecon
 - **Registro retificado depois que o atendimento acabou** não mostra a marca de telemedicina, porque a marca vem do atendimento aberto no momento em que o registro foi criado. É coerente (o registro novo não foi feito na teleconsulta), mas pode surpreender; vai para a conferência clínica.
 - **Sala criada dentro da transação da marcação**, com a trava da agenda. Com fornecedor lento, a agenda fica travada por mais tempo (anotado no ADR 0043).
 - **Link da sala no lembrete** fica gravado em `crm.outbound_messages` como o resto do texto. Com WhatsApp real, entra na revisão de privacidade do fornecedor.
-- **Leitor de tela:** os formulários do consentimento e da Memed têm rótulos e foram vistos no e2e, mas a verificação automática (axe) não roda com esses formulários abertos. Ficou para uma próxima rodada de acessibilidade.
+- **Leitor de tela:** os formulários do consentimento e da Memed agora passam pela verificação automática (axe, WCAG 2.1 A/AA) com o formulário aberto, no e2e (sem violações). A verificação não substitui o teste com leitor de tela e pessoas reais.
 - A receita simulada não pode ser cancelada "no fornecedor" (não existe); o cancelamento só afeta o registro.
