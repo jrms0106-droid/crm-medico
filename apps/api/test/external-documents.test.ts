@@ -324,6 +324,32 @@ describe('receita pela Memed (simulada)', () => {
     expect((await c.as.doctor.post(memedPath(c), MEMED)).status).toBe(422);
   });
 
+  it('recusa receita longa demais em vez de cortar o texto em silêncio', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const long = {
+      items: Array.from({ length: 10 }, (_, n) => ({
+        medication: `Medicamento fictício ${n} `.padEnd(200, 'x'),
+        instructions: 'Posologia fictícia '.padEnd(300, 'y'),
+      })),
+    };
+    const res = await c.as.doctor.post(memedPath(c), long);
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('longa demais');
+    expect(await t.db.externalDocument.count()).toBe(0);
+
+    // Uma receita grande, mas que cabe, é gravada inteira.
+    const fits = {
+      items: Array.from({ length: 3 }, (_, n) => ({
+        medication: `Medicamento fictício ${n} `.padEnd(200, 'x'),
+        instructions: 'Posologia fictícia '.padEnd(300, 'y'),
+      })),
+    };
+    const ok = await c.as.doctor.post(memedPath(c), fits);
+    expect(ok.status).toBe(201);
+    expect(ok.body.summary).toContain(fits.items[2]!.instructions);
+  });
+
   it('secretária, administrador e médico sem vínculo são barrados; outra organização dá 404', async () => {
     const c = await setupClinic();
     await startEncounter(c, 'doctor', '09:00');
