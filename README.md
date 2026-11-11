@@ -33,6 +33,8 @@ Para aprender a usar as telas (secretária, médico e administrador), veja o [gu
 
 O plano completo está em [docs/planejamento/04-plano-do-mvp.md](docs/planejamento/04-plano-do-mvp.md).
 
+O que ainda depende de autorização, contratação ou conferência está em [docs/revisao/o-que-falta-de-voce.md](docs/revisao/o-que-falta-de-voce.md).
+
 ## Estrutura
 
 ```
