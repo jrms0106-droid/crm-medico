@@ -52,6 +52,10 @@ import {
   PrescriptionProvider,
   SimulatedPrescriptionProvider,
 } from './documents/prescription-provider.js';
+import {
+  QualifiedSignatureProvider,
+  SimulatedQualifiedSignatureProvider,
+} from './documents/qualified-signature-provider.js';
 import { SchedulingService } from './scheduling/scheduling.service.js';
 import { SimulatedVideoMeeting, VideoMeetingProvider } from './scheduling/video-meeting.js';
 import { ProfessionalsController } from './org/professionals.controller.js';
@@ -64,6 +68,7 @@ export interface AppOverrides {
   languageModel?: LanguageModel;
   videoMeeting?: VideoMeetingProvider;
   prescriptionProvider?: PrescriptionProvider;
+  qualifiedSignatureProvider?: QualifiedSignatureProvider;
 }
 
 @Module({})
@@ -127,6 +132,11 @@ export class AppModule {
         {
           provide: PrescriptionProvider,
           useValue: overrides.prescriptionProvider ?? new SimulatedPrescriptionProvider(),
+        },
+        {
+          provide: QualifiedSignatureProvider,
+          useValue:
+            overrides.qualifiedSignatureProvider ?? new SimulatedQualifiedSignatureProvider(),
         },
         {
           provide: VideoMeetingProvider,

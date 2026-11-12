@@ -203,6 +203,8 @@ test.describe.serial('fluxos por perfil', () => {
   });
 
   test('médico atende, registra e assina o prontuário e uma receita', async ({ page }) => {
+    // Cada reautenticação espera o próximo código de 6 dígitos (até 30 s).
+    test.setTimeout(180_000);
     await login(page, 'doctor');
     await menu(page).getByRole('link', { name: 'Agenda' }).click();
     const row = page.getByRole('row', { name: new RegExp(PATIENT) });
@@ -241,6 +243,25 @@ test.describe.serial('fluxos por perfil', () => {
     await expect(doc.getByText('Conteúdo íntegro.')).toBeVisible();
     await expect(docs.locator('.timeline')).toContainText('Receita simples');
     await snap(page, '6-receita-assinada');
+
+    // Assinatura ICP-Brasil: só simulada, com aviso, e uma vez só (ADR 0046).
+    await doc.getByRole('button', { name: 'Assinar com ICP-Brasil (simulado)' }).click();
+    const qualified = page.getByRole('form', { name: 'Confirmar assinatura ICP-Brasil simulada' });
+    await expect(qualified).toContainText('Assinatura ICP-Brasil SIMULADA, sem validade legal');
+    const axeQualified = await new AxeBuilder({ page })
+      .include('[aria-label="Confirmar assinatura ICP-Brasil simulada"]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect(axeQualified.violations.map((v) => v.id)).toEqual([]);
+    await qualified.getByLabel('Sua senha').fill(E2E_PASSWORD);
+    await qualified.getByLabel('Código de 6 dígitos').fill(await nextCode('doctor'));
+    await qualified.getByRole('button', { name: 'Confirmar assinatura simulada' }).click();
+    await expect(doc.getByText('ICP-Brasil simulada, sem validade legal')).toBeVisible();
+    await expect(doc).toContainText(/Código SIMULADO-/);
+    await expect(
+      doc.getByRole('button', { name: 'Assinar com ICP-Brasil (simulado)' }),
+    ).toHaveCount(0);
+    await snap(page, '6a-receita-icp-simulada');
     const href = await doc.getByRole('link', { name: 'Abrir PDF' }).getAttribute('href');
     const pdf = await page.request.get(href ?? '');
     expect(pdf.status()).toBe(200);

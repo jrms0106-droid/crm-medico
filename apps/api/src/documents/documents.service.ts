@@ -9,6 +9,7 @@ import {
   type DocumentSnapshot,
   type DocumentSummaryDto,
   ErrorCode,
+  type QualifiedSignatureDto,
   type documentCreateSchema,
 } from '@crm/shared';
 import type { z } from 'zod';
@@ -20,6 +21,7 @@ import type { MedicalDocument, Prisma } from '../generated/prisma/client.js';
 import type { AuthContext } from '../identity/session.service.js';
 import { canonicalJson } from '../records/records.service.js';
 import { toLocal } from '../scheduling/time.js';
+import { QualifiedSignatureProvider } from './qualified-signature-provider.js';
 
 const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
 
@@ -62,6 +64,7 @@ export class DocumentsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(Clock) private readonly clock: Clock,
+    @Inject(QualifiedSignatureProvider) private readonly qualified: QualifiedSignatureProvider,
   ) {}
 
   async find(organizationId: string, id: string): Promise<MedicalDocument | null> {
@@ -256,6 +259,63 @@ export class DocumentsService {
     return this.dto(await this.reload(doc.id));
   }
 
+  /**
+   * Segunda assinatura, ICP-Brasil (ADR 0046), sobre o documento já assinado. O fornecedor recebe
+   * só o identificador, o resumo e o signatário. Por enquanto o único fornecedor é o simulado.
+   */
+  async qualifiedSign(ctx: AuthContext, doc: MedicalDocument): Promise<DocumentDto> {
+    if (doc.status !== 'signed' || !doc.contentHash || !doc.snapshot) {
+      throw invalidTransition('Só um documento assinado pode receber a assinatura ICP-Brasil.');
+    }
+    if (documentHash(doc) !== doc.contentHash) {
+      throw invalidTransition('O conteúdo não confere com a assinatura interna.');
+    }
+    const existing = await this.prisma.qualifiedSignature.count({ where: { documentId: doc.id } });
+    if (existing > 0) {
+      throw new AppError(409, ErrorCode.CONFLICT, 'Este documento já tem assinatura ICP-Brasil.');
+    }
+    const { issuer } = doc.snapshot as unknown as DocumentSnapshot;
+    const result = await this.qualified.sign({
+      documentId: doc.id,
+      contentHash: doc.contentHash,
+      signer: { name: issuer.name, crm: issuer.crm },
+    });
+    const evidence = {
+      method: 'internal_reauth',
+      sessionId: ctx.session.id,
+      reauthAt: ctx.session.reauthAt?.toISOString() ?? null,
+      requestId: ctx.request.requestId.slice(0, 64),
+    };
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.qualifiedSignature.create({
+          data: {
+            documentId: doc.id,
+            signerUserId: ctx.user.id,
+            provider: result.provider,
+            reference: result.reference,
+            simulated: result.simulated,
+            signedContentHash: doc.contentHash as string,
+            signedAt: this.clock.now(),
+            evidence,
+          },
+          select: { id: true },
+        });
+        await this.event(tx, doc.id, 'qualified_signed', ctx.user.id, {
+          provider: result.provider,
+          simulated: result.simulated,
+        });
+      });
+    } catch (error) {
+      // Dois pedidos ao mesmo tempo: o índice único garante uma só assinatura.
+      if ((error as { code?: string }).code === 'P2002') {
+        throw new AppError(409, ErrorCode.CONFLICT, 'Este documento já tem assinatura ICP-Brasil.');
+      }
+      throw error;
+    }
+    return this.dto(await this.reload(doc.id));
+  }
+
   async cancel(ctx: AuthContext, doc: MedicalDocument, reason: string): Promise<DocumentDto> {
     if (doc.status !== 'signed')
       throw invalidTransition('Só um documento assinado pode ser cancelado.');
@@ -344,6 +404,15 @@ export class DocumentsService {
     const name = await this.names([d.authorUserId]);
     const tele = await telemedicineEncounterIds(this.prisma, [d.encounterId]);
     const frozen = (d.snapshot as DocumentSnapshot | null)?.telemedicine;
+    const qs = await this.prisma.qualifiedSignature.findUnique({ where: { documentId: d.id } });
+    const qualifiedSignature: QualifiedSignatureDto | null = qs
+      ? {
+          provider: qs.provider,
+          reference: qs.reference,
+          simulated: qs.simulated,
+          signedAt: qs.signedAt.toISOString(),
+        }
+      : null;
     return {
       id: d.id,
       patientId: d.patientId,
@@ -362,6 +431,7 @@ export class DocumentsService {
       contentHash: d.contentHash,
       signedAt: d.signedAt?.toISOString() ?? null,
       integrity: d.contentHash ? (documentHash(d) === d.contentHash ? 'valid' : 'invalid') : null,
+      qualifiedSignature,
       cancelledAt: d.cancelledAt?.toISOString() ?? null,
       cancelReason: d.cancelReason,
       createdAt: d.createdAt.toISOString(),

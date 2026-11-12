@@ -41,5 +41,8 @@ $$;
 -- permissão, a recusa vem antes, e o papel também não consegue desligar os gatilhos.
 REVOKE UPDATE, DELETE ON audit.events FROM crm_app;
 
+-- Assinatura ICP-Brasil (ADR 0046): também só acréscimo; o gatilho já recusa, a permissão recusa antes.
+REVOKE UPDATE, DELETE ON documents.qualified_signatures FROM crm_app;
+
 -- Nada no esquema public (onde fica o controle de migrações do Prisma).
 REVOKE ALL ON SCHEMA public FROM crm_app;

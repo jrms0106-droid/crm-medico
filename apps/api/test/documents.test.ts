@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { errorResponseSchema } from '@crm/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { QualifiedSignatureProvider } from '../src/documents/qualified-signature-provider.js';
 import {
   Client,
   type TestApp,
@@ -570,5 +571,168 @@ describe('telemedicina', () => {
     expect(signed.telemedicine).toBe(false);
     expect('telemedicine' in signed.snapshot).toBe(false);
     expect(signed.integrity).toBe('valid');
+  });
+});
+
+describe('assinatura ICP-Brasil simulada', () => {
+  const qualify = (client: Client, id: string) =>
+    client.post(`/documents/${id}/qualified-signature`);
+
+  it('o autor assina o documento já assinado; o fornecedor só recebe resumo e signatário', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const signed = await signedDocument(c);
+    expect(signed.qualifiedSignature).toBeNull();
+    const calls: unknown[] = [];
+    const provider = t.app.get(QualifiedSignatureProvider);
+    const original = provider.sign.bind(provider);
+    provider.sign = (request) => {
+      calls.push(request);
+      return original(request);
+    };
+    let res;
+    try {
+      res = await qualify(c.as.doctor, signed.id);
+    } finally {
+      provider.sign = original;
+    }
+    expect(res.status).toBe(200);
+    expect(res.body.qualifiedSignature).toMatchObject({
+      provider: 'simulado',
+      simulated: true,
+      reference: expect.stringMatching(/^SIMULADO-[A-Z2-9]{4}-[A-Z2-9]{4}$/),
+    });
+    // O documento continua o mesmo: status, resumo e integridade.
+    expect(res.body).toMatchObject({
+      status: 'signed',
+      contentHash: signed.contentHash,
+      integrity: 'valid',
+    });
+    expect(calls).toEqual([
+      {
+        documentId: signed.id,
+        contentHash: signed.contentHash,
+        signer: { name: signed.snapshot.issuer.name, crm: 'CRM/SP 111111' },
+      },
+    ]);
+    const row = await t.db.qualifiedSignature.findUniqueOrThrow({
+      where: { documentId: signed.id },
+    });
+    expect(row).toMatchObject({
+      signerUserId: c.doctor.id,
+      signedContentHash: signed.contentHash,
+      simulated: true,
+    });
+    const history = await c.as.doctor.get(`/documents/${signed.id}/history`);
+    expect(history.body.map((e: { type: string }) => e.type)).toEqual([
+      'created',
+      'signed',
+      'qualified_signed',
+    ]);
+    const audit = await t.db.auditEvent.findMany({
+      where: { resourceId: signed.id, action: 'sign', outcome: 'allowed' },
+    });
+    expect(audit).toHaveLength(2);
+    // O colega vê a assinatura, e o PDF continua saindo.
+    expect(
+      (await c.as.doctor.get(`/documents/${signed.id}`)).body.qualifiedSignature,
+    ).not.toBeNull();
+    expect((await pdf(c.as.doctor, signed.id)).status).toBe(200);
+    // Uma só por documento.
+    const again = await qualify(c.as.doctor, signed.id);
+    expect(again.status).toBe(409);
+    expect(errorCode(again.body)).toBe('CONFLICT');
+    expect(await t.db.qualifiedSignature.count()).toBe(1);
+  });
+
+  it('nega a quem não é o autor, sem reautenticação recente e fora do estado assinado', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    await startEncounter(c, 'otherDoctor', '10:00');
+    const signed = await signedDocument(c);
+    // A política nega antes de pedir reautenticação; o colega reautenticado também é negado.
+    await c.as.otherDoctor.reauth(c.otherDoctor, t.clock);
+    for (const who of ['secretary', 'admin', 'otherDoctor'] as const) {
+      expect((await qualify(c.as[who], signed.id)).status).toBe(403);
+    }
+    const denied = await t.db.auditEvent.findFirst({
+      where: { resourceId: signed.id, action: 'sign', outcome: 'denied', reason: 'not_author' },
+    });
+    expect(denied).not.toBeNull();
+    // Sem reautenticação recente.
+    t.clock.advance(20 * 60_000);
+    const noReauth = await qualify(c.as.doctor, signed.id);
+    expect(noReauth.status).toBe(403);
+    expect(errorCode(noReauth.body)).toBe('REAUTH_REQUIRED');
+    await c.as.doctor.reauth(c.doctor, t.clock);
+    // Rascunho e cancelado não recebem.
+    const draft = await c.as.doctor.post(`/patients/${c.patientId}/documents`, PRESCRIPTION);
+    expect((await qualify(c.as.doctor, draft.body.id)).status).toBe(409);
+    const cancelled = await c.as.doctor.post(`/documents/${signed.id}/cancel`, {
+      reason: 'Emitido para o paciente errado (teste).',
+    });
+    expect(cancelled.status).toBe(200);
+    const res = await qualify(c.as.doctor, signed.id);
+    expect(res.status).toBe(409);
+    expect(errorCode(res.body)).toBe('INVALID_STATE_TRANSITION');
+    // Documento inexistente.
+    expect((await qualify(c.as.doctor, '01900000-0000-7000-8000-000000000000')).status).toBe(404);
+    expect(await t.db.qualifiedSignature.count()).toBe(0);
+  });
+
+  it('se o fornecedor falhar, nada é gravado', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const signed = await signedDocument(c);
+    const provider = t.app.get(QualifiedSignatureProvider);
+    const original = provider.sign.bind(provider);
+    provider.sign = () => Promise.reject(new Error('fornecedor fora do ar'));
+    try {
+      expect((await qualify(c.as.doctor, signed.id)).status).toBe(500);
+    } finally {
+      provider.sign = original;
+    }
+    expect(await t.db.qualifiedSignature.count()).toBe(0);
+    const history = await c.as.doctor.get(`/documents/${signed.id}/history`);
+    expect(history.body.map((e: { type: string }) => e.type)).toEqual(['created', 'signed']);
+  });
+
+  it('o banco só aceita assinatura simulada, do autor, com o mesmo resumo, e não deixa alterar', async () => {
+    const c = await setupClinic();
+    await startEncounter(c, 'doctor', '09:00');
+    const signed = await signedDocument(c);
+    const base = {
+      documentId: signed.id,
+      signerUserId: c.doctor.id,
+      provider: 'simulado',
+      reference: 'SIMULADO-AAAA-BBBB',
+      simulated: true,
+      signedContentHash: signed.contentHash as string,
+      signedAt: new Date(),
+      evidence: {},
+    };
+    await expect(
+      t.db.qualifiedSignature.create({ data: { ...base, simulated: false } }),
+    ).rejects.toThrow();
+    await expect(
+      t.db.qualifiedSignature.create({ data: { ...base, provider: 'fornecedor-real' } }),
+    ).rejects.toThrow();
+    await expect(
+      t.db.qualifiedSignature.create({ data: { ...base, signedContentHash: 'b'.repeat(64) } }),
+    ).rejects.toThrow(/resumo assinado não confere/);
+    await expect(
+      t.db.qualifiedSignature.create({ data: { ...base, signerUserId: c.otherDoctor.id } }),
+    ).rejects.toThrow(/Só o autor/);
+    const draft = await c.as.doctor.post(`/patients/${c.patientId}/documents`, PRESCRIPTION);
+    await expect(
+      t.db.qualifiedSignature.create({ data: { ...base, documentId: draft.body.id } }),
+    ).rejects.toThrow(/Só documento assinado/);
+    const row = await t.db.qualifiedSignature.create({ data: base });
+    await expect(
+      t.db.qualifiedSignature.update({ where: { id: row.id }, data: { reference: 'OUTRO' } }),
+    ).rejects.toThrow(/somente-acréscimo/);
+    await expect(t.db.qualifiedSignature.delete({ where: { id: row.id } })).rejects.toThrow(
+      /somente-acréscimo/,
+    );
   });
 });

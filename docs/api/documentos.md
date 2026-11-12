@@ -50,12 +50,22 @@ Regras de conteúdo:
 - `GET /documents/:id` recalcula o resumo e informa `integrity: "valid"` ou `"invalid"`.
 - Repetir a assinatura não duplica nada: a gravação é condicional à versão e ao estado, e a segunda tentativa recebe 409. Por isso a assinatura não usa o cabeçalho `Idempotency-Key` previsto na arquitetura (ver ADR 0018).
 
+## Assinatura ICP-Brasil (só simulada)
+
+Depois da assinatura interna, o autor pode pedir uma **segunda assinatura, ICP-Brasil** ([ADR 0046](../adr/0046-assinatura-icp-brasil-simulada.md)). **Hoje ela é só simulada**: nenhum serviço de assinatura foi contratado, o código gerado começa com `SIMULADO-` e não vale em farmácia nem em validador.
+
+- `POST /documents/:id/qualified-signature`: mesma permissão da assinatura (ação `sign`, só o autor, com vínculo) e reautenticação recente. Rascunho ou cancelado: 409 `INVALID_STATE_TRANSITION`; já assinado com ICP-Brasil: 409 `CONFLICT`.
+- O fornecedor recebe só o identificador do documento, o resumo SHA-256 e o signatário (nome e CRM). Nada de conteúdo clínico nem dados do paciente. Se ele falhar, nada é gravado.
+- Fica em `documents.qualified_signatures`, uma por documento, só de acréscimo. Um gatilho confere que o documento está assinado, que o resumo é o mesmo e que quem assina é o autor. Enquanto só existir o simulado, o banco só aceita `simulated = true`.
+- `GET /documents/:id` traz `qualifiedSignature` (fornecedor, código, `simulated`, data) ou `null`; o histórico ganha o evento `qualified_signed`.
+
 ## PDF
 
 `GET /documents/:id/pdf` gera o PDF na hora, a partir do documento gravado (o PDF não é guardado):
 
 - cabeçalho com organização e unidade; título do tipo; paciente; conteúdo; local e data; nome, CRM/UF e RQE do emitente;
 - rodapé com o identificador do documento, o resumo SHA-256 e a frase "Assinado eletronicamente no sistema (assinatura interna, sem certificado ICP-Brasil)";
+- com a assinatura ICP-Brasil simulada, o rodapé ganha a linha "Assinatura ICP-Brasil SIMULADA, sem validade legal (código SIMULADO-...)";
 - rascunho sai com a faixa "RASCUNHO — SEM VALIDADE"; cancelado, com "CANCELADO";
 - rascunho de outro autor não existe (404), como no prontuário.
 
@@ -81,23 +91,24 @@ O recurso na política é `medical_document`, de dado clínico. Segue o vínculo
 
 ## Endpoints (`/api/v1`, sessão `active`)
 
-| Método e rota                  | O que faz                                                        |
-| ------------------------------ | ---------------------------------------------------------------- |
-| `POST /patients/:id/documents` | cria rascunho `{ kind, content }`, ligado ao atendimento aberto  |
-| `GET /patients/:id/documents`  | lista os documentos visíveis, do mais recente para o mais antigo |
-| `GET /documents/:id`           | documento com `integrity`                                        |
-| `GET /documents/:id/history`   | eventos do documento                                             |
-| `PATCH /documents/:id`         | grava o rascunho `{ version, content }`                          |
-| `POST /documents/:id/sign`     | assina `{ version }` (reautenticação recente)                    |
-| `POST /documents/:id/discard`  | descarta o rascunho                                              |
-| `POST /documents/:id/cancel`   | cancela o assinado `{ reason }`                                  |
-| `GET /documents/:id/pdf`       | PDF do documento                                                 |
+| Método e rota                             | O que faz                                                        |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| `POST /patients/:id/documents`            | cria rascunho `{ kind, content }`, ligado ao atendimento aberto  |
+| `GET /patients/:id/documents`             | lista os documentos visíveis, do mais recente para o mais antigo |
+| `GET /documents/:id`                      | documento com `integrity`                                        |
+| `GET /documents/:id/history`              | eventos do documento                                             |
+| `PATCH /documents/:id`                    | grava o rascunho `{ version, content }`                          |
+| `POST /documents/:id/sign`                | assina `{ version }` (reautenticação recente)                    |
+| `POST /documents/:id/qualified-signature` | assinatura ICP-Brasil simulada (reautenticação recente)          |
+| `POST /documents/:id/discard`             | descarta o rascunho                                              |
+| `POST /documents/:id/cancel`              | cancela o assinado `{ reason }`                                  |
+| `GET /documents/:id/pdf`                  | PDF do documento                                                 |
 
 Toda rota tem teste de acesso permitido e negado (`apps/api/test/documents.test.ts`).
 
 ## Limites conhecidos
 
-- Assinatura interna, sem ICP-Brasil e sem validação jurídica (ver o aviso no início).
+- Assinatura interna, sem ICP-Brasil e sem validação jurídica (ver o aviso no início). A assinatura ICP-Brasil existe só simulada, à espera de um serviço contratado; a cópia FHIR do prontuário ainda não a inclui.
 - Sem receita de controle especial, sem receita antimicrobiana e sem integração com plataformas de prescrição eletrônica. Esses documentos são emitidos na plataforma do CFM e só registrados aqui ([documentos-externos.md](documentos-externos.md)).
 - A unidade ainda não tem endereço cadastrado, que receitas costumam exigir. Entra quando os campos forem validados.
 - Não há verificação pública de autenticidade (QR code ou página de conferência). É uma superfície exposta na internet e fica para quando houver hospedagem e validação jurídica.

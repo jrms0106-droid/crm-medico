@@ -125,6 +125,18 @@ export class DocumentsController {
     return this.documents.sign(ctx, doc, parseBody(documentVersionSchema, body).version);
   }
 
+  /** Assinatura ICP-Brasil, só simulada por enquanto (ADR 0046). Mesma permissão da assinatura. */
+  @Post('documents/:id/qualified-signature')
+  @HttpCode(200)
+  async qualifiedSign(
+    @Auth() ctx: AuthContext,
+    @Param('id', uuid) id: string,
+  ): Promise<DocumentDto> {
+    const doc = await this.load(ctx, id, 'sign');
+    this.authz.requireRecentReauth(ctx);
+    return this.documents.qualifiedSign(ctx, doc);
+  }
+
   @Post('documents/:id/discard')
   @HttpCode(200)
   async discard(@Auth() ctx: AuthContext, @Param('id', uuid) id: string): Promise<DocumentDto> {
