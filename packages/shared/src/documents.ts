@@ -13,6 +13,18 @@ export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
 export const TELEMEDICINE_NOTICE = 'Emitido por telemedicina (Resolução CFM 2.314/2022).';
 
+/** Aviso da assinatura ICP-Brasil simulada (ADR 0046): aparece na tela e no PDF. */
+export const SIMULATED_QUALIFIED_SIGNATURE_NOTICE =
+  'Assinatura ICP-Brasil SIMULADA, sem validade legal';
+
+/** Assinatura ICP-Brasil feita depois da interna (ADR 0046). Por enquanto, sempre simulada. */
+export interface QualifiedSignatureDto {
+  provider: string;
+  reference: string;
+  simulated: boolean;
+  signedAt: string;
+}
+
 export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
   prescription: 'Receita simples',
   certificate: 'Atestado',
@@ -192,6 +204,8 @@ export interface DocumentDto {
   contentHash: string | null;
   signedAt: string | null;
   integrity: 'valid' | 'invalid' | null;
+  /** Segunda assinatura, ICP-Brasil (ADR 0046); `null` quando não há. */
+  qualifiedSignature: QualifiedSignatureDto | null;
   cancelledAt: string | null;
   cancelReason: string | null;
   createdAt: string;

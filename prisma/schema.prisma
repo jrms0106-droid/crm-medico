@@ -713,35 +713,53 @@ enum DocumentStatus {
 /// Documento médico (receita, atestado, pedido, encaminhamento, relatório). Depois de assinado,
 /// fica congelado por gatilho no banco (docs/api/documentos.md).
 model MedicalDocument {
-  id                String          @id @default(uuid(7)) @db.Uuid
-  organizationId    String          @map("organization_id") @db.Uuid
-  patientId         String          @map("patient_id") @db.Uuid
-  patient           Patient         @relation(fields: [patientId], references: [id], onDelete: Restrict)
-  authorUserId      String          @map("author_user_id") @db.Uuid
-  encounterId       String?         @map("encounter_id") @db.Uuid
-  encounter         Encounter?      @relation(fields: [encounterId], references: [id], onDelete: Restrict)
-  unitId            String?         @map("unit_id") @db.Uuid
-  kind              DocumentKind
-  status            DocumentStatus  @default(draft)
-  version           Int             @default(1)
-  content           Json
+  id                 String              @id @default(uuid(7)) @db.Uuid
+  organizationId     String              @map("organization_id") @db.Uuid
+  patientId          String              @map("patient_id") @db.Uuid
+  patient            Patient             @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  authorUserId       String              @map("author_user_id") @db.Uuid
+  encounterId        String?             @map("encounter_id") @db.Uuid
+  encounter          Encounter?          @relation(fields: [encounterId], references: [id], onDelete: Restrict)
+  unitId             String?             @map("unit_id") @db.Uuid
+  kind               DocumentKind
+  status             DocumentStatus      @default(draft)
+  version            Int                 @default(1)
+  content            Json
   /// Emitente, paciente e local no momento da assinatura.
-  snapshot          Json?
+  snapshot           Json?
   /// Data de emissão, local da unidade.
-  issuedOn          DateTime?       @map("issued_on") @db.Date
-  contentHash       String?         @map("content_hash") @db.Char(64)
-  signedAt          DateTime?       @map("signed_at") @db.Timestamptz(3)
-  signatureEvidence Json?           @map("signature_evidence")
-  cancelledAt       DateTime?       @map("cancelled_at") @db.Timestamptz(3)
-  cancelledByUserId String?         @map("cancelled_by_user_id") @db.Uuid
-  cancelReason      String?         @map("cancel_reason") @db.VarChar(1000)
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
-  events            DocumentEvent[]
+  issuedOn           DateTime?           @map("issued_on") @db.Date
+  contentHash        String?             @map("content_hash") @db.Char(64)
+  signedAt           DateTime?           @map("signed_at") @db.Timestamptz(3)
+  signatureEvidence  Json?               @map("signature_evidence")
+  cancelledAt        DateTime?           @map("cancelled_at") @db.Timestamptz(3)
+  cancelledByUserId  String?             @map("cancelled_by_user_id") @db.Uuid
+  cancelReason       String?             @map("cancel_reason") @db.VarChar(1000)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+  events             DocumentEvent[]
+  qualifiedSignature QualifiedSignature?
 
   @@index([patientId, createdAt])
   @@index([authorUserId])
   @@map("medical_documents")
+  @@schema("documents")
+}
+
+/// Assinatura ICP-Brasil, depois da interna; só simulada por enquanto (ADR 0046). Só acréscimo.
+model QualifiedSignature {
+  id                String          @id @default(uuid(7)) @db.Uuid
+  documentId        String          @unique @map("document_id") @db.Uuid
+  document          MedicalDocument @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  signerUserId      String          @map("signer_user_id") @db.Uuid
+  provider          String          @db.VarChar(40)
+  reference         String          @db.VarChar(120)
+  simulated         Boolean
+  signedContentHash String          @map("signed_content_hash") @db.Char(64)
+  signedAt          DateTime        @map("signed_at") @db.Timestamptz(3)
+  evidence          Json
+
+  @@map("qualified_signatures")
   @@schema("documents")
 }
 

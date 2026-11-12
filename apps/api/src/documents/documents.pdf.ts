@@ -7,6 +7,7 @@ import {
   type PrescriptionContent,
   type ReferralContent,
   type ReportContent,
+  SIMULATED_QUALIFIED_SIGNATURE_NOTICE,
   TELEMEDICINE_NOTICE,
 } from '@crm/shared';
 
@@ -100,11 +101,15 @@ function footer(pdf: Doc, d: DocumentDto, page: number, pages: number) {
   pdf.page.margins.bottom = 0; // escrever no rodapé sem abrir página nova
   const lines = [
     d.contentHash ? SIGNATURE_NOTICE : 'Documento não assinado.',
+    ...(d.qualifiedSignature
+      ? [`${SIMULATED_QUALIFIED_SIGNATURE_NOTICE} (código ${d.qualifiedSignature.reference}).`]
+      : []),
     `Documento ${d.id}${d.contentHash ? ` · SHA-256 ${d.contentHash}` : ''}`,
     `Página ${page} de ${pages}`,
   ];
   pdf.font('Helvetica').fontSize(7).fillColor('#555555');
-  pdf.text(lines.join('\n'), margins.left, height - 46, {
+  // Cada linha a mais sobe o rodapé (3 linhas começam 46 pt acima da borda).
+  pdf.text(lines.join('\n'), margins.left, height - (lines.length * 9 + 19), {
     width: width - margins.left - margins.right,
     align: 'center',
   });

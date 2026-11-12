@@ -11,6 +11,7 @@ import {
   type PrescriptionContent,
   type ReferralContent,
   type ReportContent,
+  SIMULATED_QUALIFIED_SIGNATURE_NOTICE,
   type SessionInfo,
 } from '@crm/shared';
 import { ApiError, api } from '../api';
@@ -191,6 +192,7 @@ function DocumentView({
   const action = useAction();
   const [editing, setEditing] = useState(false);
   const [signing, setSigning] = useState(false);
+  const [qualifying, setQualifying] = useState(false);
   const d = doc.data;
   const mine = d?.author.id === session.user.id;
 
@@ -258,6 +260,13 @@ function DocumentView({
                   : 'Atenção: o conteúdo não confere com a assinatura.'}
               </p>
             )}
+            {d.qualifiedSignature && (
+              <p className="small">
+                <Badge tone="warn">ICP-Brasil simulada, sem validade legal</Badge> Código{' '}
+                {d.qualifiedSignature.reference}, em {formatDateTime(d.qualifiedSignature.signedAt)}
+                .
+              </p>
+            )}
             {d.status === 'cancelled' && (
               <Notice kind="warn">Documento cancelado. Motivo: {d.cancelReason}</Notice>
             )}
@@ -279,6 +288,11 @@ function DocumentView({
                     Descartar
                   </button>
                 </>
+              )}
+              {mine && d.status === 'signed' && !d.qualifiedSignature && (
+                <button type="button" className="secondary" onClick={() => setQualifying(true)}>
+                  Assinar com ICP-Brasil (simulado)
+                </button>
               )}
               {mine && d.status === 'signed' && (
                 <button type="button" className="secondary" onClick={cancel}>
@@ -302,6 +316,25 @@ function DocumentView({
                   <strong>Assinatura eletrônica interna, sem ICP-Brasil.</strong> Depois de
                   assinado, o documento não pode mais ser alterado; se houver erro, cancele e emita
                   outro.
+                </p>
+              </ReauthDialog>
+            )}
+            {qualifying && (
+              <ReauthDialog
+                session={session}
+                label="Confirmar assinatura ICP-Brasil simulada"
+                confirmText="Confirmar assinatura simulada"
+                onCancel={() => setQualifying(false)}
+                onConfirm={async () => {
+                  await api.post(`/documents/${d.id}/qualified-signature`);
+                  setQualifying(false);
+                  changed();
+                }}
+              >
+                <p>
+                  <strong>{SIMULATED_QUALIFIED_SIGNATURE_NOTICE}.</strong> Nenhum serviço de
+                  assinatura foi contratado: o código gerado serve só para testar o fluxo e não vale
+                  na farmácia nem em nenhum validador.
                 </p>
               </ReauthDialog>
             )}
