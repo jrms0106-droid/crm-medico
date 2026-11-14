@@ -69,6 +69,9 @@ Usuários fictícios criados pelo seed (senha `senha-de-desenvolvimento`, só pa
 No primeiro login, médico e administrador cadastram a verificação em duas etapas num aplicativo autenticador.
 O seed também cria a "Unidade Centro", quatro especialidades, a ficha profissional do médico (CRM 000001/SP, fictício) três pacientes fictícios e a agenda do médico (segunda a sexta, 08:00–12:00 e 14:00–18:00).
 
+Para usar só num Mac, sem hospedagem (com o celular pelo mesmo Wi-Fi), veja
+[docs/guia/usar-num-mac.md](docs/guia/usar-num-mac.md).
+
 ## Verificações
 
 ```bash
