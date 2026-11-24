@@ -45,6 +45,7 @@
   "type": "module",
   "overrides": {
     "@trickfilm400/rollup-plugin-off-main-thread": "^4.0.0",
+    "effect": "^3.22.1",
     "glob": "^14.0.2",
     "minimatch": "^11.0.1"
   }
