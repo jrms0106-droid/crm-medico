@@ -1,0 +1,9 @@
+# ADR 0047: `effect` corrigido por `overrides` enquanto o Prisma não atualiza
+
+- **Status:** aceito (2026-11-24, rodada automática)
+- **Contexto:** Saiu um aviso de gravidade alta para o pacote `effect` até a versão 3.22.0 (GHSA-7589-6fvf-x4pw, lentidão por expressão regular em `Schema.TemplateLiteral`). O `effect` chega ao projeto só pelo `@prisma/config`, que o Prisma 7.10.1 fixa na versão exata 3.20.0. A última versão do Prisma publicada também fixa 3.20.0. Com isso o passo "Dependências e segredos" do CI (`npm audit --audit-level=high`) passou a falhar na `main` e em todo PR, inclusive no #68 do dependabot.
+- **Decisão:** O `package.json` da raiz ganha `"effect": "^3.22.1"` nos `overrides`, como já é feito para `glob`, `minimatch` e o plugin do PWA ([ADR 0029](0029-avisos-do-build-e-registro-de-erros.md)). O lockfile passa a ter o `effect` 3.22.5, mesma versão principal (3), sem nenhuma outra dependência nova.
+- **Motivo:** A correção sugerida pelo `npm audit fix --force` volta o Prisma para a 6.12.0, que é outra versão principal e quebraria o cliente gerado e as migrações. Subir só o `effect` dentro da versão 3 corrige sem mexer no Prisma.
+- **Risco:** O `@prisma/config` foi testado pelo Prisma com o `effect` 3.20.0, não com a 3.22.5. O `effect` segue versionamento semântico, e o projeto inteiro (build, testes de unidade e integração com o banco, e2e) passou com a versão nova. O `@prisma/config` só lê o `prisma.config.ts` do próprio projeto, no build e nas migrações, então não recebe entrada de usuário.
+- **Alternativas descartadas:** `npm audit fix --force` (volta o Prisma para 6.12.0); desligar o `npm audit` no CI ou baixar o nível para `critical` (esconderia o aviso); esperar o Prisma (deixa o CI vermelho e trava os PRs do dependabot).
+- **Revisar quando:** Uma versão do Prisma trouxer o `effect` 3.22.1 ou maior. Nesse dia, tirar o `effect` dos `overrides`.
